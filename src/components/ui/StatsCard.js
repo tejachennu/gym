@@ -56,53 +56,63 @@ export default function StatsCard({
 
 const styles = {
   card: {
-    padding: '20px 24px',
+    padding: '12px 14px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '8px',
+    borderRadius: '14px'
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: '4px'
   },
   title: {
-    fontSize: '0.85rem',
-    fontWeight: 600,
+    fontSize: '0.72rem',
+    fontWeight: 700,
     color: 'var(--text-secondary, #AAAAAA)',
-    letterSpacing: '-0.01em',
+    letterSpacing: '0.2px',
+    textTransform: 'uppercase',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap'
   },
   iconBadge: {
-    width: '36px',
-    height: '36px',
-    borderRadius: '10px',
+    width: '30px',
+    height: '30px',
+    borderRadius: '8px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0
   },
   valueRow: {
     display: 'flex',
-    alignItems: 'baseline',
-    gap: '12px',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '6px',
+    flexWrap: 'wrap'
   },
   value: {
-    fontSize: '1.85rem',
-    fontWeight: 800,
+    fontSize: '1.4rem',
+    fontWeight: 900,
     color: '#FFFFFF',
-    letterSpacing: '-0.03em',
+    letterSpacing: '-0.02em',
     lineHeight: 1,
   },
   changeBadge: {
-    display: 'flex',
+    display: 'inline-flex',
     alignItems: 'center',
-    gap: '4px',
-    padding: '3px 8px',
-    borderRadius: '20px',
-    fontSize: '0.75rem',
-    fontWeight: 600,
+    gap: '3px',
+    padding: '2px 6px',
+    borderRadius: '12px',
+    fontSize: '0.65rem',
+    fontWeight: 700,
+    whiteSpace: 'nowrap'
   },
   description: {
-    fontSize: '0.75rem',
+    fontSize: '0.7rem',
     color: 'var(--text-muted, #666666)',
   },
 };

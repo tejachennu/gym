@@ -4,6 +4,7 @@ import React from 'react';
 
 const Badge = ({ 
   text, 
+  children,
   variant = 'default', 
   size = 'md', 
   dot = false,
@@ -49,7 +50,7 @@ const Badge = ({
   return (
     <span style={badgeStyle}>
       {dot && <span style={dotStyle} />}
-      {text}
+      {text || children}
     </span>
   );
 };

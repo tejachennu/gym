@@ -42,6 +42,17 @@ const MEAL_SLOTS = [
   { id: 'dinner', name: 'Dinner', icon: '🍲', defaultTime: '08:00 PM' },
 ];
 
+function formatDateNice(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch (e) {
+    return dateStr;
+  }
+}
+
 export default function DietPlansPage() {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState('client-diets'); // 'client-diets' | 'templates'
@@ -487,14 +498,16 @@ export default function DietPlansPage() {
                 <div style={styles.grid}>
                   {clientPlans.map((plan) => (
                     <Card key={plan.id} style={styles.planCard} className="glass-card">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <h3 style={{ margin: '0 0 4px', fontSize: '1.2rem', color: '#FFFFFF', fontWeight: 700 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '10px' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <h3 style={{ margin: '0 0 4px', fontSize: '1.05rem', color: '#FFFFFF', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {plan.planTitle || 'Diet Plan'}
                           </h3>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
-                            <Calendar size={14} color="var(--accent, #E00008)" />
-                            Valid: <strong>{plan.fromDate}</strong> ➔ <strong>{plan.toDate}</strong>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.65)', backgroundColor: 'rgba(255, 255, 255, 0.03)', padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                            <Calendar size={12} color="var(--accent, #E00008)" />
+                            <span style={{ whiteSpace: 'nowrap' }}>{formatDateNice(plan.fromDate)}</span>
+                            <span>➔</span>
+                            <span style={{ whiteSpace: 'nowrap' }}>{formatDateNice(plan.toDate)}</span>
                           </div>
                         </div>
                         <Badge variant={plan.status === 'active' ? 'success' : plan.status === 'scheduled' ? 'warning' : 'secondary'}>
@@ -1001,15 +1014,15 @@ const styles = {
     borderRadius: '10px',
     border: '1px solid var(--border, #2a2a30)',
   },
-  macroInputGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr auto', gap: '6px', alignItems: 'center' },
+  macroInputGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(60px, 1fr))', gap: '6px', alignItems: 'center' },
   trashBtn: { backgroundColor: 'transparent', border: 'none', color: '#ff1744', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   macroStat: { textAlign: 'center' },
-  macroVal: { fontSize: '1.25rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' },
-  macroLbl: { fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px', fontWeight: 600 },
+  macroVal: { fontSize: '1.1rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' },
+  macroLbl: { fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '2px', fontWeight: 600 },
   templateGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-    gap: '20px',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+    gap: '12px',
   },
   templateCard: { padding: '20px', display: 'flex', flexDirection: 'column' },
   tmplBadge: {

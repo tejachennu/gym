@@ -91,14 +91,32 @@ export default function ClientsPage() {
     }
   };
 
+  // Helper for Membership Status
+  const getMembershipStatus = (client) => {
+    if (client.status === 'inactive') return { label: 'Inactive', variant: 'warning' };
+    if (!client.currentPlan) return { label: 'Active', variant: 'success' };
+    if (client.planExpiry) {
+      const isExpired = new Date(client.planExpiry).getTime() < new Date().getTime();
+      if (isExpired) return { label: 'Expired', variant: 'danger' };
+    }
+    return { label: 'Active Member', variant: 'success' };
+  };
+
+  // Sort descending by registration / creation date
+  const sortedClients = [...clients].sort((a, b) => {
+    const tA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+    const tB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+    return tB - tA;
+  });
+
   // Filter clients
-  const filteredClients = clients.filter(c => {
+  const filteredClients = sortedClients.filter(c => {
     const matchesSearch = 
-      c.displayName?.toLowerCase().includes(search.toLowerCase()) ||
+      (c.displayName || c.name)?.toLowerCase().includes(search.toLowerCase()) ||
       c.email?.toLowerCase().includes(search.toLowerCase()) ||
       c.phone?.toLowerCase().includes(search.toLowerCase());
     
-    const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
+    const matchesStatus = statusFilter === 'all' || (c.status || 'active') === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -172,50 +190,53 @@ export default function ClientsPage() {
       ) : (
         <>
           <div style={styles.grid}>
-            {paginatedClients.map(client => (
-              <Card 
-                key={client.id} 
-                style={styles.card}
-                className="glass-card"
-                onClick={() => router.push(`/admin/clients/${client.id}`)}
-              >
-                <div style={styles.cardHeader}>
-                  <Avatar src={client.photoURL} name={client.displayName || client.name} size="lg" />
-                  <div style={styles.cardInfo}>
-                    <h3 style={styles.clientName}>{client.displayName || client.name || 'No Name'}</h3>
-                    <p style={styles.clientEmail}>{client.email}</p>
+            {paginatedClients.map(client => {
+              const memStatus = getMembershipStatus(client);
+              return (
+                <Card 
+                  key={client.id} 
+                  style={styles.card}
+                  className="glass-card"
+                  onClick={() => router.push(`/admin/clients/${client.id}`)}
+                >
+                  <div style={styles.cardHeader}>
+                    <Avatar src={client.photoURL} name={client.displayName || client.name} size="lg" />
+                    <div style={styles.cardInfo}>
+                      <h3 style={styles.clientName}>{client.displayName || client.name || 'No Name'}</h3>
+                      <p style={styles.clientEmail}>{client.email}</p>
+                    </div>
+                    <ChevronRight size={18} color="var(--text-muted, #666666)" />
                   </div>
-                  <ChevronRight size={18} color="var(--text-muted, #666666)" />
-                </div>
 
-                <div style={styles.cardDetails}>
-                  {client.phone && (
+                  <div style={styles.cardDetails}>
+                    {client.phone && (
+                      <div style={styles.detailRow}>
+                        <span style={styles.detailLabel}><Phone size={14} /> Phone:</span>
+                        <span style={styles.detailValue}>{client.phone}</span>
+                      </div>
+                    )}
+                    {(client.age || client.gender) && (
+                      <div style={styles.detailRow}>
+                        <span style={styles.detailLabel}><UserIcon size={14} /> Demographics:</span>
+                        <span style={styles.detailValue}>
+                          {client.age ? `${client.age} yrs` : ''} {client.gender ? `(${client.gender})` : ''}
+                        </span>
+                      </div>
+                    )}
                     <div style={styles.detailRow}>
-                      <span style={styles.detailLabel}><Phone size={14} /> Phone:</span>
-                      <span style={styles.detailValue}>{client.phone}</span>
+                      <span style={styles.detailLabel}><CreditCard size={14} /> Active Plan:</span>
+                      <span style={styles.detailValue}>{client.currentPlan || 'Not Assigned'}</span>
                     </div>
-                  )}
-                  {(client.age || client.gender) && (
                     <div style={styles.detailRow}>
-                      <span style={styles.detailLabel}><UserIcon size={14} /> Demographics:</span>
-                      <span style={styles.detailValue}>
-                        {client.age ? `${client.age} yrs` : ''} {client.gender ? `(${client.gender})` : ''}
-                      </span>
+                      <span style={styles.detailLabel}>Membership Status:</span>
+                      <Badge variant={memStatus.variant}>
+                        {memStatus.label}
+                      </Badge>
                     </div>
-                  )}
-                  <div style={styles.detailRow}>
-                    <span style={styles.detailLabel}><CreditCard size={14} /> Active Plan:</span>
-                    <span style={styles.detailValue}>{client.currentPlan || 'Not Assigned'}</span>
                   </div>
-                  <div style={styles.detailRow}>
-                    <span style={styles.detailLabel}>Membership Status:</span>
-                    <Badge variant={client.status === 'active' ? 'success' : 'warning'}>
-                      {client.status || 'Active'}
-                    </Badge>
-                  </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
 
           {filteredClients.length === 0 && (
@@ -311,46 +332,46 @@ export default function ClientsPage() {
 }
 
 const styles = {
-  container: { display: 'flex', flexDirection: 'column', gap: '24px' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' },
-  titleRow: { display: 'flex', alignItems: 'center', gap: '12px' },
+  container: { display: 'flex', flexDirection: 'column', gap: '16px' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' },
+  titleRow: { display: 'flex', alignItems: 'center', gap: '10px' },
   titleIcon: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '12px',
+    width: '36px',
+    height: '36px',
+    borderRadius: '10px',
     backgroundColor: 'var(--accent-surface, rgba(224, 0, 8, 0.1))',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     border: '1px solid rgba(224, 0, 8, 0.2)',
   },
-  title: { fontSize: '1.85rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' },
-  subtitle: { color: 'var(--text-secondary, #AAAAAA)', margin: '4px 0 0 0', fontSize: '0.9rem' },
-  addBtn: { display: 'flex', alignItems: 'center', gap: '8px' },
+  title: { fontSize: '1.25rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' },
+  subtitle: { color: 'var(--text-secondary, #AAAAAA)', margin: '4px 0 0 0', fontSize: '0.825rem' },
+  addBtn: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' },
   controlsBar: {
     display: 'flex',
-    justifyContent: 'space-between',
+    justify: 'space-between',
     alignItems: 'center',
-    gap: '16px',
+    gap: '10px',
     flexWrap: 'wrap',
   },
-  searchWrapper: { flex: 1, minWidth: '280px', maxWidth: '450px' },
+  searchWrapper: { flex: 1, minWidth: '200px', maxWidth: '100%' },
   filterWrapper: { display: 'flex', alignItems: 'center', gap: '8px' },
-  filterLabel: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' },
+  filterLabel: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)' },
   filterSelect: {
     backgroundColor: 'var(--card, #121214)',
     border: '1px solid var(--border, #2a2a30)',
     color: '#FFFFFF',
-    padding: '10px 14px',
-    borderRadius: '12px',
-    fontSize: '0.85rem',
+    padding: '8px 12px',
+    borderRadius: '10px',
+    fontSize: '0.8rem',
     outline: 'none',
     cursor: 'pointer',
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-    gap: '20px',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+    gap: '12px',
   },
   card: {
     padding: '20px',

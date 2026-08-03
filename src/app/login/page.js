@@ -108,17 +108,19 @@ export default function LoginPage() {
       background: 'radial-gradient(circle at center, #1a1a1e 0%, var(--bg) 100%)',
       padding: '20px'
     }}>
-      <Card style={{ width: '100%', maxWidth: '420px', padding: '40px 20px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: '5px' }}>
-          <span style={{ color: 'var(--accent)' }}>Power</span>
-          <span style={{ color: 'white' }}>House</span>
+      <Card style={{ width: '100%', maxWidth: '420px', padding: '36px 24px', textAlign: 'center', borderRadius: '16px' }} className="glass-card">
+        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '48px', height: '48px', borderRadius: '12px', backgroundColor: 'var(--accent, #E00008)', marginBottom: '12px' }} className="pulse-glow">
+          <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#FFFFFF' }}>MRK</span>
+        </div>
+        <h1 style={{ fontSize: '1.6rem', fontWeight: 900, marginBottom: '2px', color: '#FFFFFF' }}>
+          MRK <span style={{ color: 'var(--accent, #E00008)' }}>FITNESS</span>
         </h1>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '25px' }}>Fitness Management Portal</p>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.825rem', marginBottom: '24px' }}>Radha Krishna Maram — Management Portal</p>
         
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <Input 
             type="email" 
-            placeholder="Email" 
+            placeholder="Email Address" 
             value={email} 
             onChange={(e) => setEmail(e.target.value)} 
             required 
@@ -132,32 +134,34 @@ export default function LoginPage() {
             required 
             icon="🔒"
           />
-          <div style={{ textAlign: 'right', marginTop: '-5px' }}>
-            <span style={{ color: 'var(--accent)', fontSize: '0.85rem', cursor: 'pointer' }} onClick={() => setShowReset(true)}>
+          <div style={{ textAlign: 'right', marginTop: '-4px' }}>
+            <span style={{ color: 'var(--accent)', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => setShowReset(true)}>
               Forgot password?
             </span>
           </div>
-          <Button type="submit" loading={loading} style={{ backgroundColor: 'var(--accent)', color: 'white', marginTop: '5px' }}>
+          <Button type="submit" loading={loading} style={{ backgroundColor: 'var(--accent)', color: 'white', marginTop: '4px', fontWeight: 800 }}>
             Sign In
           </Button>
         </form>
 
         {/* Quick Demo Autofill Section */}
-        <div style={{ marginTop: '25px', paddingTop: '20px', borderTop: '1px solid var(--border)' }}>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>⚡ Quick Demo Logins</p>
-          <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+          <p style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>⚡ Quick Demo Logins</p>
+          <div style={{ display: 'flex', gap: '8px' }}>
             <button 
               type="button" 
               onClick={fillDemoAdmin}
               style={{
                 flex: 1,
-                padding: '8px 12px',
+                padding: '8px 10px',
                 borderRadius: '8px',
-                border: '1px solid var(--border)',
+                border: '1px solid rgba(224, 0, 8, 0.4)',
                 backgroundColor: 'rgba(224, 0, 8, 0.15)',
                 color: 'white',
                 fontSize: '0.8rem',
-                cursor: 'pointer'
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s'
               }}
             >
               👑 Fill Admin
@@ -167,13 +171,15 @@ export default function LoginPage() {
               onClick={fillDemoClient}
               style={{
                 flex: 1,
-                padding: '8px 12px',
+                padding: '8px 10px',
                 borderRadius: '8px',
-                border: '1px solid var(--border)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
                 backgroundColor: 'rgba(255, 255, 255, 0.05)',
                 color: 'white',
                 fontSize: '0.8rem',
-                cursor: 'pointer'
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s'
               }}
             >
               🏋️ Fill Client
@@ -181,9 +187,9 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div style={{ marginTop: '20px', fontSize: '0.9rem' }}>
+        <div style={{ marginTop: '18px', fontSize: '0.85rem' }}>
           <span style={{ color: 'var(--text-secondary)' }}>Don't have an account? </span>
-          <Link href="/register" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Register</Link>
+          <Link href="/register" style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>Register</Link>
         </div>
       </Card>
 

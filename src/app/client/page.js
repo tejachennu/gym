@@ -95,7 +95,7 @@ export default function ClientDashboard() {
 
   // Task completion calculation for Today's Tasks
   const isDietDone = !!(todayLog?.mealPhotos && Object.keys(todayLog.mealPhotos).length > 0);
-  const isWorkoutDone = !!todayLog?.workoutCompleted;
+  const isWorkoutDone = !!(todayLog?.workoutCompleted || (todayLog?.completedExercises && todayLog.completedExercises.length > 0));
   const isTrackingDone = !!(todayLog?.steps || todayLog?.water || todayLog?.sleepHours || todayLog?.dailyNotes);
 
   const completedTasksCount = (isDietDone ? 1 : 0) + (isWorkoutDone ? 1 : 0) + (isTrackingDone ? 1 : 0);

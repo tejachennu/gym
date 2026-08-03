@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useEffect, useState } from 'react';
 import { PageLoader } from '@/components/ui/Loading';
 import { logoutUser } from '@/lib/auth';
+import { Menu, X, LogOut, ShieldCheck } from 'lucide-react';
 
 const NAV_ITEMS = [
   { name: 'Dashboard', path: '/admin', icon: '📊' },
@@ -12,7 +13,6 @@ const NAV_ITEMS = [
   { name: 'Diet Plans', path: '/admin/diet-plans', icon: '🥗' },
   { name: 'Workout Plans', path: '/admin/workout-plans', icon: '💪' },
   { name: 'Monitoring', path: '/admin/monitoring', icon: '📱' },
-  { name: 'Check-ins', path: '/admin/checkins', icon: '📸' },
   { name: 'Blood Reports', path: '/admin/blood-reports', icon: '🩸' },
   { name: 'Notifications', path: '/admin/notifications', icon: '🔔' },
 ];
@@ -22,6 +22,16 @@ export default function AdminLayout({ children }) {
   const router = useRouter();
   const { user, userData, loading } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (!loading) {
@@ -32,6 +42,11 @@ export default function AdminLayout({ children }) {
       }
     }
   }, [user, userData, loading, router]);
+
+  // Close mobile drawer on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
 
   if (loading || !user || userData?.role === 'client') {
     return <PageLoader />;
@@ -50,20 +65,35 @@ export default function AdminLayout({ children }) {
 
   return (
     <div style={styles.container}>
-      {/* Mobile Header */}
-      <div style={styles.mobileHeader}>
-        <h1 style={styles.logo}>PowerHouse Admin</h1>
-        <button onClick={toggleMenu} style={styles.menuButton}>
-          {isMobileMenuOpen ? '✕' : '☰'}
+      {/* Mobile Top Header */}
+      <div style={{
+        ...styles.mobileHeader,
+        display: isMobile ? 'flex' : 'none'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <ShieldCheck size={20} color="var(--accent, #E00008)" />
+          <h1 style={styles.logo}>PowerHouse Admin</h1>
+        </div>
+        <button onClick={toggleMenu} style={styles.menuButton} aria-label="Toggle navigation menu">
+          {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
       </div>
 
-      {/* Sidebar */}
-      <div style={{ ...styles.sidebar, ...(isMobileMenuOpen ? styles.sidebarOpen : {}) }}>
+      {/* Sidebar (Desktop Fixed / Mobile Slide Drawer) */}
+      <div style={{ 
+        ...styles.sidebar, 
+        transform: isMobile 
+          ? (isMobileMenuOpen ? 'translateX(0)' : 'translateX(-100%)') 
+          : 'translateX(0)'
+      }}>
         <div style={styles.sidebarHeader}>
-          <h1 style={styles.logoDesktop}>PowerHouse</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ShieldCheck size={22} color="var(--accent, #E00008)" />
+            <h1 style={styles.logoDesktop}>PowerHouse</h1>
+          </div>
           <p style={styles.adminName}>Admin Portal</p>
         </div>
+
         <nav style={styles.nav}>
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.path || (item.path !== '/admin' && pathname.startsWith(item.path));
@@ -79,18 +109,28 @@ export default function AdminLayout({ children }) {
             );
           })}
         </nav>
+
         <div style={styles.logoutWrapper}>
-          <button style={styles.logoutButton} onClick={handleLogout}>Logout</button>
+          <button style={styles.logoutButton} onClick={handleLogout}>
+            <LogOut size={16} /> Logout
+          </button>
         </div>
       </div>
 
-      {/* Main Content */}
-      <main style={styles.mainContent}>
+      {/* Main Content Area */}
+      <main style={{
+        ...styles.mainContent,
+        marginLeft: isMobile ? 0 : '260px',
+        padding: isMobile ? '12px 14px 40px 14px' : '28px 36px',
+        paddingTop: isMobile ? '72px' : '28px',
+      }}>
         {children}
       </main>
 
-      {/* Overlay for mobile */}
-      {isMobileMenuOpen && <div style={styles.overlay} onClick={toggleMenu} />}
+      {/* Overlay Backdrop for Mobile Drawer */}
+      {isMobile && isMobileMenuOpen && (
+        <div style={styles.overlay} onClick={toggleMenu} />
+      )}
     </div>
   );
 }
@@ -101,11 +141,13 @@ const styles = {
     minHeight: '100vh',
     backgroundColor: 'var(--bg, #080808)',
     color: 'var(--text, #FFFFFF)',
+    position: 'relative',
+    overflowX: 'hidden',
   },
   mobileHeader: {
-    display: 'none', // Shown via media query in real CSS, using inline fallback
-    padding: '16px',
-    backgroundColor: 'var(--card, #121214)',
+    padding: '12px 16px',
+    backgroundColor: 'rgba(18, 18, 20, 0.95)',
+    backdropFilter: 'blur(12px)',
     borderBottom: '1px solid var(--border, #2a2a30)',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -114,18 +156,26 @@ const styles = {
     left: 0,
     right: 0,
     zIndex: 100,
+    height: '60px',
+    boxSizing: 'border-box',
   },
   logo: {
     margin: 0,
-    fontSize: '1.2rem',
+    fontSize: '1.1rem',
+    fontWeight: 800,
     color: 'var(--accent, #E00008)',
+    letterSpacing: '-0.2px',
   },
   menuButton: {
-    background: 'none',
-    border: 'none',
+    background: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    borderRadius: '8px',
     color: 'var(--text, #FFFFFF)',
-    fontSize: '1.5rem',
+    padding: '6px',
     cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sidebar: {
     width: '260px',
@@ -137,70 +187,81 @@ const styles = {
     height: '100vh',
     left: 0,
     top: 0,
-    zIndex: 90,
-    transition: 'transform 0.3s ease',
+    zIndex: 95,
+    transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+    boxShadow: '4px 0 24px rgba(0,0,0,0.5)',
   },
   sidebarHeader: {
-    padding: '30px 24px',
+    padding: '24px 20px',
     borderBottom: '1px solid var(--border, #2a2a30)',
   },
   logoDesktop: {
     margin: 0,
-    fontSize: '1.5rem',
+    fontSize: '1.3rem',
+    fontWeight: 800,
     color: 'var(--accent, #E00008)',
-    fontWeight: 'bold',
   },
   adminName: {
     margin: '4px 0 0',
     color: 'var(--text-secondary, #AAAAAA)',
-    fontSize: '0.9rem',
+    fontSize: '0.8rem',
+    fontWeight: 500,
   },
   nav: {
     flex: 1,
-    padding: '24px 12px',
+    padding: '16px 10px',
     overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
+    gap: '4px',
   },
   navItem: {
     display: 'flex',
     alignItems: 'center',
-    padding: '12px 16px',
-    borderRadius: 'var(--radius-sm, 12px)',
+    padding: '10px 14px',
+    borderRadius: '10px',
     color: 'var(--text-secondary, #AAAAAA)',
     textDecoration: 'none',
-    transition: 'all 0.2s',
-    fontSize: '0.95rem',
+    transition: 'all 0.2s ease',
+    fontSize: '0.88rem',
     fontWeight: 500,
   },
   navItemActive: {
-    backgroundColor: 'var(--accent-glow, rgba(224, 0, 8, 0.1))',
+    backgroundColor: 'rgba(224, 0, 8, 0.12)',
     color: 'var(--accent, #E00008)',
+    fontWeight: 700,
+    border: '1px solid rgba(224, 0, 8, 0.25)',
   },
   navIcon: {
-    marginRight: '12px',
-    fontSize: '1.2rem',
+    marginRight: '10px',
+    fontSize: '1.1rem',
   },
   logoutWrapper: {
-    padding: '24px',
+    padding: '16px 14px',
     borderTop: '1px solid var(--border, #2a2a30)',
   },
   logoutButton: {
     width: '100%',
-    padding: '12px',
-    backgroundColor: 'transparent',
-    border: '1px solid var(--border, #2a2a30)',
-    color: 'var(--text, #FFFFFF)',
-    borderRadius: 'var(--radius-sm, 12px)',
+    padding: '10px',
+    backgroundColor: 'rgba(255, 82, 82, 0.08)',
+    border: '1px solid rgba(255, 82, 82, 0.3)',
+    color: '#ff5252',
+    borderRadius: '10px',
     cursor: 'pointer',
-    transition: 'background 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    fontSize: '0.85rem',
+    fontWeight: 600,
+    transition: 'all 0.2s ease',
   },
   mainContent: {
     flex: 1,
-    marginLeft: '260px', // Matches sidebar width
-    padding: '40px',
     minHeight: '100vh',
+    width: '100%',
+    boxSizing: 'border-box',
+    transition: 'all 0.3s ease',
   },
   overlay: {
     position: 'fixed',
@@ -208,7 +269,8 @@ const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 80,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backdropFilter: 'blur(4px)',
+    zIndex: 90,
   },
 };

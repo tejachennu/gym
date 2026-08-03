@@ -118,6 +118,7 @@ export default function DietPlanPage() {
 
       await submitDailyLog(user.uid, todayDateString, {
         mealPhotos: updated,
+        dietCompleted: Object.keys(updated).length > 0,
         date: todayDateString
       });
 

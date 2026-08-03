@@ -33,6 +33,17 @@ import {
   BookOpen
 } from 'lucide-react';
 
+function formatDateNice(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch (e) {
+    return dateStr;
+  }
+}
+
 export default function WorkoutPlansPage() {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState('client-workouts'); // 'client-workouts' | 'templates'
@@ -429,64 +440,78 @@ export default function WorkoutPlansPage() {
                 </div>
               ) : clientPlans.length > 0 ? (
                 <div style={styles.grid}>
-                  {clientPlans.map((plan) => (
-                    <Card key={plan.id} style={styles.planCard} className="glass-card">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <h3 style={{ margin: '0 0 4px', fontSize: '1.2rem', color: '#FFFFFF', fontWeight: 700 }}>
-                            {plan.planTitle || 'Workout Plan'}
-                          </h3>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
-                            <Calendar size={14} color="var(--accent, #E00008)" />
-                            Valid: <strong>{plan.fromDate}</strong> ➔ <strong>{plan.toDate}</strong>
+                  {clientPlans.map((plan) => {
+                    const totalEx = plan.exercises?.length || 0;
+                    return (
+                      <Card key={plan.id} style={styles.planCard} className="glass-card">
+                        {/* Header Row */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '10px' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <h3 style={{ margin: '0 0 4px', fontSize: '1.05rem', color: '#FFFFFF', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {plan.planTitle || 'Workout Plan'}
+                            </h3>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.65)', backgroundColor: 'rgba(255, 255, 255, 0.03)', padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                              <Calendar size={12} color="var(--accent, #E00008)" />
+                              <span style={{ whiteSpace: 'nowrap' }}>{formatDateNice(plan.fromDate)}</span>
+                              <span>➔</span>
+                              <span style={{ whiteSpace: 'nowrap' }}>{formatDateNice(plan.toDate)}</span>
+                            </div>
                           </div>
+
+                          <Badge variant={plan.status === 'active' ? 'success' : plan.status === 'scheduled' ? 'warning' : 'secondary'}>
+                            {(plan.status || 'ACTIVE').toUpperCase()}
+                          </Badge>
                         </div>
-                        <Badge variant={plan.status === 'active' ? 'success' : plan.status === 'scheduled' ? 'warning' : 'secondary'}>
-                          {(plan.status || 'ACTIVE').toUpperCase()}
-                        </Badge>
-                      </div>
 
-                      <div style={styles.exerciseSummaryBar}>
-                        <Dumbbell size={16} color="var(--accent, #E00008)" />
-                        <span style={{ fontWeight: 700, color: '#FFFFFF' }}>
-                          {plan.exercises?.length || 0} Exercises Assigned
-                        </span>
-                      </div>
+                        {/* Exercise Summary Bar */}
+                        <div style={styles.exerciseSummaryBar}>
+                          <Dumbbell size={15} color="var(--accent, #E00008)" />
+                          <span style={{ fontWeight: 700, color: '#FFFFFF', fontSize: '0.85rem' }}>
+                            {totalEx} {totalEx === 1 ? 'Exercise' : 'Exercises'} Assigned
+                          </span>
+                        </div>
 
-                      {/* Summary Exercises Row */}
-                      <div style={styles.summaryExercisesList}>
-                        {(plan.exercises || []).slice(0, 3).map((ex, idx) => (
-                          <div key={idx} style={styles.summarySlotRow}>
-                            <span>• {ex.name}</span>
-                            <span style={{ color: 'var(--accent, #E00008)' }}>{ex.sets}x{ex.reps}</span>
-                          </div>
-                        ))}
-                        {plan.exercises?.length > 3 && (
-                          <div style={{ ...styles.summarySlotRow, color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                            + {plan.exercises.length - 3} more exercises
-                          </div>
-                        )}
-                      </div>
+                        {/* Summary Exercises List */}
+                        <div style={styles.summaryExercisesList}>
+                          {(plan.exercises || []).slice(0, 3).map((ex, idx) => (
+                            <div key={idx} style={styles.summarySlotRow}>
+                              <span style={{ fontSize: '0.78rem', color: 'rgba(255, 255, 255, 0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                • {ex.name}
+                              </span>
+                              <span style={{ color: 'var(--accent, #E00008)', fontWeight: 700, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                                {ex.sets} × {ex.reps}
+                              </span>
+                            </div>
+                          ))}
+                          {totalEx > 3 && (
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary, #AAAAAA)', fontStyle: 'italic', marginTop: '2px' }}>
+                              + {totalEx - 3} more exercises
+                            </div>
+                          )}
+                        </div>
 
-                      {/* Action Buttons */}
-                      <div style={styles.cardActions}>
-                        <Button 
-                          variant="outline" 
-                          onClick={() => handleOpenEditModal(plan)}
-                          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                        >
-                          <Edit size={15} /> Edit / Update Plan
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          onClick={() => handleDeleteClientPlan(plan.id)}
-                          style={{ color: '#ff1744', display: 'flex', alignItems: 'center', gap: '6px' }}
-                        >
-                          <Trash2 size={15} /> Delete
-                        </Button>
-                      </div>
-                    </Card>
-                  ))}
+                        {/* Action Buttons */}
+                        <div style={styles.cardActions}>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleOpenEditModal(plan)}
+                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.8rem' }}
+                          >
+                            <Edit size={14} /> Edit Plan
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleDeleteClientPlan(plan.id)}
+                            style={{ color: '#ff1744', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}
+                          >
+                            <Trash2 size={14} /> Delete
+                          </Button>
+                        </div>
+                      </Card>
+                    );
+                  })}
                 </div>
               ) : (
                 <div style={styles.emptyState}>
@@ -897,7 +922,7 @@ const styles = {
   removeExRowBtn: { background: 'none', border: 'none', color: '#ff1744', fontSize: '0.8rem', cursor: 'pointer' },
   exerciseFormGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(6, 1fr)',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))',
     gap: '8px',
   },
   exerciseTmplRow: {
@@ -908,8 +933,8 @@ const styles = {
   },
   templateGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-    gap: '20px',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+    gap: '12px',
   },
   templateCard: { padding: '20px', display: 'flex', flexDirection: 'column', minHeight: '180px' },
   tmplBadge: {

@@ -113,14 +113,14 @@ export default function AdminDashboard() {
           <p style={styles.subtitle}>Here is your fitness ecosystem performance & client activity summary for today.</p>
         </div>
         <div style={styles.actions}>
-          <Button onClick={handleSeedData} variant="outline" style={{ borderColor: 'var(--accent, #E00008)', color: 'var(--accent, #E00008)' }}>
-            🌱 Seed Sample Data
+          <Button onClick={handleSeedData} variant="outline" size="sm" style={{ borderColor: 'var(--accent, #E00008)', color: 'var(--accent, #E00008)', fontSize: '0.78rem', padding: '4px 10px' }}>
+            🌱 Seed Data
           </Button>
-          <Button onClick={() => router.push('/admin/clients')}>
-            <Plus size={16} /> Add Client
+          <Button onClick={() => router.push('/admin/clients')} size="sm" style={{ fontSize: '0.78rem', padding: '4px 10px' }}>
+            <Plus size={14} /> Add Client
           </Button>
-          <Button variant="outline" onClick={() => router.push('/admin/notifications')}>
-            <Bell size={16} /> Send Alert
+          <Button variant="outline" onClick={() => router.push('/admin/notifications')} size="sm" style={{ fontSize: '0.78rem', padding: '4px 10px' }}>
+            <Bell size={14} /> Alert
           </Button>
         </div>
       </header>
@@ -273,36 +273,26 @@ export default function AdminDashboard() {
 }
 
 const styles = {
-  container: { display: 'flex', flexDirection: 'column', gap: '28px' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '20px' },
-  badgeRow: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' },
-  badge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '4px',
-    padding: '3px 10px',
-    borderRadius: '20px',
-    backgroundColor: 'rgba(0, 200, 83, 0.15)',
-    color: '#00c853',
-    fontSize: '0.75rem',
-    fontWeight: 600,
-  },
-  dateTag: { fontSize: '0.8rem', color: 'var(--text-secondary, #AAAAAA)' },
-  title: { fontSize: '2rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' },
-  subtitle: { color: 'var(--text-secondary, #AAAAAA)', margin: '6px 0 0 0', fontSize: '0.925rem' },
-  actions: { display: 'flex', gap: '10px', flexWrap: 'wrap' },
+  container: { display: 'flex', flexDirection: 'column', gap: '16px' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '14px' },
+  badgeRow: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' },
+  badge: { fontSize: '0.7rem', padding: '3px 8px', borderRadius: '12px', background: 'rgba(0,200,83,0.12)', color: '#00c853', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' },
+  dateTag: { fontSize: '0.75rem', color: 'var(--text-secondary, #AAAAAA)' },
+  title: { fontSize: '1.25rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' },
+  subtitle: { color: 'var(--text-secondary, #AAAAAA)', margin: '4px 0 0 0', fontSize: '0.825rem' },
+  actions: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
   statsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '20px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+    gap: '10px',
   },
   mainGrid: {
     display: 'grid',
-    gridTemplateColumns: '2fr 1fr',
-    gap: '24px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+    gap: '14px',
     alignItems: 'start',
   },
-  activityCard: { padding: '24px' },
+  activityCard: { padding: '14px' },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
   cardHeaderTitle: { display: 'flex', alignItems: 'center', gap: '10px' },
   cardTitle: { fontSize: '1.15rem', fontWeight: 700, margin: 0 },
