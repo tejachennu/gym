@@ -22,7 +22,7 @@ const plansData = [
   },
   {
     plan_name: "Daily Pass",
-    category: "PowerHouse Fitness",
+    category: "MRK FITNESS",
     description: "Perfect for visitors, travelers, or anyone wanting to experience PowerHouse Gym for a day.",
     pricing: [{ duration: "1 Day", price: 99 }],
     features: [
@@ -37,7 +37,7 @@ const plansData = [
   },
   {
     plan_name: "Strength Training",
-    category: "PowerHouse Fitness",
+    category: "MRK FITNESS",
     description: "Focus on muscle building, strength development, and professional weight training.",
     pricing: [
       { duration: "1 Month", price: 1299 },
@@ -56,7 +56,7 @@ const plansData = [
   },
   {
     plan_name: "Cardio + Strength",
-    category: "PowerHouse Fitness",
+    category: "MRK FITNESS",
     badge: "Most Popular",
     description: "The ultimate combination for fat loss, endurance, and body transformation.",
     pricing: [
@@ -77,7 +77,7 @@ const plansData = [
   },
   {
     plan_name: "Personal Training",
-    category: "PowerHouse Fitness",
+    category: "MRK FITNESS",
     description: "One-on-one coaching with personalized workout and nutrition guidance.",
     pricing: [
       { duration: "1 Month", price: 6000 },
@@ -96,7 +96,7 @@ const plansData = [
   },
   {
     plan_name: "15 Days Pass",
-    category: "PowerHouse Fitness",
+    category: "MRK FITNESS",
     description: "A flexible short-term membership for beginners and fitness enthusiasts.",
     pricing: [{ duration: "15 Days", price: 999 }],
     features: [
@@ -199,7 +199,7 @@ async function handleSeed() {
         description: "Routine quarterly health panel review",
         abnormalities: "Vitamin D3 is slightly low (22 ng/mL). Vitamin B12 and Lipid Profile are within healthy range.",
         reportUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
-        uploadedBy: "PowerHouse Admin",
+        uploadedBy: "MRK FITNESS Admin",
         uploadedAt: serverTimestamp()
       });
       results.bloodReportsSeeded++;

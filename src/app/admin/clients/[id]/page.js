@@ -433,19 +433,73 @@ export default function ClientDetailPage({ params }) {
 function OverviewTab({ client }) {
   return (
     <div style={styles.overviewGrid}>
+      {/* 1. Personal & Contact Details */}
       <Card style={styles.card} className="glass-card">
-        <h3 style={styles.cardTitle}>Personal Info</h3>
+        <h3 style={styles.cardTitle}>📋 Personal & Contact Info</h3>
         <div style={styles.infoList}>
+          <div style={styles.infoRow}><span style={styles.label}>Client Code:</span> <span style={{ color: '#FFFFFF', fontWeight: 700 }}>{client.clientCode || `PH-${(client.id || '').slice(0, 6).toUpperCase()}`}</span></div>
           <div style={styles.infoRow}><span style={styles.label}>Phone:</span> <span style={{ color: '#FFFFFF' }}>{client.phone || 'N/A'}</span></div>
           <div style={styles.infoRow}><span style={styles.label}>Age:</span> <span style={{ color: '#FFFFFF' }}>{client.age || 'N/A'}</span></div>
           <div style={styles.infoRow}><span style={styles.label}>Gender:</span> <span style={{ color: '#FFFFFF' }}>{client.gender || 'N/A'}</span></div>
-          <div style={styles.infoRow}><span style={styles.label}>Height:</span> <span style={{ color: '#FFFFFF' }}>{client.height ? `${client.height} cm` : 'N/A'}</span></div>
-          <div style={styles.infoRow}><span style={styles.label}>Weight:</span> <span style={{ color: '#FFFFFF' }}>{client.weight ? `${client.weight} kg` : 'N/A'}</span></div>
+          <div style={styles.infoRow}><span style={styles.label}>Date of Birth:</span> <span style={{ color: '#FFFFFF' }}>{client.dob || 'N/A'}</span></div>
+          <div style={styles.infoRow}><span style={styles.label}>Profession:</span> <span style={{ color: '#FFFFFF' }}>{client.profession || 'N/A'}</span></div>
+          <div style={styles.infoRow}><span style={styles.label}>Location:</span> <span style={{ color: '#FFFFFF' }}>{client.location || client.address || 'N/A'}</span></div>
         </div>
       </Card>
       
+      {/* 2. Fitness Goals & Metrics */}
       <Card style={styles.card} className="glass-card">
-        <h3 style={styles.cardTitle}>Membership Details</h3>
+        <h3 style={styles.cardTitle}>🏋️ Metrics & Fitness Goals</h3>
+        <div style={styles.infoList}>
+          <div style={styles.infoRow}><span style={styles.label}>Height:</span> <span style={{ color: '#FFFFFF' }}>{client.height ? `${client.height} cm` : 'N/A'}</span></div>
+          <div style={styles.infoRow}><span style={styles.label}>Current Weight:</span> <span style={{ color: '#FFFFFF' }}>{client.weight ? `${client.weight} kg` : 'N/A'}</span></div>
+          <div style={styles.infoRow}><span style={styles.label}>Target Weight:</span> <span style={{ color: 'var(--success, #00c853)', fontWeight: 700 }}>{client.targetWeight ? `${client.targetWeight} kg` : 'N/A'}</span></div>
+          <div style={styles.infoRow}><span style={styles.label}>Diet Preference:</span> <span style={{ color: '#FFFFFF' }}>{client.diet || 'N/A'}</span></div>
+          <div style={styles.infoRow}><span style={styles.label}>Primary Goal:</span> <span style={{ color: 'var(--accent, #E00008)', fontWeight: 700 }}>{client.goal || 'N/A'}</span></div>
+          <div style={styles.infoRow}><span style={styles.label}>Days Available:</span> <span style={{ color: '#FFFFFF' }}>{client.daysAvailable || 'N/A'}</span></div>
+        </div>
+      </Card>
+
+      {/* 3. Medical & Injury History */}
+      <Card style={{ ...styles.card, gridColumn: '1 / -1' }} className="glass-card">
+        <h3 style={styles.cardTitle}>🏥 Medical & Health History</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px', fontSize: '0.85rem' }}>
+          <div>
+            <span style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Injuries Record:</span>
+            <div style={{ color: client.hasInjuries === 'YES' ? '#ff1744' : '#00c853', fontWeight: 700 }}>
+              {client.hasInjuries === 'YES' ? `YES — ${client.injuriesDetails || 'No details provided'}` : 'NO INJURIES LOGGED'}
+            </div>
+          </div>
+
+          <div>
+            <span style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Medical Conditions:</span>
+            <div style={{ color: client.hasHealthIssues === 'YES' ? '#ffd600' : '#00c853', fontWeight: 700 }}>
+              {client.hasHealthIssues === 'YES' ? `YES — ${client.healthIssuesDetails || 'No details provided'}` : 'NO MEDICAL CONDITIONS LOGGED'}
+            </div>
+            {client.medications && (
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '4px' }}>
+                Medications: <span style={{ color: '#FFFFFF' }}>{client.medications}</span>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <span style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Stress Level (1-10):</span>
+            <div style={{ color: '#ab47bc', fontWeight: 800, fontSize: '1rem' }}>
+              Level {client.stressLevel || 5} / 10
+            </div>
+            {client.stressSources && (
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '4px' }}>
+                Sources: <span style={{ color: '#FFFFFF' }}>{client.stressSources}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      {/* 4. Membership Details */}
+      <Card style={styles.card} className="glass-card">
+        <h3 style={styles.cardTitle}>💳 Membership Status</h3>
         <div style={styles.infoList}>
           <div style={styles.infoRow}><span style={styles.label}>Current Plan:</span> <span style={{ color: '#FFFFFF' }}>{client.currentPlan || 'None'}</span></div>
           <div style={styles.infoRow}><span style={styles.label}>Start Date:</span> <span style={{ color: '#FFFFFF' }}>{client.planStart || 'N/A'}</span></div>
@@ -453,10 +507,11 @@ function OverviewTab({ client }) {
         </div>
       </Card>
 
-      <Card style={{ ...styles.card, gridColumn: '1 / -1' }} className="glass-card">
-        <h3 style={styles.cardTitle}>Admin Notes</h3>
-        <p style={{ color: 'var(--text-secondary, #AAAAAA)', fontStyle: 'italic', margin: 0 }}>
-          {client.notes || 'No notes added for this client.'}
+      {/* 5. Admin Notes */}
+      <Card style={styles.card} className="glass-card">
+        <h3 style={styles.cardTitle}>📝 Admin Notes</h3>
+        <p style={{ color: 'var(--text-secondary, #AAAAAA)', fontStyle: 'italic', margin: 0, fontSize: '0.85rem' }}>
+          {client.notes || 'No admin notes added for this client.'}
         </p>
       </Card>
     </div>

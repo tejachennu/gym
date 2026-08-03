@@ -45,7 +45,7 @@ const Modal = ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 99999,
+    zIndex: 9999999,
     padding: '20px',
     boxSizing: 'border-box',
   };

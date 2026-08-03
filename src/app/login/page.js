@@ -109,12 +109,7 @@ export default function LoginPage() {
       padding: '20px'
     }}>
       <Card style={{ width: '100%', maxWidth: '420px', padding: '36px 24px', textAlign: 'center', borderRadius: '16px' }} className="glass-card">
-        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '48px', height: '48px', borderRadius: '12px', backgroundColor: 'var(--accent, #E00008)', marginBottom: '12px' }} className="pulse-glow">
-          <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#FFFFFF' }}>MRK</span>
-        </div>
-        <h1 style={{ fontSize: '1.6rem', fontWeight: 900, marginBottom: '2px', color: '#FFFFFF' }}>
-          MRK <span style={{ color: 'var(--accent, #E00008)' }}>FITNESS</span>
-        </h1>
+        <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: '55px', width: 'auto', objectFit: 'contain', marginBottom: '10px' }} />
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.825rem', marginBottom: '24px' }}>Radha Krishna Maram — Management Portal</p>
         
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>

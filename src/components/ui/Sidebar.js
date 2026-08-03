@@ -70,17 +70,10 @@ export default function Sidebar({ userProfile }) {
       <aside style={{ ...styles.sidebar, ...(isOpen ? styles.sidebarOpen : {}) }}>
         {/* Brand Header */}
         <div style={styles.brandHeader}>
-          <div style={styles.brandLogoRow}>
-            <div style={styles.logoBadge}>
-              <Dumbbell size={20} color="#FFFFFF" />
-            </div>
-            <div>
-              <h1 style={styles.brandTitle}>
-                <span style={{ color: 'var(--accent, #E00008)' }}>Power</span>House
-              </h1>
-              <div style={styles.portalTag}>
-                <ShieldCheck size={12} color="var(--accent, #E00008)" /> Admin Portal
-              </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: '42px', width: 'auto', maxWidth: '200px', objectFit: 'contain' }} />
+            <div style={styles.portalTag}>
+              <ShieldCheck size={12} color="var(--accent, #E00008)" /> Management Portal
             </div>
           </div>
         </div>

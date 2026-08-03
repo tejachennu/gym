@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 async function runDomTest() {
-  console.log("🚀 Starting DOM / Web Browser Automation Test for PowerHouse Fitness System...\n");
+  console.log("🚀 Starting DOM / Web Browser Automation Test for MRK FITNESS System...\n");
   
   const screenshotsDir = path.join(process.cwd(), 'test-screenshots');
   if (!fs.existsSync(screenshotsDir)) {

@@ -29,7 +29,7 @@ export const Skeleton = ({ width = '100%', height = '20px', rounded = '8px', sty
   );
 };
 
-export const PageLoader = ({ message = 'Loading PowerHouse Fitness...' }) => {
+export const PageLoader = ({ message = 'Loading MRK FITNESS...' }) => {
   const style = {
     position: 'fixed',
     top: 0,

@@ -165,13 +165,7 @@ export default function HomePage() {
       <header style={styles.navHeader}>
         <div style={styles.navContainer}>
           <div style={styles.brandGroup} onClick={() => router.push('/')}>
-            <div style={styles.logoIcon} className="pulse-glow">
-              <Dumbbell size={isMobile ? 18 : 22} color="#FFFFFF" />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ ...styles.brandTitle, fontSize: isMobile ? '1rem' : '1.15rem' }}>MRK <span style={{ color: 'var(--accent, #E00008)' }}>FITNESS</span></span>
-              <span style={styles.brandSub}>RADHA KRISHNA MARAM</span>
-            </div>
+            <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: isMobile ? '32px' : '42px', width: 'auto', objectFit: 'contain' }} />
           </div>
 
           {/* Desktop Navigation Links */}
@@ -616,8 +610,7 @@ export default function HomePage() {
         <div style={styles.footerContainer}>
           <div style={styles.footerBrand}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Dumbbell size={22} color="var(--accent, #E00008)" />
-              <span style={{ fontSize: '1.3rem', fontWeight: 900, color: '#FFFFFF' }}>MRK FITNESS</span>
+              <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: '36px', width: 'auto', objectFit: 'contain' }} />
             </div>
             <p style={{ margin: '8px 0 0', color: 'var(--text-secondary, #AAAAAA)', fontSize: '0.85rem', maxWidth: '340px' }}>
               Guided by Radha Krishna Maram. Personalized fitness coaching, strength training, and sustainable weight-loss planning.

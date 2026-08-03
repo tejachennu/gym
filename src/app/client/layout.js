@@ -47,7 +47,23 @@ export default function ClientLayout({ children }) {
         top: 0,
         zIndex: 10
       }}>
-        <h1 style={{ fontSize: '1.2rem', margin: 0, fontWeight: 600 }}>Hi, {userData?.name?.split(' ')[0] || 'Client'} 👋</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <img 
+            src="/mrk-logo.png" 
+            alt="MRK FITNESS" 
+            style={{ 
+              height: '36px', 
+              width: 'auto', 
+              maxWidth: '150px', 
+              objectFit: 'contain',
+              display: 'block'
+            }} 
+          />
+          <div style={{ height: '20px', width: '1px', backgroundColor: 'rgba(255,255,255,0.15)' }} />
+          <span style={{ fontSize: '0.95rem', margin: 0, fontWeight: 700, color: '#FFFFFF' }}>
+            Hi, {userData?.name?.split(' ')[0] || 'Client'} 👋
+          </span>
+        </div>
         <div style={{ position: 'relative' }}>
           <span 
             style={{ fontSize: '24px', cursor: 'pointer', padding: '5px' }} 

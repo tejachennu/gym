@@ -40,7 +40,7 @@ export default function PlansPage() {
 
   const [formData, setFormData] = useState({
     plan_name: '',
-    category: 'PowerHouse Fitness',
+    category: 'MRK FITNESS',
     badge: '',
     description: '',
     pricing: [{ durationVal: 1, durationUnit: 'Months', price: 1299 }],
@@ -101,7 +101,7 @@ export default function PlansPage() {
     setEditingPlanId(null);
     setFormData({
       plan_name: '',
-      category: 'PowerHouse Fitness',
+      category: 'MRK FITNESS',
       badge: '',
       description: '',
       pricing: [{ durationVal: 1, durationUnit: 'Months', price: 1299 }],
@@ -125,7 +125,7 @@ export default function PlansPage() {
     }
     setFormData({
       plan_name: plan.plan_name || plan.name || '',
-      category: plan.category || 'PowerHouse Fitness',
+      category: plan.category || 'MRK FITNESS',
       badge: plan.badge || '',
       description: plan.description || '',
       pricing: parsedPricing,
@@ -330,7 +330,7 @@ export default function PlansPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <Input 
               label="Category" 
-              placeholder="e.g. PowerHouse Fitness" 
+              placeholder="e.g. MRK FITNESS" 
               value={formData.category}
               onChange={(e) => setFormData({...formData, category: e.target.value})}
             />

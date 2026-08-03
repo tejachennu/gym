@@ -75,23 +75,35 @@ export default function ClientDashboard() {
 
   const sleepHours = todayLog?.sleepHours || 0;
 
-  // Chart Data
-  const chartData = [...checkins]
-    .sort((a, b) => {
-      const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
-      const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
-      return dateA - dateB;
-    })
-    .slice(-7)
+  // Validated Weight Chart Data
+  const validWeightList = [...checkins, ...(todayLog ? [todayLog] : [])]
     .map(c => {
-      const date = c.date?.toDate ? c.date.toDate() : new Date(c.date);
+      const dateObj = c.date?.toDate ? c.date.toDate() : new Date(c.date);
+      const wVal = parseFloat(c.weight || c.measurements?.weight || c.dailyWeight || 0);
       return {
-        date: date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-        weight: parseFloat(c.weight || c.measurements?.weight || 0)
+        dateObj,
+        date: isNaN(dateObj.getTime()) ? 'Log' : dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        weight: wVal
       };
-    });
+    })
+    .filter(item => !isNaN(item.weight) && item.weight > 0)
+    .sort((a, b) => a.dateObj - b.dateObj);
 
-  const latestWeight = chartData.length > 0 ? chartData[chartData.length - 1].weight : '--';
+  let chartData = validWeightList.slice(-7);
+  
+  // If only 1 data point, duplicate with start offset for smooth visual line
+  if (chartData.length === 1) {
+    const single = chartData[0];
+    chartData = [
+      { date: 'Start', weight: single.weight },
+      { date: single.date, weight: single.weight }
+    ];
+  }
+
+  const userProfileWeight = profile?.weight ? parseFloat(profile.weight) : 0;
+  const latestWeight = validWeightList.length > 0 
+    ? validWeightList[validWeightList.length - 1].weight 
+    : (userProfileWeight > 0 ? userProfileWeight : '--');
 
   // Task completion calculation for Today's Tasks
   const isDietDone = !!(todayLog?.mealPhotos && Object.keys(todayLog.mealPhotos).length > 0);
@@ -414,7 +426,7 @@ export default function ClientDashboard() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#2a2a30" vertical={false} />
                   <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={10} tickLine={false} axisLine={false} />
-                  <YAxis domain={['auto', 'auto']} stroke="var(--text-secondary)" fontSize={10} tickLine={false} axisLine={false} />
+                  <YAxis domain={['dataMin - 2', 'dataMax + 2']} stroke="var(--text-secondary)" fontSize={10} tickLine={false} axisLine={false} />
                   <Tooltip 
                     contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '10px', padding: '6px' }}
                     itemStyle={{ color: 'var(--accent)' }}

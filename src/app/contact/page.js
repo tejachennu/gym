@@ -55,10 +55,7 @@ export default function ContactPage() {
       <header style={styles.navHeader}>
         <div style={styles.navContainer}>
           <div style={styles.brandGroup} onClick={() => router.push('/')}>
-            <div style={styles.logoIcon}>
-              <Dumbbell size={20} color="#FFFFFF" />
-            </div>
-            <span style={styles.brandTitle}>PowerHouse <span style={{ color: 'var(--accent, #E00008)' }}>Fitness</span></span>
+            <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: '34px', width: 'auto', objectFit: 'contain' }} />
           </div>
 
           <Button variant="ghost" onClick={() => router.push('/')} style={styles.backBtn}>
@@ -94,7 +91,7 @@ export default function ContactPage() {
               </div>
               <div>
                 <h4 style={styles.infoCardTitle}>Gym Address & Headquarters</h4>
-                <p style={styles.infoCardText}>PowerHouse Fitness Center, Main Gym Complex, Film Nagar, Hyderabad, Telangana 500096</p>
+                <p style={styles.infoCardText}>MRK FITNESS Center, Main Gym Complex, Film Nagar, Hyderabad, Telangana 500096</p>
               </div>
             </Card>
 
@@ -115,7 +112,7 @@ export default function ContactPage() {
               </div>
               <div>
                 <h4 style={styles.infoCardTitle}>Support Email</h4>
-                <p style={styles.infoCardText}>tejachennu223@gmail.com / support@powerhouse.com</p>
+                <p style={styles.infoCardText}>tejachennu223@gmail.com / support@mrkfitness.com</p>
                 <span style={styles.infoSubText}>Average response time: 2 hours</span>
               </div>
             </Card>
@@ -142,7 +139,7 @@ export default function ContactPage() {
                   </div>
                   <h3 style={{ margin: '12px 0 6px', fontSize: '1.2rem', color: '#FFFFFF' }}>Message Received!</h3>
                   <p style={{ color: 'var(--text-secondary, #AAAAAA)', fontSize: '0.88rem', marginBottom: '20px', lineHeight: 1.5 }}>
-                    Thank you for contacting PowerHouse Fitness. One of our certified personal trainers will get back to you shortly.
+                    Thank you for contacting MRK FITNESS. One of our certified personal trainers will get back to you shortly.
                   </p>
                   <Button onClick={() => setSubmitted(false)}>Send Another Message</Button>
                 </div>
@@ -212,7 +209,7 @@ export default function ContactPage() {
       {/* 4. Footer */}
       <footer style={styles.footer}>
         <div style={styles.footerBottom}>
-          © {new Date().getFullYear()} PowerHouse Fitness System. All rights reserved.
+          © {new Date().getFullYear()} MRK FITNESS System. All rights reserved.
         </div>
       </footer>
     </div>

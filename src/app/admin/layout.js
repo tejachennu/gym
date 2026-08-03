@@ -72,7 +72,7 @@ export default function AdminLayout({ children }) {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <ShieldCheck size={20} color="var(--accent, #E00008)" />
-          <h1 style={styles.logo}>PowerHouse Admin</h1>
+          <h1 style={styles.logo}>MRK FITNESS</h1>
         </div>
         <button onClick={toggleMenu} style={styles.menuButton} aria-label="Toggle navigation menu">
           {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
@@ -87,11 +87,8 @@ export default function AdminLayout({ children }) {
           : 'translateX(0)'
       }}>
         <div style={styles.sidebarHeader}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ShieldCheck size={22} color="var(--accent, #E00008)" />
-            <h1 style={styles.logoDesktop}>PowerHouse</h1>
-          </div>
-          <p style={styles.adminName}>Admin Portal</p>
+          <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: '36px', width: 'auto', objectFit: 'contain' }} />
+          <p style={styles.adminName}>Management Portal</p>
         </div>
 
         <nav style={styles.nav}>
