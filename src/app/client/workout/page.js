@@ -14,6 +14,7 @@ export default function WorkoutPlanPage() {
   const [loading, setLoading] = useState(true);
   const [completedExercises, setCompletedExercises] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [isSubmittedToday, setIsSubmittedToday] = useState(false);
   const toast = useToast();
 
   const todayDateString = new Date().toISOString().split('T')[0];
@@ -32,6 +33,9 @@ export default function WorkoutPlanPage() {
         if (dailyLog && dailyLog.completedExercises) {
           setCompletedExercises(dailyLog.completedExercises);
         }
+        if (dailyLog && (dailyLog.workoutSubmitted || (dailyLog.completedExercises && dailyLog.completedExercises.length > 0))) {
+          setIsSubmittedToday(true);
+        }
       } catch (err) {
         console.error(err);
         toast.error('Failed to load workout data');
@@ -43,6 +47,7 @@ export default function WorkoutPlanPage() {
   }, [user, todayDateString]);
 
   const toggleExercise = (idx) => {
+    setIsSubmittedToday(false);
     setCompletedExercises(prev => {
       if (prev.includes(idx)) {
         return prev.filter(i => i !== idx);
@@ -57,14 +62,31 @@ export default function WorkoutPlanPage() {
     try {
       setSaving(true);
       const allCompleted = completedExercises.length === workoutPlan.exercises.length;
+
+      // Calculate total weight volume lifted today across completed exercises
+      let totalWeightVolume = 0;
+      completedExercises.forEach(idx => {
+        const ex = workoutPlan.exercises[idx];
+        if (ex) {
+          const sets = Number(ex.sets) || 1;
+          const reps = Number(ex.reps) || 1;
+          const weight = Number(ex.weight) || 0;
+          totalWeightVolume += sets * reps * weight;
+        }
+      });
+
       await submitDailyLog(user.uid, todayDateString, {
         completedExercises: completedExercises,
-        workoutCompleted: allCompleted
+        workoutCompleted: allCompleted,
+        workoutSubmitted: true,
+        workoutWeight: totalWeightVolume > 0 ? totalWeightVolume : undefined
       });
-      toast.success('Workout progress saved!');
+
+      setIsSubmittedToday(true);
+      toast.success('Workout progress submitted successfully!');
     } catch (err) {
       console.error(err);
-      toast.error('Failed to save progress');
+      toast.error('Failed to submit progress');
     } finally {
       setSaving(false);
     }
@@ -93,6 +115,18 @@ export default function WorkoutPlanPage() {
   const progressPercent = totalExercises === 0 ? 0 : Math.round((completedCount / totalExercises) * 100);
   const allCompleted = completedCount === totalExercises && totalExercises > 0;
 
+  // Calculate live volume lifted for completed exercises
+  let currentVolume = 0;
+  completedExercises.forEach(idx => {
+    const ex = workoutPlan.exercises[idx];
+    if (ex) {
+      const sets = Number(ex.sets) || 1;
+      const reps = Number(ex.reps) || 1;
+      const weight = Number(ex.weight) || 0;
+      currentVolume += sets * reps * weight;
+    }
+  });
+
   const radius = 20;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
@@ -112,11 +146,12 @@ export default function WorkoutPlanPage() {
         borderRadius: '10px'
       }}>
         <div style={{ flex: 1 }}>
-          <h1 style={{ margin: '0 0 6px 0', fontSize: '1.1rem', fontWeight: 'bold' }}>
+          <h1 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', fontWeight: 'bold' }}>
             {workoutPlan.name || workoutPlan.title || 'Today\'s Workout'}
           </h1>
-          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
             {completedCount} of {totalExercises} completed
+            {currentVolume > 0 && <strong style={{ color: '#00c853', marginLeft: '6px' }}>• Total Lifted: {currentVolume} kg</strong>}
           </p>
         </div>
         <div style={{ position: 'relative', width: '50px', height: '50px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -162,7 +197,7 @@ export default function WorkoutPlanPage() {
           justifyContent: 'center',
           gap: '8px'
         }}>
-          🎉 Workout Complete! Great Job! 🎉
+          🎉 Workout Complete! Total Volume Lifted: {currentVolume} kg! 🎉
         </div>
       )}
 
@@ -176,11 +211,10 @@ export default function WorkoutPlanPage() {
               display: 'flex', 
               flexDirection: 'column',
               gap: '10px',
-              background: isCompleted ? 'rgba(255, 255, 255, 0.01)' : 'rgba(255, 255, 255, 0.03)',
-              backdropFilter: 'blur(10px)',
+              background: isCompleted ? 'var(--card-hover)' : 'var(--card)',
               border: `1px solid ${isCompleted ? 'rgba(0, 200, 83, 0.3)' : 'var(--border)'}`,
               borderRadius: '10px',
-              opacity: isCompleted ? 0.6 : 1,
+              opacity: isCompleted ? 0.7 : 1,
               transition: 'all 0.3s ease',
               transform: isCompleted ? 'scale(0.99)' : 'scale(1)'
             }}>
@@ -190,30 +224,30 @@ export default function WorkoutPlanPage() {
                     margin: '0 0 8px 0', 
                     fontSize: '0.95rem', 
                     textDecoration: isCompleted ? 'line-through' : 'none',
-                    color: isCompleted ? 'var(--text-secondary)' : '#fff'
+                    color: isCompleted ? 'var(--text-secondary)' : 'var(--text)'
                   }}>
                     {ex.name}
                   </h3>
                   
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', fontSize: '0.75rem' }}>
-                    <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '3px 8px', borderRadius: '6px' }}>
+                    <div style={{ background: 'var(--card-hover)', border: '1px solid var(--border)', padding: '3px 8px', borderRadius: '6px' }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Sets: </span>
-                      <strong>{ex.sets}</strong>
+                      <strong style={{ color: 'var(--text)' }}>{ex.sets}</strong>
                     </div>
-                    <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '3px 8px', borderRadius: '6px' }}>
+                    <div style={{ background: 'var(--card-hover)', border: '1px solid var(--border)', padding: '3px 8px', borderRadius: '6px' }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Reps: </span>
-                      <strong>{ex.reps}</strong>
+                      <strong style={{ color: 'var(--text)' }}>{ex.reps}</strong>
                     </div>
                     {ex.weight && (
-                      <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '3px 8px', borderRadius: '6px' }}>
-                        <span style={{ color: 'var(--text-secondary)' }}>Weight: </span>
-                        <strong>{ex.weight}kg</strong>
+                      <div style={{ background: 'rgba(0, 200, 83, 0.15)', border: '1px solid rgba(0, 200, 83, 0.3)', padding: '3px 8px', borderRadius: '6px' }}>
+                        <span style={{ color: '#00c853' }}>Weight: </span>
+                        <strong style={{ color: '#00c853' }}>{ex.weight} kg</strong>
                       </div>
                     )}
                   </div>
                   
                   {ex.notes && (
-                    <div style={{ marginTop: '8px', padding: '8px 10px', background: 'rgba(224, 0, 8, 0.1)', borderLeft: '3px solid var(--accent)', borderRadius: '4px', fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)' }}>
+                    <div style={{ marginTop: '8px', padding: '8px 10px', background: 'var(--accent-surface)', borderLeft: '3px solid var(--accent)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text)' }}>
                       <strong>Note:</strong> {ex.notes}
                     </div>
                   )}
@@ -222,7 +256,7 @@ export default function WorkoutPlanPage() {
                 <button 
                   onClick={() => toggleExercise(idx)}
                   style={{ 
-                    background: isCompleted ? 'rgba(0, 200, 83, 0.15)' : 'rgba(255, 255, 255, 0.05)', 
+                    background: isCompleted ? 'rgba(0, 200, 83, 0.15)' : 'var(--card-hover)', 
                     border: `1px solid ${isCompleted ? '#00c853' : 'var(--border)'}`, 
                     borderRadius: '8px', 
                     padding: '8px',
@@ -245,24 +279,25 @@ export default function WorkoutPlanPage() {
       <div style={{ position: 'sticky', bottom: '12px', zIndex: 10, marginTop: '8px' }}>
         <Button 
           onClick={saveWorkoutLog} 
-          disabled={saving}
+          disabled={saving || isSubmittedToday}
           style={{ 
             width: '100%', 
             padding: '12px', 
             fontSize: '0.9rem', 
             fontWeight: 'bold',
-            backgroundColor: allCompleted ? '#00c853' : 'var(--accent)', 
-            color: 'white',
+            backgroundColor: isSubmittedToday ? 'var(--card-hover)' : (allCompleted ? '#00c853' : 'var(--accent)'), 
+            color: isSubmittedToday ? 'var(--text-secondary)' : 'white',
             borderRadius: '10px',
-            boxShadow: '0 8px 20px rgba(0,0,0,0.5)',
-            border: 'none',
+            boxShadow: isSubmittedToday ? 'none' : '0 8px 20px rgba(0,0,0,0.5)',
+            border: isSubmittedToday ? '1px solid var(--border)' : 'none',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            gap: '8px'
+            gap: '8px',
+            cursor: isSubmittedToday ? 'not-allowed' : 'pointer'
           }}
         >
-          {saving ? <Spinner size={20} /> : 'Save Workout Progress'}
+          {saving ? <Spinner size={18} /> : (isSubmittedToday ? '✓ Workout Progress Submitted Today' : 'Submit Workout Progress')}
         </Button>
       </div>
 

@@ -44,8 +44,8 @@ const ImageGallery = ({ images = [], columns = 3 }) => {
     overflow: 'hidden',
     aspectRatio: '1',
     cursor: 'pointer',
-    backgroundColor: '#121214',
-    border: '1px solid #2a2a30',
+    backgroundColor: 'var(--card)',
+    border: '1px solid var(--border)',
   };
 
   const imageStyle = {

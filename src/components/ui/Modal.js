@@ -39,9 +39,9 @@ const Modal = ({
     left: 0,
     width: '100vw',
     height: '100vh',
-    backgroundColor: 'rgba(8, 8, 8, 0.85)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -58,42 +58,42 @@ const Modal = ({
   };
 
   const modalStyle = {
-    backgroundColor: 'var(--card, #121214)',
-    border: '1px solid var(--border, #2a2a30)',
-    borderRadius: 'var(--radius, 20px)',
+    backgroundColor: 'var(--card)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
     width: '100%',
     maxWidth: sizes[size],
     maxHeight: 'calc(100vh - 60px)',
     display: 'flex',
     flexDirection: 'column',
-    boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.8)',
+    boxShadow: 'var(--shadow-card)',
     animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
     overflow: 'hidden',
     margin: 'auto',
   };
 
   const headerStyle = {
-    padding: '20px 24px',
-    borderBottom: '1px solid var(--border, #2a2a30)',
+    padding: '16px 20px',
+    borderBottom: '1px solid var(--border)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    backgroundColor: 'var(--card-hover)',
     flexShrink: 0,
   };
 
   const titleStyle = {
     margin: 0,
-    fontSize: '1.2rem',
+    fontSize: '1.1rem',
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: 'var(--text)',
     letterSpacing: '-0.02em',
   };
 
   const closeBtnStyle = {
     background: 'none',
     border: 'none',
-    color: 'var(--text-secondary, #AAAAAA)',
+    color: 'var(--text-secondary)',
     cursor: 'pointer',
     padding: '6px',
     display: 'flex',
@@ -104,7 +104,7 @@ const Modal = ({
   };
 
   const contentStyle = {
-    padding: '24px',
+    padding: '20px',
     overflowY: 'auto',
     flex: 1,
     display: 'flex',
@@ -120,8 +120,8 @@ const Modal = ({
             <button 
               style={closeBtnStyle} 
               onClick={onClose}
-              onMouseEnter={e => { e.currentTarget.style.color = '#FFFFFF'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-secondary, #AAAAAA)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.backgroundColor = 'var(--card-hover)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
             >
               <X size={20} />
             </button>

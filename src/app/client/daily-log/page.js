@@ -8,49 +8,51 @@ import {
   getDailyLog, 
   getClientDailyLogs, 
   submitCheckin, 
-  getClientCheckins 
+  getClientCheckins,
+  getClientById,
+  getPlans
 } from '@/lib/firestore';
 import Card from '@/components/ui/Card';
-import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
-import Modal from '@/components/ui/Modal';
-import { Input, Textarea, Select } from '@/components/ui/Input';
-import { useToast } from '@/components/ui/Toast';
+import { Input, Select, Textarea } from '@/components/ui/Input';
+import Badge from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Loading';
+import { useToast } from '@/components/ui/Toast';
+import Modal from '@/components/ui/Modal';
 import { 
-  ResponsiveContainer, 
-  AreaChart, 
-  Area, 
-  BarChart, 
-  Bar, 
+  Activity, 
+  Droplets, 
+  Moon, 
+  Zap, 
+  Smile, 
+  Heart, 
+  TrendingUp, 
+  Camera, 
+  Upload, 
+  PlusCircle, 
+  Calendar, 
+  CheckCircle2, 
+  Clock, 
+  Filter, 
+  ChevronRight,
+  ArrowLeft,
+  X,
+  FileText,
+  Dumbbell
+} from 'lucide-react';
+import { 
+  LineChart, 
+  Line, 
   XAxis, 
   YAxis, 
   Tooltip, 
-  CartesianGrid 
+  ResponsiveContainer, 
+  CartesianGrid, 
+  AreaChart, 
+  Area,
+  BarChart,
+  Bar
 } from 'recharts';
-import { 
-  Activity, 
-  Smile, 
-  Camera, 
-  Ruler, 
-  Calendar, 
-  CheckCircle2, 
-  ChevronRight, 
-  History, 
-  Clock,
-  Upload,
-  Droplets,
-  Moon,
-  Zap,
-  ArrowLeft,
-  X,
-  Lock,
-  Flame,
-  TrendingUp,
-  Image as ImageIcon,
-  Plus,
-  PlusCircle
-} from 'lucide-react';
 
 function getDirectImageUrl(url) {
   if (!url || typeof url !== 'string') return '';
@@ -74,33 +76,40 @@ export default function TrackingPage() {
     setMounted(true);
   }, []);
 
-  // Active Full-Screen Sheet state: null | 'activity' | 'wellness' | 'posture' | 'sizing'
-  const [activeModal, setActiveModal] = useState(null);
-
-  // Input Popup Modal state inside Full-Screen View: boolean
+  const [activeModal, setActiveModal] = useState(null); // 'activity_wellness' | 'posture_sizing'
   const [showInputPopup, setShowInputPopup] = useState(false);
 
-  // Submitted info detail view & image zoom lightbox state
-  const [selectedDetail, setSelectedDetail] = useState(null);
-  const [zoomImage, setZoomImage] = useState(null);
-
-  // Selected measurement toggle state for 14 anatomical points + weight graph
   const [selectedMeasurementKey, setSelectedMeasurementKey] = useState('weight');
 
-  // Data states
+  // Date Range Filters for Analytics Graphs (Default 1 Month)
+  const defaultToDate = new Date().toISOString().split('T')[0];
+  const defaultFromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const [fromDate, setFromDate] = useState(defaultFromDate);
+  const [toDate, setToDate] = useState(defaultToDate);
+
+  const [profile, setProfile] = useState(null);
+  const [masterPlans, setMasterPlans] = useState([]);
   const [todayLog, setTodayLog] = useState(null);
   const [dailyLogsHistory, setDailyLogsHistory] = useState([]);
   const [checkinsHistory, setCheckinsHistory] = useState([]);
 
-  // Form states
-  const [activityForm, setActivityForm] = useState({ steps: '', water: '', sleepHours: '', treadmillPhoto: '' });
-  const [wellnessForm, setWellnessForm] = useState({ sleepQuality: 'Good', energyLevel: 'Medium', mood: 'Good', dailyNotes: '' });
-  
-  // Posture photos state (Includes 5th slot: Treadmill Wheel Picture)
+  // Combined Activity & Wellness State
+  const [activityWellnessForm, setActivityWellnessForm] = useState({
+    steps: '',
+    water: '',
+    sleepHours: '',
+    workoutWeight: '',
+    treadmillPhoto: '',
+    sleepQuality: 'Good',
+    energyLevel: 'Medium',
+    mood: 'Good',
+    dailyNotes: ''
+  });
+
+  // Combined Posture Photos & Sizing Measurements State
   const [posturePhotos, setPosturePhotos] = useState({ front: '', back: '', left: '', right: '', treadmillWheel: '' });
   const [uploadingPhotos, setUploadingPhotos] = useState({});
 
-  // Sizing measurements state (14 anatomical points + weight)
   const [sizingForm, setSizingForm] = useState({
     weight: '', neck: '', shoulder: '', chest: '', waist: '', stomach: '', highHip: '',
     rBicep: '', lBicep: '', rForearm: '', lForearm: '', rThigh: '', lThigh: '', rCalf: '', lCalf: ''
@@ -117,28 +126,31 @@ export default function TrackingPage() {
   const loadAllData = async () => {
     try {
       setLoading(true);
-      const [log, logsList, checkinsList] = await Promise.all([
+      const [profileData, tLog, logsHist, chkHist, plansData] = await Promise.all([
+        getClientById(user.uid),
         getDailyLog(user.uid, todayDateString),
         getClientDailyLogs(user.uid),
-        getClientCheckins(user.uid)
+        getClientCheckins(user.uid),
+        getPlans()
       ]);
 
-      setTodayLog(log);
-      setDailyLogsHistory(logsList || []);
-      setCheckinsHistory(checkinsList || []);
+      setProfile(profileData);
+      setMasterPlans(plansData || []);
+      setTodayLog(tLog);
+      setDailyLogsHistory(logsHist || []);
+      setCheckinsHistory(chkHist || []);
 
-      if (log) {
-        setActivityForm({
-          steps: log.steps || '',
-          water: log.water || '',
-          sleepHours: log.sleepHours || '',
-          treadmillPhoto: log.treadmillPhoto || ''
-        });
-        setWellnessForm({
-          sleepQuality: log.sleepQuality || 'Good',
-          energyLevel: log.energyLevel || 'Medium',
-          mood: log.mood || 'Good',
-          dailyNotes: log.dailyNotes || ''
+      if (tLog) {
+        setActivityWellnessForm({
+          steps: tLog.steps !== undefined ? String(tLog.steps) : '',
+          water: tLog.water !== undefined ? String(tLog.water) : '',
+          sleepHours: tLog.sleepHours !== undefined ? String(tLog.sleepHours) : '',
+          workoutWeight: tLog.workoutWeight !== undefined ? String(tLog.workoutWeight) : '',
+          treadmillPhoto: tLog.treadmillPhoto || '',
+          sleepQuality: tLog.sleepQuality || 'Good',
+          energyLevel: tLog.energyLevel || 'Medium',
+          mood: tLog.mood || 'Good',
+          dailyNotes: tLog.dailyNotes || ''
         });
       }
     } catch (err) {
@@ -149,59 +161,28 @@ export default function TrackingPage() {
     }
   };
 
-  // 10-DAY LOCKOUT CALCULATIONS
-  const latestCheckinDate = checkinsHistory.length > 0 && checkinsHistory[0].date
-    ? new Date(checkinsHistory[0].date)
-    : null;
+  // Strict Feature Verification
+  const hasPlan = profile?.currentPlan && profile?.currentPlan !== 'None' && profile?.currentPlan !== 'Not Assigned';
 
-  const now = new Date();
-  const daysPassedSinceCheckin = latestCheckinDate
-    ? Math.max(0, Math.floor((now - latestCheckinDate) / (1000 * 60 * 60 * 24)))
-    : 99;
-
-  const daysToGo = Math.max(0, 10 - daysPassedSinceCheckin);
-  const isCheckinLocked = daysToGo > 0;
-
-  // Submit Handlers
-  const handleSaveActivity = async () => {
-    if (!user?.uid) return;
-    setSubmitting(true);
-    try {
-      await submitDailyLog(user.uid, todayDateString, {
-        ...todayLog,
-        ...activityForm,
-        date: todayDateString
-      });
-      toast.success('Activity log saved successfully!');
-      await loadAllData();
-      setShowInputPopup(false);
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to save activity');
-    } finally {
-      setSubmitting(false);
+  const hasPostureCheckin = (() => {
+    if (!hasPlan) return false;
+    
+    if (profile?.planFeatures && typeof profile.planFeatures.hasPostureCheckin === 'boolean') {
+      return profile.planFeatures.hasPostureCheckin === true;
     }
-  };
 
-  const handleSaveWellness = async () => {
-    if (!user?.uid) return;
-    setSubmitting(true);
-    try {
-      await submitDailyLog(user.uid, todayDateString, {
-        ...todayLog,
-        ...wellnessForm,
-        date: todayDateString
-      });
-      toast.success('Wellness log saved successfully!');
-      await loadAllData();
-      setShowInputPopup(false);
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to save wellness');
-    } finally {
-      setSubmitting(false);
+    const clientPlanName = (profile?.currentPlan || '').toLowerCase();
+    const matchedPlan = (masterPlans || []).find(mp => {
+      const pName = (mp.plan_name || mp.name || '').toLowerCase();
+      return pName && clientPlanName.includes(pName);
+    });
+
+    if (matchedPlan && typeof matchedPlan.hasPostureCheckin === 'boolean') {
+      return matchedPlan.hasPostureCheckin === true;
     }
-  };
+
+    return false;
+  })();
 
   const handlePhotoUpload = async (e, side) => {
     const file = e.target.files?.[0];
@@ -209,939 +190,530 @@ export default function TrackingPage() {
 
     setUploadingPhotos(prev => ({ ...prev, [side]: true }));
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch('/api/upload', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (data.success) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result;
         if (side === 'activityTreadmill') {
-          setActivityForm(prev => ({ ...prev, treadmillPhoto: data.fileUrl }));
+          setActivityWellnessForm(prev => ({ ...prev, treadmillPhoto: base64 }));
         } else {
-          setPosturePhotos(prev => ({ ...prev, [side]: data.fileUrl }));
+          setPosturePhotos(prev => ({ ...prev, [side]: base64 }));
         }
-        toast.success(`Photo uploaded successfully!`);
-      } else {
-        throw new Error(data.error || 'Upload failed');
-      }
+        toast.success(`Photo selected!`);
+        setUploadingPhotos(prev => ({ ...prev, [side]: false }));
+      };
+      reader.readAsDataURL(file);
     } catch (err) {
       console.error(err);
       toast.error('Failed to upload image');
-    } finally {
       setUploadingPhotos(prev => ({ ...prev, [side]: false }));
     }
   };
 
-  const handleSavePosture = async () => {
-    if (!user?.uid) return;
-    if (isCheckinLocked) {
-      return toast.error(`Check-in locked! Unlock in ${daysToGo} day(s).`);
+  // Save Unified Activity & Wellness Log
+  const handleSaveActivityWellness = async (e) => {
+    if (e) e.preventDefault();
+    setSubmitting(true);
+    try {
+      await submitDailyLog(user.uid, {
+        date: todayDateString,
+        steps: activityWellnessForm.steps ? Number(activityWellnessForm.steps) : 0,
+        water: activityWellnessForm.water ? Number(activityWellnessForm.water) : 0,
+        sleepHours: activityWellnessForm.sleepHours ? Number(activityWellnessForm.sleepHours) : 0,
+        workoutWeight: activityWellnessForm.workoutWeight ? Number(activityWellnessForm.workoutWeight) : 0,
+        treadmillPhoto: activityWellnessForm.treadmillPhoto || '',
+        sleepQuality: activityWellnessForm.sleepQuality,
+        energyLevel: activityWellnessForm.energyLevel,
+        mood: activityWellnessForm.mood,
+        dailyNotes: activityWellnessForm.dailyNotes || ''
+      });
+
+      toast.success('Daily Activity & Wellness Log saved successfully!');
+      setShowInputPopup(false);
+      await loadAllData();
+    } catch (err) {
+      console.error(err);
+      toast.error(err || 'Failed to save log');
+    } finally {
+      setSubmitting(false);
     }
-    if (!posturePhotos.front && !posturePhotos.back && !posturePhotos.left && !posturePhotos.right && !posturePhotos.treadmillWheel) {
-      return toast.warning('Please upload at least one posture photo or treadmill picture');
+  };
+
+  // Save Unified 10-Day Posture & Sizing Check-in
+  const handleSavePostureSizing = async (e) => {
+    if (e) e.preventDefault();
+
+    if (!posturePhotos.front && !posturePhotos.back && !posturePhotos.left && !posturePhotos.right) {
+      toast.error('Please upload at least 1 body posture photo (Front, Back, Left, or Right).');
+      return;
     }
+
     setSubmitting(true);
     try {
       await submitCheckin(user.uid, {
-        date: new Date().toISOString(),
+        date: todayDateString,
         photos: posturePhotos,
-        type: 'posture'
+        measurements: {
+          weight: sizingForm.weight ? Number(sizingForm.weight) : 0,
+          neck: sizingForm.neck ? Number(sizingForm.neck) : 0,
+          shoulder: sizingForm.shoulder ? Number(sizingForm.shoulder) : 0,
+          chest: sizingForm.chest ? Number(sizingForm.chest) : 0,
+          waist: sizingForm.waist ? Number(sizingForm.waist) : 0,
+          stomach: sizingForm.stomach ? Number(sizingForm.stomach) : 0,
+          highHip: sizingForm.highHip ? Number(sizingForm.highHip) : 0,
+          rBicep: sizingForm.rBicep ? Number(sizingForm.rBicep) : 0,
+          lBicep: sizingForm.lBicep ? Number(sizingForm.lBicep) : 0,
+          rForearm: sizingForm.rForearm ? Number(sizingForm.rForearm) : 0,
+          lForearm: sizingForm.lForearm ? Number(sizingForm.lForearm) : 0,
+          rThigh: sizingForm.rThigh ? Number(sizingForm.rThigh) : 0,
+          lThigh: sizingForm.lThigh ? Number(sizingForm.lThigh) : 0,
+          rCalf: sizingForm.rCalf ? Number(sizingForm.rCalf) : 0,
+          lCalf: sizingForm.lCalf ? Number(sizingForm.lCalf) : 0,
+        }
       });
-      toast.success('10-Day Body Posture check-in submitted!');
+
+      toast.success('10-Day Body Posture & Sizing Check-in submitted successfully!');
+      setShowInputPopup(false);
       setPosturePhotos({ front: '', back: '', left: '', right: '', treadmillWheel: '' });
+      setSizingForm({ weight: '', neck: '', shoulder: '', chest: '', waist: '', stomach: '', highHip: '', rBicep: '', lBicep: '', rForearm: '', lForearm: '', rThigh: '', lThigh: '', rCalf: '', lCalf: '' });
       await loadAllData();
-      setShowInputPopup(false);
     } catch (err) {
       console.error(err);
-      toast.error('Failed to submit posture check-in');
+      toast.error(err || 'Failed to submit check-in');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleSaveSizing = async () => {
-    if (!user?.uid) return;
-    if (isCheckinLocked) {
-      return toast.error(`Check-in locked! Unlock in ${daysToGo} day(s).`);
-    }
-    if (!sizingForm.weight) {
-      return toast.warning('Please enter body weight');
-    }
-    setSubmitting(true);
-    try {
-      await submitCheckin(user.uid, {
-        date: new Date().toISOString(),
-        measurements: sizingForm,
-        weight: sizingForm.weight,
-        type: 'sizing'
-      });
-      toast.success('14-Point Body measurements submitted!');
-      setSizingForm({
-        weight: '', neck: '', shoulder: '', chest: '', waist: '', stomach: '', highHip: '',
-        rBicep: '', lBicep: '', rForearm: '', lForearm: '', rThigh: '', lThigh: '', rCalf: '', lCalf: ''
-      });
-      await loadAllData();
-      setShowInputPopup(false);
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to submit sizing check-in');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  // Check-in status lock
+  const latestCheckinDate = checkinsHistory[0]?.createdAt?.toDate 
+    ? checkinsHistory[0].createdAt.toDate() 
+    : (checkinsHistory[0]?.date ? new Date(checkinsHistory[0].date) : null);
 
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: '50px' }}><Spinner /></div>;
+  const daysPassedSinceCheckin = latestCheckinDate 
+    ? Math.floor((new Date().getTime() - latestCheckinDate.getTime()) / (1000 * 60 * 60 * 24)) 
+    : 999;
+  
+  const isCheckinLocked = latestCheckinDate && daysPassedSinceCheckin < 10;
+  const daysToGo = 10 - daysPassedSinceCheckin;
 
-  const isTodayActivityDone = !!(todayLog?.steps || todayLog?.water || todayLog?.sleepHours || todayLog?.treadmillPhoto);
-  const isTodayWellnessDone = !!(todayLog?.energyLevel || todayLog?.mood || todayLog?.dailyNotes);
+  const isTodayActivityWellnessDone = !!(todayLog?.steps || todayLog?.water || todayLog?.sleepHours || todayLog?.dailyNotes);
 
-  // Prepared Chart Data Series
-  const activityChartData = [...dailyLogsHistory]
-    .sort((a, b) => new Date(a.date) - new Date(b.date))
-    .slice(-7)
+  // Filter Activity Chart Data
+  const activityChartData = dailyLogsHistory
+    .filter(log => {
+      if (!log.date) return false;
+      return log.date >= fromDate && log.date <= toDate;
+    })
+    .sort((a, b) => a.date.localeCompare(b.date))
     .map(log => ({
-      date: new Date(log.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-      steps: Number(log.steps) || 0,
-      water: Number(log.water) || 0,
-      sleep: Number(log.sleepHours) || 0
+      date: log.date.split('-').slice(1).join('/'),
+      steps: log.steps || 0,
+      water: log.water || 0,
+      sleepHours: log.sleepHours || 0,
+      workoutWeight: log.workoutWeight || 0
     }));
 
-  const MEASUREMENT_METRICS = [
-    { key: 'weight', label: 'Scale Weight', unit: 'kg' },
-    { key: 'neck', label: '1. Neck', unit: 'cm' },
-    { key: 'shoulder', label: '2. Shoulder', unit: 'cm' },
-    { key: 'chest', label: '3. Chest', unit: 'cm' },
-    { key: 'waist', label: '4. Waist', unit: 'cm' },
-    { key: 'stomach', label: '5. Stomach', unit: 'cm' },
-    { key: 'highHip', label: '6. High Hip', unit: 'cm' },
-    { key: 'rBicep', label: '7. Right Bicep', unit: 'cm' },
-    { key: 'lBicep', label: '8. Left Bicep', unit: 'cm' },
-    { key: 'rForearm', label: '9. Right Forearm', unit: 'cm' },
-    { key: 'lForearm', label: '10. Left Forearm', unit: 'cm' },
-    { key: 'rThigh', label: '11. Right Thigh', unit: 'cm' },
-    { key: 'lThigh', label: '12. Left Thigh', unit: 'cm' },
-    { key: 'rCalf', label: '13. Right Calf', unit: 'cm' },
-    { key: 'lCalf', label: '14. Left Calf', unit: 'cm' },
-  ];
-
-  const currentMetric = MEASUREMENT_METRICS.find(m => m.key === selectedMeasurementKey) || MEASUREMENT_METRICS[0];
-
-  const measurementChartSeries = [...checkinsHistory]
-    .map(c => {
-      const dVal = selectedMeasurementKey === 'weight'
-        ? parseFloat(c.weight || c.measurements?.weight || 0)
-        : parseFloat(c.measurements?.[selectedMeasurementKey] || 0);
+  // Filter Sizing Chart Data
+  const sizingChartData = checkinsHistory
+    .map(chk => {
+      const dStr = chk.date || (chk.createdAt?.seconds ? new Date(chk.createdAt.seconds * 1000).toISOString().split('T')[0] : '');
+      const m = chk.measurements || {};
       return {
-        date: new Date(c.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-        value: dVal
+        date: dStr ? dStr.split('-').slice(1).join('/') : 'Log',
+        fullDate: dStr,
+        val: m[selectedMeasurementKey] !== undefined ? Number(m[selectedMeasurementKey]) : 0
       };
     })
-    .filter(d => !isNaN(d.value) && d.value > 0)
-    .slice(-10);
+    .filter(item => item.fullDate >= fromDate && item.fullDate <= toDate && item.val > 0)
+    .sort((a, b) => a.fullDate.localeCompare(b.fullDate));
+
+  if (loading) return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+      <Spinner />
+    </div>
+  );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '90px' }} className="animate-fade-up">
-      <div>
-        <h2 style={{ fontSize: '1.4rem', fontWeight: 900, margin: '0 0 4px 0', color: '#FFFFFF' }}>
-          📊 Client Tracking Hub
-        </h2>
-        <p style={{ margin: 0, color: 'var(--text-secondary, #AAAAAA)', fontSize: '0.825rem' }}>
-          Select a category to view full-screen analytics, log entries, and submit check-ins
-        </p>
-      </div>
+    <div style={styles.container} className="animate-fade-up">
+      {/* Header */}
+      <header style={styles.header}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={styles.iconCircle}>
+            <Activity size={18} color="var(--accent)" />
+          </div>
+          <h1 style={styles.title}>Client Health & Tracking Hub</h1>
+        </div>
+        <p style={styles.subtitle}>Unified Daily Activity & Wellness Logs + 10-Day Body Posture & Sizing Check-ins</p>
+      </header>
 
-      {/* 4 CATEGORY TRACKING CARDS */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {/* 2 Main Unified Navigation Hub Cards */}
+      <div style={styles.hubGrid}>
         
-        {/* 1. Activity Log Card */}
-        <Card onClick={() => { setActiveModal('activity'); setShowInputPopup(false); }} style={styles.hubCard} className="glass-card">
-          <div style={styles.hubIconWrapper}>
-            <Activity size={22} color="var(--accent, #E00008)" />
+        {/* UNIFIED CARD 1: DAILY ACTIVITY & WELLNESS */}
+        <Card onClick={() => { setActiveModal('activity_wellness'); setShowInputPopup(false); }} style={styles.hubCard} className="glass-card">
+          <div style={{ ...styles.hubIconWrapper, backgroundColor: 'rgba(0, 200, 83, 0.15)' }}>
+            <Activity size={20} color="#00c853" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-              <h3 style={styles.hubTitle}>Activity & Workout Picture</h3>
-              {isTodayActivityDone && <Badge variant="success">Logged Today</Badge>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+              <h3 style={styles.hubTitle}>Daily Activity & Wellness Log</h3>
+              {isTodayActivityWellnessDone ? <Badge variant="success">✓ Submitted Today</Badge> : <Badge variant="warning">Pending Today</Badge>}
             </div>
             <p style={styles.hubSub}>
-              {todayLog?.steps || 0} steps • {todayLog?.water || 0}L water • {todayLog?.sleepHours || 0}h sleep
+              {todayLog?.steps || 0} steps • {todayLog?.water || 0}L water • {todayLog?.sleepHours || 0}h sleep • Mood: {todayLog?.mood || 'Good'}
             </p>
           </div>
           <ChevronRight size={18} color="var(--text-secondary)" />
         </Card>
 
-        {/* 2. Wellness Log Card */}
-        <Card onClick={() => { setActiveModal('wellness'); setShowInputPopup(false); }} style={styles.hubCard} className="glass-card">
-          <div style={{ ...styles.hubIconWrapper, backgroundColor: 'rgba(255, 214, 0, 0.15)', borderColor: 'rgba(255, 214, 0, 0.3)' }}>
-            <Smile size={22} color="#ffd600" />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-              <h3 style={styles.hubTitle}>Wellness & Mood</h3>
-              {isTodayWellnessDone && <Badge variant="success">Logged Today</Badge>}
+        {/* UNIFIED CARD 2: 10-DAY BODY POSTURE & SIZING (GATED) */}
+        {hasPostureCheckin && (
+          <Card onClick={() => { setActiveModal('posture_sizing'); setShowInputPopup(false); }} style={{ ...styles.hubCard, borderLeft: '3px solid var(--accent, #E00008)' }} className="glass-card">
+            <div style={{ ...styles.hubIconWrapper, backgroundColor: 'rgba(224, 0, 8, 0.15)' }}>
+              <Camera size={20} color="var(--accent, #E00008)" />
             </div>
-            <p style={styles.hubSub}>
-              Energy: {todayLog?.energyLevel || 'Medium'} • Mood: {todayLog?.mood || 'Good'}
-            </p>
-          </div>
-          <ChevronRight size={18} color="var(--text-secondary)" />
-        </Card>
-
-        {/* 3. Body Posture (4-Side Pics) Card */}
-        <Card onClick={() => { setActiveModal('posture'); setShowInputPopup(false); }} style={{ ...styles.hubCard, borderLeft: '4px solid var(--accent, #E00008)' }} className="glass-card">
-          <div style={{ ...styles.hubIconWrapper, backgroundColor: 'rgba(224, 0, 8, 0.15)', borderColor: 'rgba(224, 0, 8, 0.3)' }}>
-            <Camera size={22} color="var(--accent, #E00008)" />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-              <h3 style={styles.hubTitle}>Body Posture (4-Side Pics)</h3>
-              {isCheckinLocked ? (
-                <Badge variant="warning">🔒 {daysToGo} Days to Go</Badge>
-              ) : (
-                <Badge variant="danger">Every 10 Days</Badge>
-              )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                <h3 style={styles.hubTitle}>10-Day Body Posture & Measurements Check-in</h3>
+                {isCheckinLocked ? (
+                  <Badge variant="warning">🔒 {daysToGo} Days Left</Badge>
+                ) : (
+                  <Badge variant="danger">Submit Check-in</Badge>
+                )}
+              </div>
+              <p style={styles.hubSub}>
+                {latestCheckinDate ? `Last check-in ${daysPassedSinceCheckin} day(s) ago` : 'No posture & sizing check-in submitted yet'}
+              </p>
             </div>
-            <p style={styles.hubSub}>
-              {latestCheckinDate ? `Last submitted ${daysPassedSinceCheckin} day(s) ago` : 'No posture check-in submitted yet'}
-            </p>
-          </div>
-          <ChevronRight size={18} color="var(--text-secondary)" />
-        </Card>
-
-        {/* 4. Sizing & Measurements Card */}
-        <Card onClick={() => { setActiveModal('sizing'); setShowInputPopup(false); }} style={{ ...styles.hubCard, borderLeft: '4px solid #00c853' }} className="glass-card">
-          <div style={{ ...styles.hubIconWrapper, backgroundColor: 'rgba(0, 200, 83, 0.15)', borderColor: 'rgba(0, 200, 83, 0.3)' }}>
-            <Ruler size={22} color="#00c853" />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-              <h3 style={styles.hubTitle}>Sizing & 14-Point Measurements</h3>
-              {isCheckinLocked ? (
-                <Badge variant="warning">🔒 {daysToGo} Days to Go</Badge>
-              ) : (
-                <Badge variant="success">Body Stats</Badge>
-              )}
-            </div>
-            <p style={styles.hubSub}>
-              Latest Weight: {checkinsHistory[0]?.weight || checkinsHistory[0]?.measurements?.weight || '--'} kg
-            </p>
-          </div>
-          <ChevronRight size={18} color="var(--text-secondary)" />
-        </Card>
+            <ChevronRight size={18} color="var(--text-secondary)" />
+          </Card>
+        )}
 
       </div>
 
-      {/* ========================================================================= */}
-      {/* 100vh FULL-SCREEN MOBILE OVERLAY SHEETS VIA REACT PORTAL                  */}
-      {/* ========================================================================= */}
+      {/* OVERLAY SHEETS */}
       {mounted && activeModal && createPortal(
         <>
-          {/* FULL SCREEN SHEET 1: ACTIVITY & TREADMILL PIC */}
-          {activeModal === 'activity' && (
+          {/* SHEET 1: UNIFIED DAILY ACTIVITY & WELLNESS */}
+          {activeModal === 'activity_wellness' && (
             <div style={styles.fullScreenOverlay} className="animate-fade-up">
-          <header style={styles.sheetHeader}>
-            <button onClick={() => setActiveModal(null)} style={styles.sheetBackBtn}>
-              <ArrowLeft size={22} color="#FFFFFF" />
-              <h3 style={styles.sheetTitle}>Activity & Workout Analytics</h3>
-            </button>
-          </header>
+              <header style={styles.sheetHeader}>
+                <button onClick={() => setActiveModal(null)} style={styles.sheetBackBtn}>
+                  <ArrowLeft size={18} color="var(--text)" />
+                  <h3 style={styles.sheetTitle}>Daily Activity & Wellness Log</h3>
+                </button>
+              </header>
 
-          <div style={styles.sheetContent}>
-            
-            {/* Prominent Top CTA Button to open Input Popup Modal */}
-            <Button onClick={() => setShowInputPopup(true)} style={{ padding: '16px', fontSize: '1rem', fontWeight: 900, borderRadius: '12px' }}>
-              <PlusCircle size={20} /> Add Activity & Treadmill Pic
-            </Button>
-
-            {/* 3 ANALYTICAL GRAPHS FOR STEPS, WATER & SLEEP */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              
-              {/* GRAPH 1: STEPS */}
-              <Card style={styles.chartCard} className="glass-card">
-                <h4 style={styles.chartTitle}>👣 7-Day Daily Steps Analytics</h4>
-                {activityChartData.length > 0 ? (
-                  <div style={{ width: '100%', height: 160 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={activityChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" vertical={false} />
-                        <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={11} axisLine={false} tickLine={false} />
-                        <YAxis stroke="var(--text-secondary)" fontSize={11} axisLine={false} tickLine={false} />
-                        <Tooltip contentStyle={{ backgroundColor: '#121214', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px' }} />
-                        <Bar dataKey="steps" fill="var(--accent, #E00008)" radius={[6, 6, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic', margin: 0 }}>No steps data logged yet.</p>
-                )}
-              </Card>
-
-              {/* GRAPH 2: WATER INTAKE */}
-              <Card style={styles.chartCard} className="glass-card">
-                <h4 style={styles.chartTitle}>💧 7-Day Water Intake Analytics (Litres)</h4>
-                {activityChartData.length > 0 ? (
-                  <div style={{ width: '100%', height: 160 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={activityChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="waterGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#0288d1" stopOpacity={0.4}/>
-                            <stop offset="95%" stopColor="#0288d1" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" vertical={false} />
-                        <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={11} axisLine={false} tickLine={false} />
-                        <YAxis stroke="var(--text-secondary)" fontSize={11} axisLine={false} tickLine={false} domain={[0, 'dataMax + 1']} />
-                        <Tooltip contentStyle={{ backgroundColor: '#121214', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px' }} />
-                        <Area type="monotone" dataKey="water" stroke="#0288d1" strokeWidth={2} fillOpacity={1} fill="url(#waterGrad)" />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic', margin: 0 }}>No water intake logged yet.</p>
-                )}
-              </Card>
-
-              {/* GRAPH 3: SLEEP HOURS */}
-              <Card style={styles.chartCard} className="glass-card">
-                <h4 style={styles.chartTitle}>🌙 7-Day Sleep Duration Analytics (Hours)</h4>
-                {activityChartData.length > 0 ? (
-                  <div style={{ width: '100%', height: 160 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={activityChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="sleepGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#7c4dff" stopOpacity={0.4}/>
-                            <stop offset="95%" stopColor="#7c4dff" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" vertical={false} />
-                        <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={11} axisLine={false} tickLine={false} />
-                        <YAxis stroke="var(--text-secondary)" fontSize={11} axisLine={false} tickLine={false} domain={[0, 12]} />
-                        <Tooltip contentStyle={{ backgroundColor: '#121214', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px' }} />
-                        <Area type="monotone" dataKey="sleep" stroke="#7c4dff" strokeWidth={2} fillOpacity={1} fill="url(#sleepGrad)" />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic', margin: 0 }}>No sleep hours logged yet.</p>
-                )}
-              </Card>
-
-            </div>
-
-            {/* Submission History */}
-            <div>
-              <h4 style={styles.historyHeading}><History size={18} /> Submission History (Click to view details)</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {dailyLogsHistory.map((item, idx) => (
-                  <div 
-                    key={idx} 
-                    onClick={() => setSelectedDetail({ type: 'activity', title: `Activity Log — ${item.date}`, data: item })}
-                    style={{ ...styles.historyRowItem, cursor: 'pointer' }}
-                  >
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.date}</span>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#FFFFFF' }}>
-                      👣 {item.steps || 0} steps • 💧 {item.water || 0}L • 🌙 {item.sleepHours || 0}h
+              <div style={styles.sheetContent}>
+                {/* Date Filter Bar */}
+                <Card style={{ padding: '8px 12px' }} className="glass-card">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Filter size={14} color="var(--accent)" /> Analytics Date Range:
                     </span>
+                    <Input 
+                      type="date" 
+                      label="From Date" 
+                      value={fromDate} 
+                      onChange={(e) => setFromDate(e.target.value)} 
+                      containerStyle={{ flex: 1, minWidth: '120px' }}
+                    />
+                    <Input 
+                      type="date" 
+                      label="To Date" 
+                      value={toDate} 
+                      onChange={(e) => setToDate(e.target.value)} 
+                      containerStyle={{ flex: 1, minWidth: '120px' }}
+                    />
+                    <Button variant="outline" size="sm" onClick={() => { setFromDate(defaultFromDate); setToDate(defaultToDate); }} style={{ alignSelf: 'flex-end' }}>
+                      Reset (1 Month)
+                    </Button>
                   </div>
-                ))}
-              </div>
-            </div>
+                </Card>
 
-          </div>
-
-          {/* POPUP INPUT MODAL FOR ACTIVITY */}
-          {showInputPopup && (
-            <Modal isOpen={showInputPopup} onClose={() => setShowInputPopup(false)} title="Log Today's Activity" size="md">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <Input type="number" label="Daily Steps" value={activityForm.steps} onChange={(e) => setActivityForm({...activityForm, steps: e.target.value})} placeholder="e.g. 8000" />
-                <Input type="number" step="0.1" label="Water Intake (Litres)" value={activityForm.water} onChange={(e) => setActivityForm({...activityForm, water: e.target.value})} placeholder="e.g. 3.0" />
-                <Input type="number" step="0.5" label="Sleep Hours" value={activityForm.sleepHours} onChange={(e) => setActivityForm({...activityForm, sleepHours: e.target.value})} placeholder="e.g. 7.5" />
-
-                {/* Treadmill Wheel Picture Upload Slot */}
-                <div style={{ padding: '14px', border: '1px dashed rgba(224,0,8,0.4)', borderRadius: '10px', backgroundColor: 'rgba(224,0,8,0.05)', textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#FFFFFF', marginBottom: '8px' }}>
-                    🏃 Treadmill Wheel / Workout Photo
-                  </div>
-                  {activityForm.treadmillPhoto ? (
-                    <div style={{ position: 'relative' }}>
-                      <img src={getDirectImageUrl(activityForm.treadmillPhoto)} alt="Treadmill" style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }} />
-                      <label htmlFor="activity-treadmill-popup" style={{ position: 'absolute', bottom: '6px', right: '6px', background: 'rgba(0,0,0,0.8)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', color: '#FFFFFF' }}>
-                        Change Pic
-                      </label>
-                    </div>
+                <Button 
+                  onClick={() => !isTodayActivityWellnessDone && setShowInputPopup(true)} 
+                  disabled={isTodayActivityWellnessDone}
+                  style={{ 
+                    padding: '10px', 
+                    fontSize: '0.85rem',
+                    backgroundColor: isTodayActivityWellnessDone ? '#00c853' : 'var(--accent)',
+                    color: '#fff',
+                    opacity: isTodayActivityWellnessDone ? 0.8 : 1,
+                    cursor: isTodayActivityWellnessDone ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isTodayActivityWellnessDone ? (
+                    <>✓ Daily Activity & Wellness Submitted Today</>
                   ) : (
-                    <div>
-                      <input type="file" accept="image/*" id="activity-treadmill-popup" style={{ display: 'none' }} onChange={(e) => handlePhotoUpload(e, 'activityTreadmill')} disabled={uploadingPhotos['activityTreadmill']} />
-                      <label htmlFor="activity-treadmill-popup" style={{ fontSize: '0.78rem', padding: '8px 16px', background: 'var(--accent, #E00008)', borderRadius: '8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#FFFFFF', fontWeight: 800 }}>
-                        {uploadingPhotos['activityTreadmill'] ? <Spinner /> : <Upload size={14} />} {uploadingPhotos['activityTreadmill'] ? 'Uploading...' : 'Upload Treadmill Pic'}
-                      </label>
-                    </div>
+                    <><PlusCircle size={16} /> Log Today's Activity & Wellness</>
                   )}
-                </div>
-
-                <Button onClick={handleSaveActivity} loading={submitting} style={{ padding: '14px', fontWeight: 800, fontSize: '0.95rem' }}>
-                  Save Activity Log
                 </Button>
-              </div>
-            </Modal>
-          )}
 
-        </div>
-      )}
-
-      {/* FULL SCREEN SHEET 2: WELLNESS & MOOD */}
-      {activeModal === 'wellness' && (
-        <div style={styles.fullScreenOverlay} className="animate-fade-up">
-          <header style={styles.sheetHeader}>
-            <button onClick={() => setActiveModal(null)} style={styles.sheetBackBtn}>
-              <ArrowLeft size={22} color="#FFFFFF" />
-              <h3 style={styles.sheetTitle}>Wellness & Mood Analytics</h3>
-            </button>
-          </header>
-
-          <div style={styles.sheetContent}>
-            
-            {/* Prominent CTA Button */}
-            <Button onClick={() => setShowInputPopup(true)} style={{ padding: '16px', fontSize: '1rem', fontWeight: 900, borderRadius: '12px' }}>
-              <PlusCircle size={20} /> Add Wellness Log
-            </Button>
-
-            {/* Submission History */}
-            <div>
-              <h4 style={styles.historyHeading}><History size={18} /> Submission History (Click to view details)</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {dailyLogsHistory.map((item, idx) => (
-                  <div 
-                    key={idx} 
-                    onClick={() => setSelectedDetail({ type: 'wellness', title: `Wellness Log — ${item.date}`, data: item })}
-                    style={{ ...styles.historyRowItem, cursor: 'pointer' }}
-                  >
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.date}</span>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#FFFFFF' }}>
-                      ⚡ {item.energyLevel || '--'} • 😊 {item.mood || '--'} {item.dailyNotes ? `("${item.dailyNotes}")` : ''}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </div>
-
-          {/* POPUP INPUT MODAL FOR WELLNESS */}
-          {showInputPopup && (
-            <Modal isOpen={showInputPopup} onClose={() => setShowInputPopup(false)} title="Log Today's Wellness" size="md">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <Select label="Sleep Quality" value={wellnessForm.sleepQuality} onChange={(e) => setWellnessForm({...wellnessForm, sleepQuality: e.target.value})} options={[{ label: 'Excellent 🌟', value: 'Excellent' }, { label: 'Good 😊', value: 'Good' }, { label: 'Average 😐', value: 'Average' }, { label: 'Poor 😫', value: 'Poor' }]} />
-                <Select label="Energy Level" value={wellnessForm.energyLevel} onChange={(e) => setWellnessForm({...wellnessForm, energyLevel: e.target.value})} options={[{ label: 'High 🔥', value: 'High' }, { label: 'Medium ⚡', value: 'Medium' }, { label: 'Low 😴', value: 'Low' }]} />
-                <Select label="Mood" value={wellnessForm.mood} onChange={(e) => setWellnessForm({...wellnessForm, mood: e.target.value})} options={[{ label: 'Great 😄', value: 'Great' }, { label: 'Good 🙂', value: 'Good' }, { label: 'Stressed 😓', value: 'Stressed' }, { label: 'Tired 😴', value: 'Tired' }]} />
-                <Textarea label="Daily Wellness Notes" value={wellnessForm.dailyNotes} onChange={(e) => setWellnessForm({...wellnessForm, dailyNotes: e.target.value})} placeholder="Notes about your day, recovery, or diet..." rows={3} />
-
-                <Button onClick={handleSaveWellness} loading={submitting} style={{ padding: '14px', fontWeight: 800 }}>
-                  Save Wellness Log
-                </Button>
-              </div>
-            </Modal>
-          )}
-
-        </div>
-      )}
-
-      {/* FULL SCREEN SHEET 3: BODY POSTURE (4 SIDES) */}
-      {activeModal === 'posture' && (
-        <div style={styles.fullScreenOverlay} className="animate-fade-up">
-          <header style={styles.sheetHeader}>
-            <button onClick={() => setActiveModal(null)} style={styles.sheetBackBtn}>
-              <ArrowLeft size={22} color="#FFFFFF" />
-              <h3 style={styles.sheetTitle}>10-Day Body Posture History</h3>
-            </button>
-          </header>
-
-          <div style={styles.sheetContent}>
-            
-            {/* Lockout Notice or Add Check-in CTA Button */}
-            {isCheckinLocked ? (
-              <Card style={styles.lockedCard} className="glass-card">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                  <Lock size={22} color="#ffd600" />
-                  <h4 style={{ margin: 0, fontSize: '1rem', color: '#ffd600', fontWeight: 900 }}>Check-in Locked</h4>
-                </div>
-                <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: '#FFFFFF', lineHeight: 1.5 }}>
-                  You submitted your 10-day check-in <strong>{daysPassedSinceCheckin} day(s) ago</strong>. Next submission unlocks in <strong style={{ color: '#ffd600' }}>{daysToGo} day(s)</strong>.
-                </p>
-                <div style={{ width: '100%', height: '8px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                  <div style={{ width: `${(daysPassedSinceCheckin / 10) * 100}%`, height: '100%', backgroundColor: '#ffd600' }} />
-                </div>
-              </Card>
-            ) : (
-              <Button onClick={() => setShowInputPopup(true)} style={{ padding: '16px', fontSize: '1rem', fontWeight: 900, borderRadius: '12px' }}>
-                <PlusCircle size={20} /> Submit 10-Day Posture Check-in
-              </Button>
-            )}
-
-            {/* Check-in History */}
-            <div>
-              <h4 style={styles.historyHeading}><History size={18} /> Check-in History (Click card to view details)</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {checkinsHistory.map((c, idx) => {
-                  const dateNice = c.date ? new Date(c.date).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Check-in';
-                  const photosObj = c.photos || {};
-
-                  return (
-                    <div 
-                      key={idx} 
-                      onClick={() => setSelectedDetail({ type: 'posture', title: `Body Posture Check-in — ${dateNice}`, data: c })}
-                      style={{ ...styles.historyBox, cursor: 'pointer' }}
-                      className="glass-card-hover"
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#FFFFFF' }}>📅 {dateNice}</span>
-                        <Badge variant={c.reviewed ? 'success' : 'warning'}>{c.reviewed ? 'Reviewed' : 'Pending Review'}</Badge>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginTop: '8px' }}>
-                        {[
-                          { key: 'front', tag: 'Front' },
-                          { key: 'back', tag: 'Back' },
-                          { key: 'left', tag: 'Left' },
-                          { key: 'right', tag: 'Right' },
-                          { key: 'treadmillWheel', tag: 'Cardio' }
-                        ].map(({ key, tag }) => {
-                          const pUrl = photosObj[key];
-                          if (!pUrl) return null;
-                          return (
-                            <div key={key} style={{ textAlign: 'center' }}>
-                              <img src={getDirectImageUrl(pUrl)} alt={tag} style={{ width: '100%', height: '60px', objectFit: 'cover', borderRadius: '6px' }} />
-                              <span style={{ fontSize: '0.62rem', color: 'var(--text-secondary)' }}>{tag}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
+                {/* GRAPH 1: WORKOUT WEIGHT LIFTED */}
+                <Card style={styles.chartCard} className="glass-card">
+                  <h4 style={{ ...styles.chartTitle, color: '#00c853', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Dumbbell size={16} color="#00c853" /> 🏋️ Workout Weight Lifted Analytics ({fromDate} to {toDate})
+                  </h4>
+                  {activityChartData.length > 0 ? (
+                    <div style={{ width: '100%', height: 165 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={activityChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                          <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={10} />
+                          <YAxis stroke="var(--text-secondary)" fontSize={10} />
+                          <Tooltip contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '11px' }} formatter={(val) => [`${val} kg`, 'Lifted Weight / Volume']} />
+                          <Area type="monotone" dataKey="workoutWeight" stroke="#00c853" fill="#00c853" fillOpacity={0.25} strokeWidth={2} />
+                        </AreaChart>
+                      </ResponsiveContainer>
                     </div>
-                  );
-                })}
+                  ) : <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No workout weight data found for date range.</p>}
+                </Card>
+
+                {/* GRAPH 2: STEPS */}
+                <Card style={styles.chartCard} className="glass-card">
+                  <h4 style={styles.chartTitle}>👟 Daily Steps Analytics</h4>
+                  {activityChartData.length > 0 ? (
+                    <div style={{ width: '100%', height: 140 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={activityChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                          <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={10} />
+                          <YAxis stroke="var(--text-secondary)" fontSize={10} />
+                          <Tooltip contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '11px' }} formatter={(val) => [`${val} steps`, 'Steps']} />
+                          <Bar dataKey="steps" fill="#4dabf7" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No step data found for date range.</p>}
+                </Card>
+
+                {/* GRAPH 3: WATER INTAKE */}
+                <Card style={styles.chartCard} className="glass-card">
+                  <h4 style={{ ...styles.chartTitle, color: '#0288d1' }}>💧 Water Intake Analytics (Litres)</h4>
+                  {activityChartData.length > 0 ? (
+                    <div style={{ width: '100%', height: 130 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={activityChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                          <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={10} />
+                          <YAxis stroke="var(--text-secondary)" fontSize={10} />
+                          <Tooltip contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '11px' }} formatter={(val) => [`${val} L`, 'Water']} />
+                          <Line type="monotone" dataKey="water" stroke="#0288d1" strokeWidth={2} dot={{ r: 3 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No water intake data found.</p>}
+                </Card>
               </div>
-            </div>
 
-          </div>
+              {/* INPUT POPUP FOR ACTIVITY & WELLNESS */}
+              {showInputPopup && (
+                <Modal isOpen={showInputPopup} onClose={() => setShowInputPopup(false)} title="Log Today's Activity & Wellness" size="md">
+                  <form onSubmit={handleSaveActivityWellness} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <Input label="Steps (e.g. 10000)" type="number" value={activityWellnessForm.steps} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, steps: e.target.value })} />
+                      <Input label="Water (Litres e.g. 3)" type="number" step="0.1" value={activityWellnessForm.water} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, water: e.target.value })} />
+                    </div>
 
-          {/* POPUP INPUT MODAL FOR POSTURE */}
-          {showInputPopup && !isCheckinLocked && (
-            <Modal isOpen={showInputPopup} onClose={() => setShowInputPopup(false)} title="Submit 10-Day Body Posture (4 Sides)" size="md">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  Upload photos every 10 days to monitor physique changes.
-                </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <Input label="Sleep Duration (Hours e.g. 7.5)" type="number" step="0.5" value={activityWellnessForm.sleepHours} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, sleepHours: e.target.value })} />
+                      <Input label="Workout Weight Lifted (kg)" type="number" step="0.5" value={activityWellnessForm.workoutWeight} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, workoutWeight: e.target.value })} />
+                    </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                  {[
-                    { side: 'front', label: '1. Front View' },
-                    { side: 'back', label: '2. Back View' },
-                    { side: 'left', label: '3. Left View' },
-                    { side: 'right', label: '4. Right View' },
-                    { side: 'treadmillWheel', label: '5. Treadmill / Workout' }
-                  ].map(({ side, label }) => {
-                    const url = posturePhotos[side];
-                    const isUploading = uploadingPhotos[side];
-                    return (
-                      <div key={side} style={{ padding: '10px', backgroundColor: 'rgba(255, 255, 255, 0.02)', border: '1px dashed rgba(255, 255, 255, 0.12)', borderRadius: '10px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#FFFFFF', marginBottom: '6px' }}>
-                          {label}
+                    {/* Treadmill Photo Upload */}
+                    <Card style={{ padding: '8px', backgroundColor: 'var(--card-hover)', border: '1px dashed var(--border)' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 700, marginBottom: '4px', color: 'var(--text)' }}>
+                        📸 Treadmill Photo / Proof (Optional)
+                      </div>
+                      <input type="file" accept="image/*" id="treadmill-photo-upload" onChange={(e) => handlePhotoUpload(e, 'activityTreadmill')} style={{ display: 'none' }} />
+                      <label htmlFor="treadmill-photo-upload" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '6px', backgroundColor: 'var(--card)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem' }}>
+                        {uploadingPhotos['activityTreadmill'] ? <Spinner size={12} /> : <Upload size={14} color="var(--accent)" />}
+                        {activityWellnessForm.treadmillPhoto ? '✓ Photo Selected (Change)' : 'Choose Treadmill Photo'}
+                      </label>
+                      {activityWellnessForm.treadmillPhoto && (
+                        <div style={{ marginTop: '6px', textAlign: 'center' }}>
+                          <img src={getDirectImageUrl(activityWellnessForm.treadmillPhoto)} alt="Treadmill preview" style={{ height: '60px', borderRadius: '4px', objectFit: 'cover' }} />
                         </div>
-                        {url ? (
-                          <div style={{ position: 'relative' }}>
-                            <img src={getDirectImageUrl(url)} alt={side} style={{ width: '100%', height: '85px', objectFit: 'cover', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }} />
-                            <label htmlFor={`posture-popup-${side}`} style={{ position: 'absolute', bottom: '4px', right: '4px', background: 'rgba(0,0,0,0.7)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem', cursor: 'pointer', color: '#FFFFFF' }}>
-                              Change
-                            </label>
-                          </div>
-                        ) : (
-                          <div style={{ padding: '8px 0' }}>
-                            <input type="file" accept="image/*" id={`posture-popup-${side}`} style={{ display: 'none' }} onChange={(e) => handlePhotoUpload(e, side)} disabled={isUploading} />
-                            <label htmlFor={`posture-popup-${side}`} style={{ fontSize: '0.72rem', padding: '6px 12px', background: 'rgba(224, 0, 8, 0.15)', border: '1px solid rgba(224, 0, 8, 0.3)', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#FFFFFF', fontWeight: 700 }}>
-                              {isUploading ? <Spinner /> : <Upload size={12} />} {isUploading ? 'Uploading...' : 'Upload'}
-                            </label>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                      )}
+                    </Card>
 
-                <Button onClick={handleSavePosture} loading={submitting} style={{ padding: '14px', fontSize: '0.95rem', fontWeight: 800 }}>
-                  Submit Check-in
-                </Button>
-              </div>
-            </Modal>
-          )}
-
-        </div>
-      )}
-
-      {/* FULL SCREEN SHEET 4: SIZING & 14-POINT MEASUREMENTS */}
-      {activeModal === 'sizing' && (
-        <div style={styles.fullScreenOverlay} className="animate-fade-up">
-          <header style={styles.sheetHeader}>
-            <button onClick={() => setActiveModal(null)} style={styles.sheetBackBtn}>
-              <ArrowLeft size={22} color="#FFFFFF" />
-              <h3 style={styles.sheetTitle}>Sizing & 14-Point Measurements</h3>
-            </button>
-          </header>
-
-          <div style={styles.sheetContent}>
-            
-            {/* Lockout Notice or Add Measurements CTA Button */}
-            {isCheckinLocked ? (
-              <Card style={styles.lockedCard} className="glass-card">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                  <Lock size={22} color="#ffd600" />
-                  <h4 style={{ margin: 0, fontSize: '1rem', color: '#ffd600', fontWeight: 900 }}>Check-in Locked</h4>
-                </div>
-                <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: '#FFFFFF', lineHeight: 1.5 }}>
-                  Measurements are submitted once every 10 days. Next submission unlocks in <strong style={{ color: '#ffd600' }}>{daysToGo} day(s)</strong>.
-                </p>
-              </Card>
-            ) : (
-              <Button onClick={() => setShowInputPopup(true)} style={{ padding: '16px', fontSize: '1rem', fontWeight: 900, borderRadius: '12px' }}>
-                <PlusCircle size={20} /> Submit 14-Point Measurements
-              </Button>
-            )}
-
-            {/* 14-Point & Weight Progress Analytics with Interactive Metric Toggle */}
-            <Card style={styles.chartCard} className="glass-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h4 style={styles.chartTitle}>📈 {currentMetric.label} Progress Analytics</h4>
-                <Badge variant="success">Unit: {currentMetric.unit}</Badge>
-              </div>
-
-              {/* TOGGLE CHIPS FOR 14 MEASUREMENT POINTS + WEIGHT */}
-              <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '12px' }} className="no-scrollbar">
-                {MEASUREMENT_METRICS.map(m => {
-                  const active = m.key === selectedMeasurementKey;
-                  return (
-                    <button
-                      key={m.key}
-                      onClick={() => setSelectedMeasurementKey(m.key)}
-                      style={{
-                        padding: '6px 14px',
-                        borderRadius: '20px',
-                        fontSize: '0.75rem',
-                        fontWeight: active ? 900 : 600,
-                        whiteSpace: 'nowrap',
-                        border: active ? '1px solid #00c853' : '1px solid rgba(255,255,255,0.1)',
-                        backgroundColor: active ? 'rgba(0, 200, 83, 0.25)' : 'rgba(255,255,255,0.03)',
-                        color: active ? '#00c853' : 'var(--text-secondary)',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s'
-                      }}
-                    >
-                      {m.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* DYNAMIC CHART FOR SELECTED ANATOMICAL METRIC */}
-              {measurementChartSeries.length > 0 ? (
-                <div style={{ width: '100%', height: 220 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={measurementChartSeries} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="measGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#00c853" stopOpacity={0.35}/>
-                          <stop offset="95%" stopColor="#00c853" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" vertical={false} />
-                      <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={11} axisLine={false} tickLine={false} />
-                      <YAxis stroke="var(--text-secondary)" fontSize={11} axisLine={false} tickLine={false} domain={['dataMin - 1', 'dataMax + 1']} />
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#121214', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px' }} 
-                        formatter={(val) => [`${val} ${currentMetric.unit}`, currentMetric.label]} 
-                      />
-                      <Area type="monotone" dataKey="value" stroke="#00c853" strokeWidth={2} fillOpacity={1} fill="url(#measGrad)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic', margin: 0, padding: '20px 0', textAlign: 'center' }}>
-                  No logged history available for {currentMetric.label}.
-                </p>
-              )}
-            </Card>
-
-            {/* Sizing & Measurement History */}
-            <div>
-              <h4 style={styles.historyHeading}><History size={18} /> Measurement History (Click to view details)</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {checkinsHistory.filter(c => c.measurements || c.weight).map((c, idx) => {
-                  const dateNice = c.date ? new Date(c.date).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Check-in';
-                  return (
-                    <div 
-                      key={idx} 
-                      onClick={() => setSelectedDetail({ type: 'sizing', title: `14-Point Measurements — ${dateNice}`, data: c })}
-                      style={{ ...styles.historyRowItem, cursor: 'pointer' }}
-                    >
-                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#FFFFFF' }}>📅 {dateNice}</span>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#00c853' }}>
-                        Scale: {c.weight || c.measurements?.weight || '--'} kg
-                      </span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                      <Select label="Sleep Quality" value={activityWellnessForm.sleepQuality} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, sleepQuality: e.target.value })} options={[{ label: 'Good', value: 'Good' }, { label: 'Average', value: 'Average' }, { label: 'Poor', value: 'Poor' }]} />
+                      <Select label="Energy Level" value={activityWellnessForm.energyLevel} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, energyLevel: e.target.value })} options={[{ label: 'High', value: 'High' }, { label: 'Medium', value: 'Medium' }, { label: 'Low', value: 'Low' }]} />
+                      <Select label="Mood" value={activityWellnessForm.mood} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, mood: e.target.value })} options={[{ label: 'Great 😁', value: 'Great' }, { label: 'Good 🙂', value: 'Good' }, { label: 'Tired 😫', value: 'Tired' }]} />
                     </div>
-                  );
-                })}
-              </div>
+
+                    <Textarea label="Daily Wellness Notes / Remarks" placeholder="How did you feel today? Any soreness or achievement?" value={activityWellnessForm.dailyNotes} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, dailyNotes: e.target.value })} rows={2} />
+
+                    <Button type="submit" loading={submitting} style={{ width: '100%', marginTop: '4px' }}>
+                      Save Daily Activity & Wellness Log
+                    </Button>
+                  </form>
+                </Modal>
+              )}
             </div>
-
-          </div>
-
-          {/* POPUP INPUT MODAL FOR MEASUREMENTS */}
-          {showInputPopup && !isCheckinLocked && (
-            <Modal isOpen={showInputPopup} onClose={() => setShowInputPopup(false)} title="Record 14-Point Measurements (cm)" size="md">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <Input type="number" label="Body Weight (kg) *" value={sizingForm.weight} onChange={(e) => setSizingForm({...sizingForm, weight: e.target.value})} required />
-                  </div>
-
-                  <Input type="number" label="1. Neck" value={sizingForm.neck} onChange={(e) => setSizingForm({...sizingForm, neck: e.target.value})} />
-                  <Input type="number" label="2. Shoulder" value={sizingForm.shoulder} onChange={(e) => setSizingForm({...sizingForm, shoulder: e.target.value})} />
-                  <Input type="number" label="3. Chest" value={sizingForm.chest} onChange={(e) => setSizingForm({...sizingForm, chest: e.target.value})} />
-                  <Input type="number" label="4. Waist" value={sizingForm.waist} onChange={(e) => setSizingForm({...sizingForm, waist: e.target.value})} />
-                  <Input type="number" label="5. Stomach" value={sizingForm.stomach} onChange={(e) => setSizingForm({...sizingForm, stomach: e.target.value})} />
-                  <Input type="number" label="6. High Hip" value={sizingForm.highHip} onChange={(e) => setSizingForm({...sizingForm, highHip: e.target.value})} />
-                  <Input type="number" label="7. Right Bicep" value={sizingForm.rBicep} onChange={(e) => setSizingForm({...sizingForm, rBicep: e.target.value})} />
-                  <Input type="number" label="8. Left Bicep" value={sizingForm.lBicep} onChange={(e) => setSizingForm({...sizingForm, lBicep: e.target.value})} />
-                  <Input type="number" label="9. Right Forearm" value={sizingForm.rForearm} onChange={(e) => setSizingForm({...sizingForm, rForearm: e.target.value})} />
-                  <Input type="number" label="10. Left Forearm" value={sizingForm.lForearm} onChange={(e) => setSizingForm({...sizingForm, lForearm: e.target.value})} />
-                  <Input type="number" label="11. Right Thigh" value={sizingForm.rThigh} onChange={(e) => setSizingForm({...sizingForm, rThigh: e.target.value})} />
-                  <Input type="number" label="12. Left Thigh" value={sizingForm.lThigh} onChange={(e) => setSizingForm({...sizingForm, lThigh: e.target.value})} />
-                  <Input type="number" label="13. Right Calf" value={sizingForm.rCalf} onChange={(e) => setSizingForm({...sizingForm, rCalf: e.target.value})} />
-                  <Input type="number" label="14. Left Calf" value={sizingForm.lCalf} onChange={(e) => setSizingForm({...sizingForm, lCalf: e.target.value})} />
-                </div>
-
-                <Button onClick={handleSaveSizing} loading={submitting} style={{ padding: '14px', fontSize: '0.95rem', fontWeight: 800, marginTop: '8px' }}>
-                  Submit Measurements
-                </Button>
-              </div>
-            </Modal>
           )}
 
-        </div>
-      )}
+          {/* SHEET 2: UNIFIED 10-DAY BODY POSTURE & SIZING */}
+          {hasPostureCheckin && activeModal === 'posture_sizing' && (
+            <div style={styles.fullScreenOverlay} className="animate-fade-up">
+              <header style={styles.sheetHeader}>
+                <button onClick={() => setActiveModal(null)} style={styles.sheetBackBtn}>
+                  <ArrowLeft size={18} color="var(--text)" />
+                  <h3 style={styles.sheetTitle}>10-Day Body Posture & Sizing Check-in</h3>
+                </button>
+              </header>
 
-      {/* SUBMITTED INFO DETAIL MODAL */}
-      {selectedDetail && (
-        <Modal 
-          isOpen={!!selectedDetail} 
-          onClose={() => setSelectedDetail(null)} 
-          title={selectedDetail.title} 
-          size="md"
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            
-            {/* 1. POSTURE CHECK-IN DETAIL */}
-            {selectedDetail.type === 'posture' && (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.03)' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Status</span>
-                  <Badge variant={selectedDetail.data.reviewed ? 'success' : 'warning'}>
-                    {selectedDetail.data.reviewed ? 'Reviewed by Coach' : 'Pending Review'}
-                  </Badge>
-                </div>
-
-                <h5 style={{ margin: '0', fontSize: '0.9rem', color: '#FFFFFF', fontWeight: 800 }}>Submitted 4-Angle & Cardio Photos (Click photo to zoom)</h5>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                  {[
-                    { key: 'front', label: '1. Front View' },
-                    { key: 'back', label: '2. Back View' },
-                    { key: 'left', label: '3. Left View' },
-                    { key: 'right', label: '4. Right View' },
-                    { key: 'treadmillWheel', label: '5. Treadmill / Workout' }
-                  ].map(({ key, label }) => {
-                    const url = selectedDetail.data.photos?.[key];
-                    if (!url) return null;
-                    return (
-                      <div 
-                        key={key} 
-                        onClick={() => setZoomImage({ url: getDirectImageUrl(url), label })}
-                        style={{ cursor: 'pointer', textAlign: 'center', padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}
-                      >
-                        <img src={getDirectImageUrl(url)} alt={label} style={{ width: '100%', height: '110px', objectFit: 'cover', borderRadius: '6px' }} />
-                        <div style={{ fontSize: '0.72rem', color: '#FFFFFF', fontWeight: 700, marginTop: '4px' }}>{label} 🔍</div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {selectedDetail.data.notes && (
-                  <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: 'rgba(224, 0, 8, 0.08)', border: '1px solid rgba(224, 0, 8, 0.2)' }}>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--accent)', fontWeight: 800 }}>Coach Notes</div>
-                    <div style={{ fontSize: '0.85rem', color: '#FFFFFF', marginTop: '4px' }}>{selectedDetail.data.notes}</div>
+              <div style={styles.sheetContent}>
+                {/* Date Filter Bar */}
+                <Card style={{ padding: '8px 12px' }} className="glass-card">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Filter size={14} color="var(--accent)" /> Date Range:
+                    </span>
+                    <Input type="date" label="From" value={fromDate} onChange={(e) => setFromDate(e.target.value)} containerStyle={{ flex: 1, minWidth: '120px' }} />
+                    <Input type="date" label="To" value={toDate} onChange={(e) => setToDate(e.target.value)} containerStyle={{ flex: 1, minWidth: '120px' }} />
                   </div>
-                )}
-              </>
-            )}
+                </Card>
 
-            {/* 2. SIZING MEASUREMENTS DETAIL */}
-            {selectedDetail.type === 'sizing' && (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '8px', backgroundColor: 'rgba(0,200,83,0.08)' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Body Weight</span>
-                  <span style={{ fontSize: '1.1rem', color: '#00c853', fontWeight: 900 }}>{selectedDetail.data.weight || selectedDetail.data.measurements?.weight || '--'} kg</span>
-                </div>
+                <Button 
+                  onClick={() => !isCheckinLocked && setShowInputPopup(true)} 
+                  disabled={isCheckinLocked}
+                  style={{ 
+                    padding: '10px', 
+                    fontSize: '0.85rem',
+                    backgroundColor: isCheckinLocked ? 'var(--card-hover)' : 'var(--accent)',
+                    color: isCheckinLocked ? 'var(--text-secondary)' : '#fff',
+                    cursor: isCheckinLocked ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isCheckinLocked ? (
+                    <>🔒 Check-in Locked (Unlocks in {daysToGo} Days)</>
+                  ) : (
+                    <><Camera size={16} /> Submit 10-Day Body Posture & Sizing Check-in</>
+                  )}
+                </Button>
 
-                <h5 style={{ margin: '0', fontSize: '0.9rem', color: '#FFFFFF', fontWeight: 800 }}>14-Point Body Measurements (cm)</h5>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                  {[
-                    { key: 'neck', label: '1. Neck' },
-                    { key: 'shoulder', label: '2. Shoulder' },
-                    { key: 'chest', label: '3. Chest' },
-                    { key: 'waist', label: '4. Waist' },
-                    { key: 'stomach', label: '5. Stomach' },
-                    { key: 'highHip', label: '6. High Hip' },
-                    { key: 'rBicep', label: '7. Right Bicep' },
-                    { key: 'lBicep', label: '8. Left Bicep' },
-                    { key: 'rForearm', label: '9. Right Forearm' },
-                    { key: 'lForearm', label: '10. Left Forearm' },
-                    { key: 'rThigh', label: '11. Right Thigh' },
-                    { key: 'lThigh', label: '12. Left Thigh' },
-                    { key: 'rCalf', label: '13. Right Calf' },
-                    { key: 'lCalf', label: '14. Left Calf' }
-                  ].map(({ key, label }) => {
-                    const val = selectedDetail.data.measurements?.[key];
-                    return (
-                      <div key={key} style={{ padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255,255,255,0.02)', display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{label}</span>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#FFFFFF' }}>{val ? `${val} cm` : '--'}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-
-            {/* 3. ACTIVITY LOG DETAIL */}
-            {selectedDetail.type === 'activity' && (
-              <>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                  <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Daily Steps</div>
-                    <div style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--accent)' }}>{selectedDetail.data.steps || 0}</div>
-                  </div>
-                  <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Water Intake</div>
-                    <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0288d1' }}>{selectedDetail.data.water || 0} L</div>
-                  </div>
-                  <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Sleep Duration</div>
-                    <div style={{ fontSize: '1rem', fontWeight: 900, color: '#7c4dff' }}>{selectedDetail.data.sleepHours || 0} h</div>
-                  </div>
-                </div>
-
-                {selectedDetail.data.treadmillPhoto && (
-                  <div style={{ marginTop: '8px' }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#FFFFFF', marginBottom: '6px' }}>🏃 Treadmill Wheel / Workout Photo</div>
-                    <img 
-                      src={getDirectImageUrl(selectedDetail.data.treadmillPhoto)} 
-                      alt="Treadmill" 
-                      onClick={() => setZoomImage({ url: getDirectImageUrl(selectedDetail.data.treadmillPhoto), label: 'Treadmill Wheel Photo' })}
-                      style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: '8px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }} 
+                {/* SIZING METRIC SELECTION GRAPH */}
+                <Card style={styles.chartCard} className="glass-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                    <h4 style={styles.chartTitle}>📐 14-Point Body Sizing Metric Progress</h4>
+                    <Select 
+                      value={selectedMeasurementKey} 
+                      onChange={(e) => setSelectedMeasurementKey(e.target.value)} 
+                      options={[
+                        { label: 'Weight (kg)', value: 'weight' },
+                        { label: 'Waist (in)', value: 'waist' },
+                        { label: 'Chest (in)', value: 'chest' },
+                        { label: 'Stomach (in)', value: 'stomach' },
+                        { label: 'Neck (in)', value: 'neck' },
+                        { label: 'Shoulder (in)', value: 'shoulder' },
+                        { label: 'Right Bicep (in)', value: 'rBicep' },
+                        { label: 'Left Bicep (in)', value: 'lBicep' },
+                        { label: 'Right Thigh (in)', value: 'rThigh' },
+                        { label: 'Left Thigh (in)', value: 'lThigh' }
+                      ]}
+                      containerStyle={{ margin: 0, width: '150px' }}
                     />
                   </div>
-                )}
-              </>
-            )}
 
-            {/* 4. WELLNESS LOG DETAIL */}
-            {selectedDetail.type === 'wellness' && (
-              <>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                  <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Sleep Quality</div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#FFFFFF' }}>{selectedDetail.data.sleepQuality || '--'}</div>
-                  </div>
-                  <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Energy Level</div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#ffd600' }}>{selectedDetail.data.energyLevel || '--'}</div>
-                  </div>
-                  <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Mood</div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#00c853' }}>{selectedDetail.data.mood || '--'}</div>
-                  </div>
-                </div>
+                  {sizingChartData.length > 0 ? (
+                    <div style={{ width: '100%', height: 165 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={sizingChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                          <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={10} />
+                          <YAxis stroke="var(--text-secondary)" fontSize={10} domain={['dataMin - 1', 'dataMax + 1']} />
+                          <Tooltip contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '11px' }} />
+                          <Line type="monotone" dataKey="val" stroke="var(--accent)" strokeWidth={2.5} dot={{ r: 4 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No measurement data found for selected metric.</p>}
+                </Card>
+              </div>
 
-                {selectedDetail.data.dailyNotes && (
-                  <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.03)' }}>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700 }}>Wellness Notes</div>
-                    <div style={{ fontSize: '0.85rem', color: '#FFFFFF', marginTop: '4px' }}>"{selectedDetail.data.dailyNotes}"</div>
-                  </div>
-                )}
-              </>
-            )}
+              {/* INPUT POPUP FOR POSTURE & SIZING */}
+              {showInputPopup && (
+                <Modal isOpen={showInputPopup} onClose={() => setShowInputPopup(false)} title="10-Day Body Posture & Sizing Check-in" size="lg">
+                  <form onSubmit={handleSavePostureSizing} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    
+                    {/* 4-SIDE POSTURE PHOTOS */}
+                    <Card style={{ padding: '10px', backgroundColor: 'var(--card-hover)', border: '1px solid var(--border)' }}>
+                      <h4 style={{ margin: '0 0 8px 0', fontSize: '0.82rem', fontWeight: 800, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Camera size={14} /> 1. Upload 4-Side Body Posture Photos (Mandatory)
+                      </h4>
 
-          </div>
-        </Modal>
-      )}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                        {['front', 'back', 'left', 'right'].map((side) => (
+                          <div key={side} style={{ padding: '6px', backgroundColor: 'var(--card)', borderRadius: '6px', textAlign: 'center', border: '1px solid var(--border)' }}>
+                            <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'capitalize', color: 'var(--text)', marginBottom: '4px' }}>
+                              {side} Photo
+                            </div>
+                            <input type="file" accept="image/*" id={`posture-upload-${side}`} onChange={(e) => handlePhotoUpload(e, side)} style={{ display: 'none' }} />
+                            <label htmlFor={`posture-upload-${side}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', backgroundColor: 'var(--card-hover)', borderRadius: '4px', cursor: 'pointer', fontSize: '0.72rem' }}>
+                              {uploadingPhotos[side] ? <Spinner size={12} /> : <Upload size={12} color="var(--accent)" />}
+                              {posturePhotos[side] ? '✓ Uploaded' : 'Upload'}
+                            </label>
+                            {posturePhotos[side] && (
+                              <img src={getDirectImageUrl(posturePhotos[side])} alt={`${side} preview`} style={{ width: '100%', height: '50px', objectFit: 'cover', borderRadius: '4px', marginTop: '4px' }} />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
 
-      {/* HIGH-RES IMAGE ZOOM LIGHTBOX */}
-      {zoomImage && (
-        <Modal isOpen={!!zoomImage} onClose={() => setZoomImage(null)} title={zoomImage.label || 'Photo Preview'} size="lg">
-          <div style={{ textAlign: 'center' }}>
-            <img src={zoomImage.url} alt={zoomImage.label} style={{ maxWidth: '100%', maxHeight: '75vh', objectFit: 'contain', borderRadius: '8px' }} />
-          </div>
-        </Modal>
-      )}
+                    {/* 14-POINT SIZING MEASUREMENTS */}
+                    <Card style={{ padding: '10px', backgroundColor: 'var(--card-hover)', border: '1px solid var(--border)' }}>
+                      <h4 style={{ margin: '0 0 8px 0', fontSize: '0.82rem', fontWeight: 800, color: '#00c853', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <TrendingUp size={14} /> 2. Enter Body Sizing Measurements (Optional)
+                      </h4>
 
-        </>,
-        document.body
-      )}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                        <Input label="Weight (kg)" type="number" step="0.1" value={sizingForm.weight} onChange={(e) => setSizingForm({ ...sizingForm, weight: e.target.value })} />
+                        <Input label="Waist (in)" type="number" step="0.1" value={sizingForm.waist} onChange={(e) => setSizingForm({ ...sizingForm, waist: e.target.value })} />
+                        <Input label="Chest (in)" type="number" step="0.1" value={sizingForm.chest} onChange={(e) => setSizingForm({ ...sizingForm, chest: e.target.value })} />
+                        <Input label="Stomach (in)" type="number" step="0.1" value={sizingForm.stomach} onChange={(e) => setSizingForm({ ...sizingForm, stomach: e.target.value })} />
+                        <Input label="Neck (in)" type="number" step="0.1" value={sizingForm.neck} onChange={(e) => setSizingForm({ ...sizingForm, neck: e.target.value })} />
+                        <Input label="Shoulder (in)" type="number" step="0.1" value={sizingForm.shoulder} onChange={(e) => setSizingForm({ ...sizingForm, shoulder: e.target.value })} />
+                        <Input label="Right Bicep" type="number" step="0.1" value={sizingForm.rBicep} onChange={(e) => setSizingForm({ ...sizingForm, rBicep: e.target.value })} />
+                        <Input label="Left Bicep" type="number" step="0.1" value={sizingForm.lBicep} onChange={(e) => setSizingForm({ ...sizingForm, lBicep: e.target.value })} />
+                        <Input label="Right Thigh" type="number" step="0.1" value={sizingForm.rThigh} onChange={(e) => setSizingForm({ ...sizingForm, rThigh: e.target.value })} />
+                      </div>
+                    </Card>
+
+                    <Button type="submit" loading={submitting} style={{ width: '100%', marginTop: '4px' }}>
+                      Submit 10-Day Body Posture & Sizing Check-in
+                    </Button>
+                  </form>
+                </Modal>
+              )}
+            </div>
+          )}
+        </>
+      , document.body)}
 
     </div>
   );
 }
 
 const styles = {
-  hubCard: { padding: '16px', display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer', transition: 'all 0.2s' },
-  hubIconWrapper: { width: '42px', height: '42px', borderRadius: '12px', backgroundColor: 'rgba(224, 0, 8, 0.12)', border: '1px solid rgba(224, 0, 8, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  hubTitle: { fontSize: '0.95rem', fontWeight: 800, margin: 0, color: '#FFFFFF' },
-  hubSub: { fontSize: '0.78rem', color: 'var(--text-secondary, #AAAAAA)', margin: 0 },
-  fullScreenOverlay: { 
-    position: 'fixed', 
-    top: 0, 
-    left: 0, 
-    right: 0, 
-    bottom: 0, 
-    zIndex: 99999, 
-    backgroundColor: '#080808', 
-    overflowY: 'auto', 
-    display: 'flex', 
-    flexDirection: 'column' 
-  },
-  sheetHeader: { 
-    position: 'sticky', 
-    top: 0, 
-    zIndex: 100, 
-    backgroundColor: 'rgba(18, 18, 20, 0.98)', 
-    backdropFilter: 'blur(20px)', 
-    WebkitBackdropFilter: 'blur(20px)',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.1)', 
-    padding: '16px', 
-    display: 'flex', 
-    alignItems: 'center', 
-    justify: 'space-between' 
-  },
-  sheetBackBtn: { display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', color: '#FFFFFF', cursor: 'pointer', padding: 0 },
-  sheetTitle: { margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#FFFFFF', textAlign: 'left' },
-  sheetCloseBtn: { background: 'rgba(255,255,255,0.08)', border: 'none', color: '#FFFFFF', borderRadius: '50%', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
-  sheetContent: { padding: '24px 16px 100px 16px', maxWidth: '750px', margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '20px' },
-  chartCard: { padding: '18px' },
-  chartTitle: { margin: '0 0 14px 0', fontSize: '0.95rem', fontWeight: 900, color: '#FFFFFF' },
-  sectionCard: { padding: '18px' },
-  cardHeaderTitle: { margin: '0 0 14px 0', fontSize: '1rem', fontWeight: 900, color: '#FFFFFF' },
-  historyHeading: { margin: '0 0 12px 0', fontSize: '0.95rem', color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 900 },
-  historyRowItem: { padding: '12px 14px', borderRadius: '10px', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  historyBox: { padding: '14px', borderRadius: '12px', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)', display: 'flex', flexDirection: 'column', gap: '8px' },
-  lockedCard: { padding: '18px', backgroundColor: 'rgba(255, 214, 0, 0.08)', border: '1px solid rgba(255, 214, 0, 0.35)' }
+  container: { display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '80px' },
+  header: { display: 'flex', flexDirection: 'column', gap: '2px' },
+  iconCircle: { width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--accent-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text)' },
+  subtitle: { fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 },
+  hubGrid: { display: 'flex', flexDirection: 'column', gap: '10px' },
+  hubCard: { padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', borderRadius: '12px' },
+  hubIconWrapper: { width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  hubTitle: { fontSize: '0.88rem', fontWeight: 800, margin: 0, color: 'var(--text)' },
+  hubSub: { fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '2px 0 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  fullScreenOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'var(--bg)', zIndex: 999, display: 'flex', flexDirection: 'column', overflowY: 'auto' },
+  sheetHeader: { position: 'sticky', top: 0, zIndex: 10, padding: '12px 16px', backgroundColor: 'var(--card)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center' },
+  sheetBackBtn: { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' },
+  sheetTitle: { fontSize: '0.95rem', fontWeight: 800, margin: 0, color: 'var(--text)' },
+  sheetContent: { padding: '14px 16px 80px 16px', display: 'flex', flexDirection: 'column', gap: '12px' },
+  chartCard: { padding: '12px' },
+  chartTitle: { fontSize: '0.82rem', fontWeight: 800, margin: '0 0 8px 0', color: 'var(--text)' }
 };

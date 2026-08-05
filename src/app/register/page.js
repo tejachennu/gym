@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { registerUser } from '@/lib/auth';
 import { useToast } from '@/components/ui/Toast';
+import { validateField } from '@/lib/validation';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
@@ -16,6 +17,17 @@ export default function RegisterPage() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
+
+    const nameErr = validateField('Full Name', formData.name, { required: true });
+    const emailErr = validateField('Email Address', formData.email, { email: true, required: true });
+    const phoneErr = validateField('Phone Number', formData.phone, { phone: true, required: true });
+    const passErr = validateField('Password', formData.password, { required: true });
+
+    if (nameErr || emailErr || phoneErr || passErr) {
+      toast.error(nameErr || emailErr || phoneErr || passErr);
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       return toast.error('Passwords do not match');
     }
@@ -29,7 +41,7 @@ export default function RegisterPage() {
         router.push('/client');
       }
     } catch (err) {
-      toast.error(err.message || 'Registration failed');
+      toast.error(err);
     } finally {
       setLoading(false);
     }
@@ -41,33 +53,31 @@ export default function RegisterPage() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'radial-gradient(circle at center, #1a1a1e 0%, var(--bg) 100%)',
-      padding: '20px'
+      background: 'radial-gradient(circle at center, var(--card-hover) 0%, var(--bg) 100%)',
+      padding: '16px'
     }}>
-      <Card style={{ width: '100%', maxWidth: '400px', padding: '40px 20px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '1.8rem', marginBottom: '5px' }}>
-          <span style={{ color: 'var(--accent)' }}>Power</span>
-          <span style={{ color: 'white' }}>House</span>
-        </h1>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '25px' }}>Create Fitness Account</p>
+      <Card style={{ width: '100%', maxWidth: '380px', padding: '24px 20px', textAlign: 'center', borderRadius: '14px' }} className="glass-card">
+        <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: '40px', width: 'auto', objectFit: 'contain', marginBottom: '6px' }} />
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', marginBottom: '16px' }}>Create Fitness Account</p>
         
-        <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          <Input placeholder="Full Name" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required />
-          <Input type="email" placeholder="Email (e.g. admin@powerhouse.com)" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} required />
-          <Input type="tel" placeholder="Phone Number" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} required />
+        <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <Input placeholder="Full Name *" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required />
+          <Input type="email" placeholder="Email Address *" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} required />
+          <Input type="tel" numeric={true} placeholder="Phone Number (Numbers only) *" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} required />
           
           <div style={{ textAlign: 'left' }}>
-            <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '5px', display: 'block' }}>Account Type / Role:</label>
+            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block', fontWeight: 600 }}>Account Type / Role:</label>
             <select 
               value={formData.role} 
               onChange={(e) => setFormData({...formData, role: e.target.value})}
               style={{
                 width: '100%',
-                padding: '12px 16px',
-                borderRadius: '12px',
+                padding: '8px 12px',
+                borderRadius: '8px',
                 backgroundColor: 'var(--card)',
                 border: '1px solid var(--border)',
-                color: 'white',
+                color: 'var(--text)',
+                fontSize: '0.82rem',
                 outline: 'none'
               }}
             >
@@ -76,17 +86,17 @@ export default function RegisterPage() {
             </select>
           </div>
 
-          <Input type="password" placeholder="Password" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} required />
-          <Input type="password" placeholder="Confirm Password" value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} required />
+          <Input type="password" placeholder="Password *" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} required />
+          <Input type="password" placeholder="Confirm Password *" value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} required />
           
-          <Button type="submit" loading={loading} style={{ backgroundColor: 'var(--accent)', color: 'white', marginTop: '10px' }}>
-            Register as {formData.role === 'admin' ? 'Admin' : 'Client'}
+          <Button type="submit" loading={loading} style={{ backgroundColor: 'var(--accent)', color: 'white', marginTop: '6px', fontWeight: 800 }}>
+            Submit Registration
           </Button>
         </form>
 
-        <div style={{ marginTop: '20px', fontSize: '0.9rem' }}>
+        <div style={{ marginTop: '14px', fontSize: '0.8rem' }}>
           <span style={{ color: 'var(--text-secondary)' }}>Already have an account? </span>
-          <Link href="/login" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Login</Link>
+          <Link href="/login" style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>Login</Link>
         </div>
       </Card>
     </div>

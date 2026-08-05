@@ -33,7 +33,11 @@ import {
   Home as HomeIcon,
   Check,
   Menu,
-  X
+  X,
+  HelpCircle,
+  ChevronDown,
+  MessageCircle,
+  CheckSquare
 } from 'lucide-react';
 
 function InstagramIcon({ size = 18, color = "#e1306c" }) {
@@ -51,7 +55,7 @@ const DEFAULT_PLANS = [
     id: 'default-1',
     plan_name: "Cardio + Strength",
     category: "MRK FITNESS",
-    badge: "Most Popular",
+    badge: "Most Popular 🔥",
     description: "The ultimate combination for fat loss, endurance, and body transformation.",
     pricing: [
       { duration: "1 Month", price: 1599 },
@@ -64,7 +68,7 @@ const DEFAULT_PLANS = [
     id: 'default-2',
     plan_name: "Personal Training",
     category: "MRK FITNESS",
-    badge: "VIP Coaching",
+    badge: "VIP 1-on-1 Coaching 👑",
     description: "One-on-one dedicated coaching with Radha Krishna Maram.",
     pricing: [
       { duration: "1 Month", price: 6000 },
@@ -87,11 +91,30 @@ const DEFAULT_PLANS = [
     id: 'default-4',
     plan_name: "Daily Access Pass",
     category: "MRK FITNESS",
-    description: "Single day drop-in pass.",
+    description: "Single day drop-in pass for workout enthusiasts.",
     pricing: [
       { duration: "1 Day", price: 99 }
     ],
     features: ["Full Gym Access", "Cardio Zone & Weights", "Locker Facility", "Trainer Assistance"]
+  }
+];
+
+const FAQS = [
+  {
+    q: "How does the MRK FITNESS online & in-gym coaching work?",
+    a: "Every member gets a personalized dashboard. Head Coach Radha Krishna Maram designs your custom workout split and macro-balanced diet plan based on your intake assessment (goals, injuries, medical conditions). You submit daily activity logs and 10-day posture photos for continuous progress tracking."
+  },
+  {
+    q: "What is included in the 10-Day Body Posture & Sizing Check-in?",
+    a: "Every 10 days, you upload 4-side posture photos (Front, Back, Left, Right) along with 14-point body measurements (weight, waist, chest, arms, legs). Coach Radha Krishna reviews your photos and measurements to tweak your diet and workout routines for non-stop results."
+  },
+  {
+    q: "Do I get a customized diet plan according to my dietary preferences?",
+    a: "Yes! Diet plans are 100% customized for VEG, NON-VEG, EGGETARIAN, and VEGAN preferences. Meal slots (Breakfast, Pre-Workout, Post-Workout, Lunch, Dinner) list exact quantities and macro totals tailored to your target calories."
+  },
+  {
+    q: "Can beginners join Personal Training with Head Coach Radha Krishna Maram?",
+    a: "Absolutely! Whether you are a beginner taking your first steps or an advanced lifter aiming for peak performance, Coach Radha Krishna provides step-by-step guidance, form correction, and custom training splits."
   }
 ];
 
@@ -105,10 +128,12 @@ export default function HomePage() {
   // Responsive Mobile Menu State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [openFaq, setOpenFaq] = useState(null);
 
-  // Interactive Calorie Estimator State
+  // Interactive Calorie & Nutrition Calculator State
   const [calcWeight, setCalcWeight] = useState(75);
   const [calcHeight, setCalcHeight] = useState(175);
+  const [calcAge, setCalcAge] = useState(28);
   const [calcGoal, setCalcGoal] = useState('fatloss');
 
   useEffect(() => {
@@ -150,38 +175,42 @@ export default function HomePage() {
   };
 
   const calculateCalories = () => {
-    const bmr = 10 * calcWeight + 6.25 * calcHeight - 5 * 25 + 5;
+    const bmr = 10 * calcWeight + 6.25 * calcHeight - 5 * calcAge + 5;
     const maintenance = Math.round(bmr * 1.4);
-    if (calcGoal === 'fatloss') return maintenance - 400;
+    if (calcGoal === 'fatloss') return maintenance - 450;
     if (calcGoal === 'muscle') return maintenance + 350;
     return maintenance;
   };
 
   const estimatedCalories = calculateCalories();
+  const proteinGrams = Math.round(calcWeight * 2.2);
+  const carbsGrams = Math.round((estimatedCalories * 0.40) / 4);
+  const fatGrams = Math.round((estimatedCalories * 0.25) / 9);
 
   return (
     <div style={styles.pageWrapper}>
-      {/* 1. Header Navigation Bar */}
+      {/* 1. Sticky Navigation Header */}
       <header style={styles.navHeader}>
         <div style={styles.navContainer}>
           <div style={styles.brandGroup} onClick={() => router.push('/')}>
-            <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: isMobile ? '32px' : '42px', width: 'auto', objectFit: 'contain' }} />
+            <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: isMobile ? '34px' : '44px', width: 'auto', objectFit: 'contain' }} />
           </div>
 
-          {/* Desktop Navigation Links */}
+          {/* Desktop Links */}
           {!isMobile && (
             <nav style={styles.navLinks}>
               <a href="#about" style={styles.link}>Who is MRK?</a>
               <a href="#specializations" style={styles.link}>Specializations</a>
-              <a href="#offerings" style={styles.link}>Program Features</a>
-              <a href="#calculator" style={styles.link}>Calculator</a>
+              <a href="#offerings" style={styles.link}>Features</a>
+              <a href="#calculator" style={styles.link}>Calorie Calculator</a>
               <a href="#plans" style={styles.link}>Pricing Plans</a>
-              <a href="/contact" style={styles.link}>Contact Us</a>
+              <a href="#faqs" style={styles.link}>FAQs</a>
+              <a href="/contact" style={styles.link}>Contact</a>
             </nav>
           )}
 
           {/* Desktop Actions / Mobile Menu Button */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {!isMobile && (
               <div style={styles.navActions}>
                 {user ? (
@@ -205,7 +234,7 @@ export default function HomePage() {
               <button 
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
                 style={styles.hamburgerBtn}
-                aria-label="Toggle Navigation Menu"
+                aria-label="Toggle Menu"
               >
                 {isMobileMenuOpen ? <X size={22} color="#FFFFFF" /> : <Menu size={22} color="#FFFFFF" />}
               </button>
@@ -213,27 +242,16 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Mobile Slide-out Drawer Menu */}
+        {/* Mobile Slide-out Drawer */}
         {isMobile && isMobileMenuOpen && (
           <div style={styles.mobileDrawer} className="animate-fade-up">
-            <a href="#about" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>
-              Who is MRK?
-            </a>
-            <a href="#specializations" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>
-              Specializations
-            </a>
-            <a href="#offerings" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>
-              Program Features
-            </a>
-            <a href="#calculator" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>
-              Calculator
-            </a>
-            <a href="#plans" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>
-              Pricing Plans
-            </a>
-            <a href="/contact" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>
-              Contact Us
-            </a>
+            <a href="#about" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>Who is MRK?</a>
+            <a href="#specializations" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>Specializations</a>
+            <a href="#offerings" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>Features</a>
+            <a href="#calculator" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>Calorie Calculator</a>
+            <a href="#plans" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>Pricing Plans</a>
+            <a href="#faqs" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>FAQs</a>
+            <a href="/contact" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>Contact Us</a>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
               {user ? (
@@ -241,19 +259,17 @@ export default function HomePage() {
                   <ShieldCheck size={16} /> Portal Dashboard
                 </Button>
               ) : (
-                <>
-                  <Button onClick={() => { setIsMobileMenuOpen(false); router.push('/login'); }} style={{ width: '100%' }}>
-                    Get Started / Login <ArrowRight size={16} />
-                  </Button>
-                </>
+                <Button onClick={() => { setIsMobileMenuOpen(false); router.push('/login'); }} style={{ width: '100%' }}>
+                  Get Started / Login <ArrowRight size={16} />
+                </Button>
               )}
             </div>
           </div>
         )}
       </header>
 
-      {/* 2. Hero Banner Section */}
-      <section style={{ ...styles.heroSection, padding: isMobile ? '40px 16px 50px 16px' : '70px 16px 80px 16px' }}>
+      {/* 2. Hero Section */}
+      <section style={{ ...styles.heroSection, padding: isMobile ? '40px 16px 50px 16px' : '80px 16px 90px 16px' }}>
         <div style={styles.heroGlow1} />
         <div style={styles.heroGlow2} />
         <div style={styles.heroGlow3} />
@@ -261,21 +277,21 @@ export default function HomePage() {
         <div style={styles.heroContainer}>
           <div style={styles.heroBadge}>
             <Sparkles size={14} color="var(--accent, #E00008)" />
-            <span>START YOUR JOURNEY WITH MRK FITNESS</span>
+            <span>TRANSFORM YOUR BODY WITH MRK FITNESS</span>
           </div>
 
-          <h1 style={{ ...styles.heroTitle, fontSize: isMobile ? '1.8rem' : '2.6rem' }}>
-            LET US BUILD THE <br />
-            <span style={styles.gradientText}>BEST VERSION OF YOU</span>
+          <h1 style={{ ...styles.heroTitle, fontSize: isMobile ? '2.1rem' : '3.2rem' }}>
+            BUILD THE <span style={styles.gradientText}>BEST VERSION</span> <br />
+            OF YOURSELF
           </h1>
 
-          <p style={{ ...styles.heroSubtitle, fontSize: isMobile ? '0.88rem' : '0.98rem' }}>
-            Personalized strength training routines, scientific fat-loss diets, weekly check-ins, and 24/7 direct coaching by Head Coach <strong>Radha Krishna Maram</strong>.
+          <p style={{ ...styles.heroSubtitle, fontSize: isMobile ? '0.9rem' : '1.05rem' }}>
+            Personalized strength training routines, scientific fat-loss diets, 10-day posture reviews, and 24/7 direct coaching by Head Coach <strong>Radha Krishna Maram</strong>.
           </p>
 
           <div style={{ ...styles.heroBtnGroup, flexDirection: isMobile ? 'column' : 'row' }}>
             <Button onClick={handlePortalRedirect} style={{ ...styles.mainCtaBtn, width: isMobile ? '100%' : 'auto', justifyContent: 'center' }} className="pulse-glow">
-              Start Your Journey Now <ChevronRight size={18} />
+              Start Your Transformation <ChevronRight size={18} />
             </Button>
             <a 
               href="https://instagram.com/__MRK.FITNESS.__" 
@@ -283,24 +299,29 @@ export default function HomePage() {
               rel="noopener noreferrer"
               style={{ ...styles.instaBtn, justifyContent: 'center', width: isMobile ? '100%' : 'auto' }}
             >
-              <InstagramIcon size={18} color="#e1306c" /> DM on Instagram
+              <InstagramIcon size={18} color="#e1306c" /> DM Head Coach on Instagram
             </a>
           </div>
 
-          {/* Key Program Highlights Row */}
-          <div style={{ ...styles.heroStatsRow, padding: isMobile ? '12px 14px' : '16px 28px', gap: isMobile ? '12px' : '24px' }}>
+          {/* Key Program Highlights Bar */}
+          <div style={{ ...styles.heroStatsRow, padding: isMobile ? '14px 16px' : '18px 32px', gap: isMobile ? '14px' : '32px' }}>
             <div style={styles.statBox}>
-              <div style={{ ...styles.statNumber, fontSize: isMobile ? '1.1rem' : '1.4rem' }}>2+ Years</div>
+              <div style={{ ...styles.statNumber, fontSize: isMobile ? '1.2rem' : '1.5rem' }}>2+ Years</div>
               <div style={styles.statLabel}>Specialized Coaching</div>
             </div>
             <div style={styles.statDivider} />
             <div style={styles.statBox}>
-              <div style={{ ...styles.statNumber, fontSize: isMobile ? '1.1rem' : '1.4rem' }}>100%</div>
-              <div style={styles.statLabel}>Custom Plans</div>
+              <div style={{ ...styles.statNumber, fontSize: isMobile ? '1.2rem' : '1.5rem' }}>100%</div>
+              <div style={styles.statLabel}>Custom Macro Diets</div>
             </div>
             <div style={styles.statDivider} />
             <div style={styles.statBox}>
-              <div style={{ ...styles.statNumber, fontSize: isMobile ? '1.1rem' : '1.4rem' }}>24 / 7</div>
+              <div style={{ ...styles.statNumber, fontSize: isMobile ? '1.2rem' : '1.5rem' }}>Every 10 Days</div>
+              <div style={styles.statLabel}>Posture Photo Audits</div>
+            </div>
+            <div style={styles.statDivider} />
+            <div style={styles.statBox}>
+              <div style={{ ...styles.statNumber, fontSize: isMobile ? '1.2rem' : '1.5rem' }}>24 / 7</div>
               <div style={styles.statLabel}>Direct Support</div>
             </div>
           </div>
@@ -309,19 +330,20 @@ export default function HomePage() {
 
       {/* 3. WHO IS MRK? (Coach Profile Section) */}
       <section id="about" style={{ ...styles.section, padding: isMobile ? '30px 16px' : '60px 16px' }}>
-        <Card style={{ ...styles.aboutCard, padding: isMobile ? '16px' : '24px' }} className="glass-card">
+        <Card style={{ ...styles.aboutCard, padding: isMobile ? '18px' : '30px' }} className="glass-card">
           <div style={styles.aboutGrid}>
             {/* Coach Circle Avatar */}
             <div style={styles.aboutPhotoCol}>
-              <div style={{ ...styles.coachAvatarCircle, width: isMobile ? '90px' : '120px', height: isMobile ? '90px' : '120px' }}>
+              <div style={{ ...styles.coachAvatarCircle, width: isMobile ? '100px' : '130px', height: isMobile ? '100px' : '130px' }}>
                 <img 
                   src="/images/mrk_coach_avatar.jpg" 
                   alt="Radha Krishna Maram" 
                   style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
+                  onError={(e) => { e.target.onerror = null; e.target.src = "/mrk-logo.png"; }}
                 />
               </div>
-              <h3 style={{ ...styles.coachName, fontSize: isMobile ? '1.15rem' : '1.35rem' }}>Radha Krishna Maram</h3>
-              <p style={styles.coachTitle}>Personal Fitness Trainer & Strength & Weight-Loss Specialist</p>
+              <h3 style={{ ...styles.coachName, fontSize: isMobile ? '1.2rem' : '1.4rem' }}>Radha Krishna Maram</h3>
+              <p style={styles.coachTitle}>Head Personal Fitness Trainer & Strength Specialist</p>
               
               <a 
                 href="https://instagram.com/__MRK.FITNESS.__" 
@@ -337,7 +359,7 @@ export default function HomePage() {
             {/* Coach Bio Text */}
             <div style={styles.aboutTextCol}>
               <div style={styles.sectionBadge}>MEET YOUR HEAD COACH</div>
-              <h2 style={{ ...styles.aboutHeadline, fontSize: isMobile ? '1.3rem' : '1.6rem' }}>WHO IS <span style={{ color: 'var(--accent, #E00008)' }}>MRK?</span></h2>
+              <h2 style={{ ...styles.aboutHeadline, fontSize: isMobile ? '1.4rem' : '1.8rem' }}>WHO IS <span style={{ color: 'var(--accent, #E00008)' }}>MRK?</span></h2>
 
               <p style={styles.bioParagraph}>
                 <strong>Radha Krishna Maram</strong> is a dedicated Personal Fitness Trainer and Strength & Weight-Loss Specialist with over two years of hands-on experience helping individuals transform their bodies and lifestyles.
@@ -356,10 +378,10 @@ export default function HomePage() {
       </section>
 
       {/* 4. SPECIALIZATIONS SECTION */}
-      <section id="specializations" style={{ ...styles.section, background: 'rgba(18, 18, 20, 0.4)', padding: isMobile ? '30px 16px' : '60px 16px' }}>
+      <section id="specializations" style={{ ...styles.section, background: 'rgba(18, 18, 20, 0.4)', padding: isMobile ? '35px 16px' : '65px 16px' }}>
         <div style={styles.sectionHeader}>
           <span style={styles.sectionBadge}>EXPERT CORE CAPABILITIES</span>
-          <h2 style={{ ...styles.sectionTitle, fontSize: isMobile ? '1.3rem' : '1.6rem' }}>SPECIALIZATIONS</h2>
+          <h2 style={{ ...styles.sectionTitle, fontSize: isMobile ? '1.4rem' : '1.8rem' }}>PROGRAM SPECIALIZATIONS</h2>
           <p style={styles.sectionSub}>Targeted fitness protocols engineered for permanent body transformations.</p>
         </div>
 
@@ -378,7 +400,7 @@ export default function HomePage() {
             <div style={styles.specIconBox}>
               <Flame size={22} color="#ff9100" />
             </div>
-            <h3 style={styles.specTitle}>Fat Loss Diets & Workout Plans</h3>
+            <h3 style={styles.specTitle}>Fat Loss Diets & Workouts</h3>
             <p style={styles.specDesc}>
               Calculated calorie deficit protocols paired with metabolic resistance workouts for accelerated body fat reduction.
             </p>
@@ -388,9 +410,9 @@ export default function HomePage() {
             <div style={styles.specIconBox}>
               <Target size={22} color="#00c853" />
             </div>
-            <h3 style={styles.specTitle}>Goal Setting & Achievement Strategies</h3>
+            <h3 style={styles.specTitle}>Goal Setting & Tracking</h3>
             <p style={styles.specDesc}>
-              Structured milestone tracking and psychological discipline techniques to guarantee weekly progress accountability.
+              Structured milestone tracking and 10-day posture photo reviews to guarantee weekly progress accountability.
             </p>
           </Card>
 
@@ -406,68 +428,42 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 5. PROGRAM OFFERINGS & FEATURES */}
-      <section id="offerings" style={{ ...styles.section, padding: isMobile ? '30px 16px' : '60px 16px' }}>
+      {/* 5. PROGRAM FEATURES & INCLUSIONS */}
+      <section id="offerings" style={{ ...styles.section, padding: isMobile ? '35px 16px' : '65px 16px' }}>
         <div style={styles.sectionHeader}>
           <span style={styles.sectionBadge}>WHAT YOU GET WITH MRK FITNESS</span>
-          <h2 style={{ ...styles.sectionTitle, fontSize: isMobile ? '1.3rem' : '1.6rem' }}>PROGRAM FEATURES & INCLUSIONS</h2>
+          <h2 style={{ ...styles.sectionTitle, fontSize: isMobile ? '1.4rem' : '1.8rem' }}>PROGRAM FEATURES & INCLUSIONS</h2>
           <p style={styles.sectionSub}>Complete 360-degree support to build the best version of you.</p>
         </div>
 
         <div style={styles.offeringsGrid}>
-          <div style={styles.offeringCard} className="glass-card">
-            <div style={styles.offeringCheck}>
-              <Check size={14} color="#FFFFFF" />
+          {[
+            'Customized Gym & Home Workout Splits',
+            'Personalized Macro-Balanced Diet Plan',
+            '10-Day Body Posture & Sizing Check-in Reviews',
+            'Daily Activity, Steps & Water Intake Logging',
+            'Fat Loss, Muscle Recomp & Strength Focus',
+            '24/7 Direct WhatsApp & Call Coach Support'
+          ].map((item, idx) => (
+            <div key={idx} style={styles.offeringCard} className="glass-card">
+              <div style={styles.offeringCheck}>
+                <Check size={14} color="#FFFFFF" />
+              </div>
+              <span style={styles.offeringText}>{item}</span>
             </div>
-            <span style={styles.offeringText}>Custom Workout Plan</span>
-          </div>
-
-          <div style={styles.offeringCard} className="glass-card">
-            <div style={styles.offeringCheck}>
-              <Check size={14} color="#FFFFFF" />
-            </div>
-            <span style={styles.offeringText}>Personalized Diet Plan</span>
-          </div>
-
-          <div style={styles.offeringCard} className="glass-card">
-            <div style={styles.offeringCheck}>
-              <Check size={14} color="#FFFFFF" />
-            </div>
-            <span style={styles.offeringText}>Weekly Check-ins</span>
-          </div>
-
-          <div style={styles.offeringCard} className="glass-card">
-            <div style={styles.offeringCheck}>
-              <Check size={14} color="#FFFFFF" />
-            </div>
-            <span style={styles.offeringText}>Fat Loss / Muscle Gain Programs</span>
-          </div>
-
-          <div style={styles.offeringCard} className="glass-card">
-            <div style={styles.offeringCheck}>
-              <Check size={14} color="#FFFFFF" />
-            </div>
-            <span style={styles.offeringText}>24/7 Direct Support</span>
-          </div>
-
-          <div style={styles.offeringCard} className="glass-card">
-            <div style={styles.offeringCheck}>
-              <Check size={14} color="#FFFFFF" />
-            </div>
-            <span style={styles.offeringText}>Home & Gym Workouts Available</span>
-          </div>
+          ))}
         </div>
       </section>
 
       {/* 6. INTERACTIVE CALORIE & NUTRITION CALCULATOR */}
-      <section id="calculator" style={{ ...styles.section, background: 'rgba(18, 18, 20, 0.4)', padding: isMobile ? '30px 16px' : '60px 16px' }}>
+      <section id="calculator" style={{ ...styles.section, background: 'rgba(18, 18, 20, 0.4)', padding: isMobile ? '35px 16px' : '65px 16px' }}>
         <div style={styles.sectionHeader}>
-          <span style={styles.sectionBadge}>FREE FITNESS WIDGET</span>
-          <h2 style={{ ...styles.sectionTitle, fontSize: isMobile ? '1.3rem' : '1.6rem' }}>Estimate Your Daily Nutrition Target</h2>
+          <span style={styles.sectionBadge}>INTERACTIVE FITNESS TOOL</span>
+          <h2 style={{ ...styles.sectionTitle, fontSize: isMobile ? '1.4rem' : '1.8rem' }}>Estimate Your Daily Nutrition Target</h2>
           <p style={styles.sectionSub}>Get an instant estimate of your required calorie & macro intake.</p>
         </div>
 
-        <Card style={{ ...styles.calcCard, padding: isMobile ? '16px' : '24px' }} className="glass-card">
+        <Card style={{ ...styles.calcCard, padding: isMobile ? '18px' : '28px' }} className="glass-card">
           <div style={styles.calcGrid}>
             <div style={styles.calcInputsCol}>
               <div style={styles.inputGroup}>
@@ -495,6 +491,18 @@ export default function HomePage() {
               </div>
 
               <div style={styles.inputGroup}>
+                <label style={styles.label}>Age (years): <strong style={{ color: '#FFFFFF' }}>{calcAge} yrs</strong></label>
+                <input 
+                  type="range" 
+                  min="16" 
+                  max="70" 
+                  value={calcAge} 
+                  onChange={(e) => setCalcAge(Number(e.target.value))}
+                  style={styles.slider}
+                />
+              </div>
+
+              <div style={styles.inputGroup}>
                 <label style={styles.label}>Transformation Goal:</label>
                 <div style={styles.goalBtnRow}>
                   <button 
@@ -508,39 +516,41 @@ export default function HomePage() {
                     onClick={() => setCalcGoal('muscle')}
                     style={{ ...styles.goalBtn, ...(calcGoal === 'muscle' ? styles.goalBtnActive : {}) }}
                   >
-                    💪 Muscle
+                    💪 Muscle Gain
                   </button>
 
                   <button 
                     onClick={() => setCalcGoal('maintenance')}
                     style={{ ...styles.goalBtn, ...(calcGoal === 'maintenance' ? styles.goalBtnActive : {}) }}
                   >
-                    ⚡ Maintain
+                    ⚡ Maintenance
                   </button>
                 </div>
               </div>
             </div>
 
             <div style={styles.calcResultsCol}>
-              <div style={styles.resultBadge}>RECOMMENDED TARGET</div>
-              <div style={{ ...styles.resultCalorie, fontSize: isMobile ? '1.8rem' : '2.2rem' }}>{estimatedCalories} <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Kcal / day</span></div>
+              <div style={styles.resultBadge}>ESTIMATED DAILY TARGET</div>
+              <div style={{ ...styles.resultCalorie, fontSize: isMobile ? '2.1rem' : '2.5rem' }}>
+                {estimatedCalories} <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Kcal / day</span>
+              </div>
 
               <div style={styles.macroPillsRow}>
                 <div style={styles.macroPill}>
-                  <span style={{ color: '#ff5252' }}>Protein</span>
-                  <strong>{Math.round(calcWeight * 2.2)}g</strong>
+                  <span style={{ color: '#ff5252' }}>🥩 Protein</span>
+                  <strong>{proteinGrams}g</strong>
                 </div>
                 <div style={styles.macroPill}>
-                  <span style={{ color: '#448aff' }}>Carbs</span>
-                  <strong>{Math.round((estimatedCalories * 0.4) / 4)}g</strong>
+                  <span style={{ color: '#448aff' }}>🍞 Carbs</span>
+                  <strong>{carbsGrams}g</strong>
                 </div>
                 <div style={styles.macroPill}>
-                  <span style={{ color: '#ffb300' }}>Fats</span>
-                  <strong>{Math.round((estimatedCalories * 0.25) / 9)}g</strong>
+                  <span style={{ color: '#ffb300' }}>🥑 Fats</span>
+                  <strong>{fatGrams}g</strong>
                 </div>
               </div>
 
-              <Button onClick={() => router.push('/login')} style={{ width: '100%', marginTop: '16px' }}>
+              <Button onClick={() => router.push('/login')} style={{ width: '100%', marginTop: '18px', padding: '12px' }}>
                 Get Custom MRK Plan for {calcWeight}kg <ArrowRight size={16} />
               </Button>
             </div>
@@ -549,10 +559,10 @@ export default function HomePage() {
       </section>
 
       {/* 7. PRICING & MEMBERSHIP TIERS */}
-      <section id="plans" style={{ ...styles.section, padding: isMobile ? '30px 16px' : '60px 16px' }}>
+      <section id="plans" style={{ ...styles.section, padding: isMobile ? '35px 16px' : '65px 16px' }}>
         <div style={styles.sectionHeader}>
-          <span style={styles.sectionBadge}>JOIN MRK FITNESS</span>
-          <h2 style={{ ...styles.sectionTitle, fontSize: isMobile ? '1.3rem' : '1.6rem' }}>MEMBERSHIP & PRICING PLANS</h2>
+          <span style={styles.sectionBadge}>JOIN MRK FITNESS TODAY</span>
+          <h2 style={{ ...styles.sectionTitle, fontSize: isMobile ? '1.4rem' : '1.8rem' }}>MEMBERSHIP & PRICING PLANS</h2>
           <p style={styles.sectionSub}>Choose your commitment level and start transforming today.</p>
         </div>
 
@@ -567,35 +577,37 @@ export default function HomePage() {
               const priceDisplay = lowestTier ? `₹${lowestTier.price}` : 'Custom';
 
               return (
-                <Card key={p.id || idx} style={{ ...styles.planCard, padding: isMobile ? '16px' : '20px' }} className="glass-card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
-                    <h3 style={styles.planName}>{p.plan_name || p.name}</h3>
-                    {p.badge && (
-                      <div style={styles.planBadgeInline}>{p.badge}</div>
-                    )}
-                  </div>
-                  <p style={styles.planCategory}>MRK FITNESS</p>
+                <Card key={p.id || idx} style={{ ...styles.planCard, padding: isMobile ? '18px' : '22px' }} className="glass-card">
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
+                      <h3 style={styles.planName}>{p.plan_name || p.name}</h3>
+                      {p.badge && (
+                        <div style={styles.planBadgeInline}>{p.badge}</div>
+                      )}
+                    </div>
+                    <p style={styles.planCategory}>MRK FITNESS</p>
 
-                  <div style={styles.planPriceBox}>
-                    <span style={styles.planPrice}>{priceDisplay}</span>
-                    <span style={styles.planPeriod}> / {lowestTier?.duration || 'period'}</span>
+                    <div style={styles.planPriceBox}>
+                      <span style={styles.planPrice}>{priceDisplay}</span>
+                      <span style={styles.planPeriod}> / {lowestTier?.duration || 'period'}</span>
+                    </div>
+
+                    <div style={styles.planFeatureList}>
+                      {(p.features || [
+                        'Custom Workout Plan',
+                        'Personalized Diet Plan',
+                        'Weekly Check-ins',
+                        '24/7 Trainer Support'
+                      ]).map((feat, fIdx) => (
+                        <div key={fIdx} style={styles.planFeatureItem}>
+                          <CheckCircle2 size={15} color="#00c853" />
+                          <span>{feat}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
-                  <div style={styles.planFeatureList}>
-                    {(p.features || [
-                      'Custom Workout Plan',
-                      'Personalized Diet Plan',
-                      'Weekly Check-ins',
-                      '24/7 Trainer Support'
-                    ]).map((feat, fIdx) => (
-                      <div key={fIdx} style={styles.planFeatureItem}>
-                        <CheckCircle2 size={15} color="#00c853" />
-                        <span>{feat}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <Button onClick={() => router.push('/login')} style={{ width: '100%', marginTop: '16px', fontWeight: 800 }}>
+                  <Button onClick={() => router.push('/login')} style={{ width: '100%', marginTop: '20px', fontWeight: 800 }}>
                     Enroll Now <ArrowRight size={16} />
                   </Button>
                 </Card>
@@ -605,15 +617,50 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* 8. FOOTER */}
+      {/* 8. FAQS SECTION */}
+      <section id="faqs" style={{ ...styles.section, background: 'rgba(18, 18, 20, 0.4)', padding: isMobile ? '35px 16px' : '65px 16px' }}>
+        <div style={styles.sectionHeader}>
+          <span style={styles.sectionBadge}>FREQUENTLY ASKED QUESTIONS</span>
+          <h2 style={{ ...styles.sectionTitle, fontSize: isMobile ? '1.4rem' : '1.8rem' }}>EVERYTHING YOU NEED TO KNOW</h2>
+          <p style={styles.sectionSub}>Have questions about MRK Fitness programs? We have answers.</p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '800px', margin: '0 auto' }}>
+          {FAQS.map((faq, idx) => {
+            const isOpen = openFaq === idx;
+            return (
+              <Card 
+                key={idx} 
+                onClick={() => setOpenFaq(isOpen ? null : idx)}
+                style={{ padding: '16px 20px', cursor: 'pointer', border: isOpen ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)' }} 
+                className="glass-card"
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                  <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <HelpCircle size={16} color="var(--accent)" /> {faq.q}
+                  </h3>
+                  <ChevronDown size={18} color="var(--text-secondary)" style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                </div>
+                {isOpen && (
+                  <p style={{ margin: '12px 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
+                    {faq.a}
+                  </p>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 9. FOOTER */}
       <footer style={styles.footer}>
         <div style={styles.footerContainer}>
           <div style={styles.footerBrand}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: '36px', width: 'auto', objectFit: 'contain' }} />
+              <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: '38px', width: 'auto', objectFit: 'contain' }} />
             </div>
-            <p style={{ margin: '8px 0 0', color: 'var(--text-secondary, #AAAAAA)', fontSize: '0.85rem', maxWidth: '340px' }}>
-              Guided by Radha Krishna Maram. Personalized fitness coaching, strength training, and sustainable weight-loss planning.
+            <p style={{ margin: '10px 0 0', color: 'var(--text-secondary, #AAAAAA)', fontSize: '0.85rem', maxWidth: '360px', lineHeight: 1.5 }}>
+              Guided by Head Coach Radha Krishna Maram. Personalized fitness coaching, strength training, scientific macro diets, and sustainable weight-loss planning.
             </p>
             <div style={{ marginTop: '14px' }}>
               <a 
@@ -634,13 +681,14 @@ export default function HomePage() {
               <a href="#specializations" style={styles.footerLink}>Specializations</a>
               <a href="#offerings" style={styles.footerLink}>Program Features</a>
               <a href="#plans" style={styles.footerLink}>Pricing Plans</a>
+              <a href="#faqs" style={styles.footerLink}>FAQs</a>
               <a href="/contact" style={styles.footerLink}>Contact Support</a>
             </div>
 
             <div style={styles.footerCol}>
-              <h4 style={styles.footerColTitle}>Portals</h4>
-              <a href="/login" style={styles.footerLink}>Client Login</a>
-              <a href="/login" style={styles.footerLink}>Admin Login</a>
+              <h4 style={styles.footerColTitle}>Client & Admin Portals</h4>
+              <a href="/login" style={styles.footerLink}>Client Portal Login</a>
+              <a href="/login" style={styles.footerLink}>Admin Dashboard Login</a>
             </div>
           </div>
         </div>
@@ -655,12 +703,9 @@ export default function HomePage() {
 
 const styles = {
   pageWrapper: { backgroundColor: 'var(--bg, #080808)', color: '#FFFFFF', minHeight: '100vh', overflowX: 'hidden' },
-  navHeader: { position: 'sticky', top: 0, zIndex: 100, backgroundColor: 'rgba(18, 18, 20, 0.92)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' },
-  navContainer: { maxWidth: '1100px', margin: '0 auto', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  navHeader: { position: 'sticky', top: 0, zIndex: 100, backgroundColor: 'rgba(14, 14, 18, 0.94)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' },
+  navContainer: { maxWidth: '1140px', margin: '0 auto', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   brandGroup: { display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' },
-  logoIcon: { width: '36px', height: '36px', borderRadius: '10px', backgroundColor: 'var(--accent, #E00008)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  brandTitle: { fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.3px', margin: 0, lineHeight: 1 },
-  brandSub: { fontSize: '0.58rem', fontWeight: 700, color: 'var(--accent, #E00008)', letterSpacing: '1px', marginTop: '2px' },
   navLinks: { display: 'flex', gap: '18px' },
   link: { color: 'var(--text-secondary, #AAAAAA)', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600, transition: 'color 0.2s' },
   navActions: { display: 'flex', alignItems: 'center', gap: '10px' },
@@ -694,49 +739,49 @@ const styles = {
     borderRadius: '10px'
   },
   heroSection: { position: 'relative', textAlign: 'center', overflow: 'hidden' },
-  heroGlow1: { position: 'absolute', top: '-100px', left: '15%', width: '350px', height: '350px', borderRadius: '50%', background: 'rgba(224, 0, 8, 0.22)', filter: 'blur(100px)', pointerEvents: 'none' },
-  heroGlow2: { position: 'absolute', top: '100px', right: '15%', width: '350px', height: '350px', borderRadius: '50%', background: 'rgba(255, 145, 0, 0.14)', filter: 'blur(100px)', pointerEvents: 'none' },
-  heroGlow3: { position: 'absolute', bottom: '0', left: '40%', width: '280px', height: '280px', borderRadius: '50%', background: 'rgba(224, 0, 8, 0.1)', filter: 'blur(90px)', pointerEvents: 'none' },
-  heroContainer: { maxWidth: '850px', margin: '0 auto', position: 'relative', zIndex: 1 },
+  heroGlow1: { position: 'absolute', top: '-100px', left: '15%', width: '350px', height: '350px', borderRadius: '50%', background: 'rgba(224, 0, 8, 0.25)', filter: 'blur(110px)', pointerEvents: 'none' },
+  heroGlow2: { position: 'absolute', top: '100px', right: '15%', width: '350px', height: '350px', borderRadius: '50%', background: 'rgba(255, 145, 0, 0.16)', filter: 'blur(110px)', pointerEvents: 'none' },
+  heroGlow3: { position: 'absolute', bottom: '0', left: '40%', width: '280px', height: '280px', borderRadius: '50%', background: 'rgba(224, 0, 8, 0.12)', filter: 'blur(90px)', pointerEvents: 'none' },
+  heroContainer: { maxWidth: '880px', margin: '0 auto', position: 'relative', zIndex: 1 },
   heroBadge: { display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(224, 0, 8, 0.15)', border: '1px solid rgba(224, 0, 8, 0.35)', color: 'var(--accent, #E00008)', padding: '4px 14px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 800, marginBottom: '18px' },
   heroTitle: { fontWeight: 900, margin: '0 0 16px 0', letterSpacing: '-0.03em', lineHeight: 1.1 },
   gradientText: { background: 'linear-gradient(135deg, var(--accent, #E00008) 0%, #ff9100 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
   heroSubtitle: { color: 'var(--text-secondary, #AAAAAA)', margin: '0 0 30px 0', lineHeight: 1.6 },
-  heroBtnGroup: { display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '30px' },
-  mainCtaBtn: { padding: '12px 24px', fontSize: '0.92rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' },
+  heroBtnGroup: { display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '32px' },
+  mainCtaBtn: { padding: '12px 26px', fontSize: '0.92rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' },
   instaBtn: { padding: '12px 20px', borderRadius: '10px', backgroundColor: 'rgba(225, 48, 108, 0.15)', border: '1px solid rgba(225, 48, 108, 0.35)', color: '#FFFFFF', fontSize: '0.9rem', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' },
   heroStatsRow: { display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', backgroundColor: 'rgba(18, 18, 20, 0.85)', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.08)' },
   statBox: { textAlign: 'center' },
   statNumber: { fontWeight: 900, color: '#FFFFFF' },
   statLabel: { fontSize: '0.7rem', color: 'var(--text-secondary, #AAAAAA)', marginTop: '2px' },
   statDivider: { width: '1px', height: '24px', backgroundColor: 'rgba(255, 255, 255, 0.1)' },
-  section: { maxWidth: '1100px', margin: '0 auto' },
-  sectionHeader: { textAlign: 'center', marginBottom: '30px' },
+  section: { maxWidth: '1140px', margin: '0 auto' },
+  sectionHeader: { textAlign: 'center', marginBottom: '32px' },
   sectionBadge: { fontSize: '0.72rem', fontWeight: 800, color: 'var(--accent, #E00008)', textTransform: 'uppercase', letterSpacing: '1px' },
   sectionTitle: { fontWeight: 900, margin: '6px 0 8px 0', letterSpacing: '-0.02em' },
   sectionSub: { fontSize: '0.85rem', color: 'var(--text-secondary, #AAAAAA)', margin: 0 },
   aboutCard: {},
-  aboutGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '24px', alignItems: 'center' },
+  aboutGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '26px', alignItems: 'center' },
   aboutPhotoCol: { textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' },
   coachAvatarCircle: { borderRadius: '50%', backgroundColor: 'rgba(224, 0, 8, 0.15)', border: '2px solid var(--accent, #E00008)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 28px rgba(224, 0, 8, 0.35)', flexShrink: 0 },
-  coachName: { fontWeight: 900, margin: '4px 0 2px 0', color: '#FFFFFF' },
+  coachName: { fontWeight: 900, margin: '6px 0 2px 0', color: '#FFFFFF' },
   coachTitle: { fontSize: '0.78rem', color: 'var(--text-secondary, #AAAAAA)', margin: 0 },
   socialPill: { marginTop: '8px', padding: '6px 14px', borderRadius: '20px', backgroundColor: 'rgba(225, 48, 108, 0.15)', border: '1px solid rgba(225, 48, 108, 0.3)', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', textDecoration: 'none' },
   aboutTextCol: { display: 'flex', flexDirection: 'column', gap: '10px' },
   aboutHeadline: { fontWeight: 900, margin: '4px 0 10px 0', color: '#FFFFFF' },
   bioParagraph: { fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.85)', lineHeight: 1.6, margin: 0 },
   bioParagraphHighlight: { fontSize: '0.85rem', color: '#FFFFFF', fontStyle: 'italic', lineHeight: 1.6, margin: 0, paddingLeft: '12px', borderLeft: '3px solid var(--accent, #E00008)' },
-  specGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' },
-  specCard: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' },
-  specIconBox: { width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  specGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '16px' },
+  specCard: { padding: '18px', display: 'flex', flexDirection: 'column', gap: '8px' },
+  specIconBox: { width: '42px', height: '42px', borderRadius: '10px', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   specTitle: { fontSize: '0.98rem', fontWeight: 800, margin: 0, color: '#FFFFFF' },
   specDesc: { fontSize: '0.8rem', color: 'var(--text-secondary, #AAAAAA)', margin: 0, lineHeight: 1.5 },
-  offeringsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' },
-  offeringCard: { padding: '14px', display: 'flex', alignItems: 'center', gap: '10px', borderRadius: '12px' },
+  offeringsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' },
+  offeringCard: { padding: '16px', display: 'flex', alignItems: 'center', gap: '12px', borderRadius: '12px' },
   offeringCheck: { width: '24px', height: '24px', borderRadius: '50%', backgroundColor: 'var(--accent, #E00008)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  offeringText: { fontSize: '0.85rem', fontWeight: 700, color: '#FFFFFF' },
+  offeringText: { fontSize: '0.88rem', fontWeight: 700, color: '#FFFFFF' },
   calcCard: {},
-  calcGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px', alignItems: 'center' },
+  calcGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', alignItems: 'center' },
   calcInputsCol: { display: 'flex', flexDirection: 'column', gap: '14px' },
   inputGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
   label: { fontSize: '0.82rem', color: 'var(--text-secondary, #AAAAAA)' },
@@ -744,27 +789,27 @@ const styles = {
   goalBtnRow: { display: 'flex', gap: '6px', flexWrap: 'wrap' },
   goalBtn: { flex: 1, padding: '8px 10px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' },
   goalBtnActive: { backgroundColor: 'rgba(224, 0, 8, 0.15)', color: '#FFFFFF', borderColor: 'var(--accent, #E00008)' },
-  calcResultsCol: { padding: '16px', backgroundColor: 'rgba(0, 0, 0, 0.3)', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.08)', textAlign: 'center' },
+  calcResultsCol: { padding: '20px', backgroundColor: 'rgba(0, 0, 0, 0.35)', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.08)', textAlign: 'center' },
   resultBadge: { fontSize: '0.68rem', fontWeight: 800, color: 'var(--accent, #E00008)', letterSpacing: '0.5px' },
-  resultCalorie: { fontWeight: 800, color: '#FFFFFF', margin: '4px 0 10px 0' },
-  macroPillsRow: { display: 'flex', justifyContent: 'space-around', gap: '6px', padding: '8px', backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.05)' },
-  macroPill: { display: 'flex', flexDirection: 'column', fontSize: '0.72rem' },
-  plansGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' },
+  resultCalorie: { fontWeight: 800, color: '#FFFFFF', margin: '4px 0 12px 0' },
+  macroPillsRow: { display: 'flex', justifyContent: 'space-around', gap: '6px', padding: '10px', backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.05)' },
+  macroPill: { display: 'flex', flexDirection: 'column', fontSize: '0.75rem', gap: '2px' },
+  plansGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' },
   planCard: { display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' },
   planBadgeInline: { backgroundColor: 'rgba(224, 0, 8, 0.18)', color: 'var(--accent, #E00008)', border: '1px solid rgba(224, 0, 8, 0.4)', padding: '2px 8px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0 },
-  planName: { fontSize: '1.1rem', fontWeight: 800, margin: 0, color: '#FFFFFF', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' },
+  planName: { fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#FFFFFF', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' },
   planCategory: { fontSize: '0.72rem', color: 'var(--text-secondary, #AAAAAA)', margin: '0 0 12px 0', textTransform: 'uppercase', letterSpacing: '0.5px' },
   planPriceBox: { display: 'flex', alignItems: 'baseline', marginBottom: '14px' },
-  planPrice: { fontSize: '1.6rem', fontWeight: 800, color: '#FFFFFF' },
+  planPrice: { fontSize: '1.75rem', fontWeight: 800, color: '#FFFFFF' },
   planPeriod: { fontSize: '0.78rem', color: 'var(--text-secondary, #AAAAAA)' },
   planFeatureList: { display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 },
   planFeatureItem: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.85)' },
-  footer: { borderTop: '1px solid rgba(255, 255, 255, 0.08)', backgroundColor: 'rgba(10, 10, 12, 0.95)', padding: '40px 16px 20px 16px' },
-  footerContainer: { maxWidth: '1100px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '24px' },
-  footerBrand: { flex: 1, minWidth: '220px' },
-  footerLinksGroup: { display: 'flex', gap: '30px', flexWrap: 'wrap' },
+  footer: { borderTop: '1px solid rgba(255, 255, 255, 0.08)', backgroundColor: 'rgba(10, 10, 12, 0.95)', padding: '45px 16px 20px 16px' },
+  footerContainer: { maxWidth: '1140px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '28px' },
+  footerBrand: { flex: 1, minWidth: '240px' },
+  footerLinksGroup: { display: 'flex', gap: '40px', flexWrap: 'wrap' },
   footerCol: { display: 'flex', flexDirection: 'column', gap: '6px' },
-  footerColTitle: { fontSize: '0.85rem', fontWeight: 700, color: '#FFFFFF', marginBottom: '4px' },
-  footerLink: { color: 'var(--text-secondary, #AAAAAA)', textDecoration: 'none', fontSize: '0.8rem', transition: 'color 0.2s' },
-  footerBottom: { maxWidth: '1100px', margin: '20px auto 0 auto', paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.05)', textAlign: 'center', color: 'var(--text-muted, #666666)', fontSize: '0.72rem' }
+  footerColTitle: { fontSize: '0.88rem', fontWeight: 700, color: '#FFFFFF', marginBottom: '6px' },
+  footerLink: { color: 'var(--text-secondary, #AAAAAA)', textDecoration: 'none', fontSize: '0.82rem', transition: 'color 0.2s' },
+  footerBottom: { maxWidth: '1140px', margin: '24px auto 0 auto', paddingTop: '18px', borderTop: '1px solid rgba(255, 255, 255, 0.05)', textAlign: 'center', color: 'var(--text-muted, #666666)', fontSize: '0.72rem' }
 };

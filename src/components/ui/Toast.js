@@ -1,14 +1,16 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { sanitizeErrorMessage } from '@/lib/errorUtils';
 
 const ToastContext = createContext(null);
 
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
 
-  const showToast = useCallback((message, type = 'info', duration = 3000) => {
+  const showToast = useCallback((rawMessage, type = 'info', duration = 3500) => {
     const id = Math.random().toString(36).substr(2, 9);
+    const message = type === 'error' ? sanitizeErrorMessage(rawMessage) : rawMessage;
     setToasts(prev => [...prev, { id, message, type, duration }]);
   }, []);
 
@@ -44,33 +46,36 @@ const ToastItem = ({ toast, onRemove }) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsClosing(true);
-      setTimeout(onRemove, 300); // Wait for animation
+      setTimeout(onRemove, 300);
     }, toast.duration);
     return () => clearTimeout(timer);
   }, [toast.duration, onRemove]);
 
   const colors = {
-    success: '#00c853',
-    error: '#ff1744',
-    warning: '#ffd600',
-    info: '#2196f3'
+    success: 'var(--success, #00c853)',
+    error: 'var(--danger, #ff1744)',
+    warning: 'var(--warning, #ffd600)',
+    info: 'var(--info, #2196f3)'
   };
   const color = colors[toast.type] || colors.info;
 
   const toastStyle = {
-    backgroundColor: '#121214',
+    backgroundColor: 'var(--card, #121214)',
     borderLeft: `4px solid ${color}`,
-    borderTop: '1px solid #2a2a30',
-    borderRight: '1px solid #2a2a30',
-    borderBottom: '1px solid #2a2a30',
-    borderRadius: '8px',
-    padding: '16px',
-    color: '#fff',
-    minWidth: '300px',
+    borderTop: '1px solid var(--border, #2a2a30)',
+    borderRight: '1px solid var(--border, #2a2a30)',
+    borderBottom: '1px solid var(--border, #2a2a30)',
+    borderRadius: 'var(--radius-sm, 8px)',
+    padding: '12px 16px',
+    color: 'var(--text, #fff)',
+    fontSize: '0.85rem',
+    fontWeight: 500,
+    minWidth: '280px',
+    maxWidth: '420px',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+    boxShadow: 'var(--shadow-card)',
     animation: isClosing ? 'slideOut 0.3s forwards' : 'slideIn 0.3s forwards',
     position: 'relative',
     overflow: 'hidden'
@@ -89,6 +94,10 @@ const ToastItem = ({ toast, onRemove }) => {
   return (
     <div style={toastStyle}>
       <style>{`
+        @keyframes slideIn {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
         @keyframes slideOut {
           to { transform: translateX(100%); opacity: 0; }
         }
@@ -97,7 +106,7 @@ const ToastItem = ({ toast, onRemove }) => {
           to { width: 0%; }
         }
       `}</style>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         <span>{toast.message}</span>
       </div>
       <button 
@@ -105,7 +114,7 @@ const ToastItem = ({ toast, onRemove }) => {
           setIsClosing(true);
           setTimeout(onRemove, 300);
         }}
-        style={{ background: 'transparent', border: 'none', color: '#AAAAAA', cursor: 'pointer', fontSize: '18px' }}
+        style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary, #AAAAAA)', cursor: 'pointer', fontSize: '16px', padding: '2px' }}
       >
         ×
       </button>
@@ -124,7 +133,7 @@ export const useToast = () => {
   return {
     showToast,
     success: (msg, duration) => showToast(msg, 'success', duration),
-    error: (msg, duration) => showToast(msg, 'error', duration),
+    error: (msg, duration) => showToast(sanitizeErrorMessage(msg), 'error', duration),
     warning: (msg, duration) => showToast(msg, 'warning', duration),
     info: (msg, duration) => showToast(msg, 'info', duration),
   };

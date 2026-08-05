@@ -11,16 +11,16 @@ const Badge = ({
   style = {}
 }) => {
   const colors = {
-    default: { bg: '#2a2a30', text: '#FFFFFF', dot: '#FFFFFF' },
+    default: { bg: 'var(--card-hover)', text: 'var(--text)', dot: 'var(--text-secondary)' },
     success: { bg: 'rgba(0, 200, 83, 0.15)', text: '#00c853', dot: '#00c853' },
-    warning: { bg: 'rgba(255, 214, 0, 0.15)', text: '#ffd600', dot: '#ffd600' },
+    warning: { bg: 'rgba(255, 214, 0, 0.15)', text: '#d97706', dot: '#d97706' },
     danger: { bg: 'rgba(255, 23, 68, 0.15)', text: '#ff1744', dot: '#ff1744' },
     info: { bg: 'rgba(33, 150, 243, 0.15)', text: '#2196f3', dot: '#2196f3' }
   };
 
   const sizes = {
-    sm: { padding: '2px 8px', fontSize: '12px' },
-    md: { padding: '4px 12px', fontSize: '14px' }
+    sm: { padding: '2px 8px', fontSize: '11px' },
+    md: { padding: '3px 10px', fontSize: '12px' }
   };
 
   const currentVariant = colors[variant] || colors.default;
@@ -35,6 +35,7 @@ const Badge = ({
     borderRadius: '999px',
     fontWeight: '600',
     whiteSpace: 'nowrap',
+    border: '1px solid transparent',
     ...currentSize,
     ...style
   };

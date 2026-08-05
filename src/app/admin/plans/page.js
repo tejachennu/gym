@@ -8,7 +8,7 @@ import { CardSkeleton } from '@/components/ui/Loading';
 import Modal from '@/components/ui/Modal';
 import { Input, Textarea, Select } from '@/components/ui/Input';
 import PlanCard from '@/components/ui/PlanCard';
-import { CreditCard, Plus, RefreshCw, Trash2, Check } from 'lucide-react';
+import { CreditCard, Plus, RefreshCw, Trash2, Check, Send } from 'lucide-react';
 
 export default function PlansPage() {
   const toast = useToast();
@@ -101,11 +101,16 @@ export default function PlansPage() {
     setEditingPlanId(null);
     setFormData({
       plan_name: '',
-      category: 'MRK FITNESS',
+      category: 'POWERHOUSE FITNESS',
       badge: '',
       description: '',
-      pricing: [{ durationVal: 1, durationUnit: 'Months', price: 1299 }],
-      features: ['Full Gym Access', 'Strength Training', 'Trainer Guidance']
+      pricing: [{ durationVal: 1, durationUnit: 'Months', price: 1599 }],
+      features: ['Full Gym Access', 'Strength Training', 'Trainer Guidance'],
+      hasDiet: true,
+      hasWorkout: true,
+      hasTracking: true,
+      hasPostureCheckin: true,
+      hasDailyLog: true
     });
     setIsModalOpen(true);
   };
@@ -125,11 +130,16 @@ export default function PlansPage() {
     }
     setFormData({
       plan_name: plan.plan_name || plan.name || '',
-      category: plan.category || 'MRK FITNESS',
+      category: plan.category || 'POWERHOUSE FITNESS',
       badge: plan.badge || '',
       description: plan.description || '',
       pricing: parsedPricing,
-      features: plan.features && plan.features.length > 0 ? plan.features : ['Full Gym Access']
+      features: plan.features && plan.features.length > 0 ? plan.features : ['Full Gym Access'],
+      hasDiet: plan.hasDiet ?? true,
+      hasWorkout: plan.hasWorkout ?? true,
+      hasTracking: plan.hasTracking ?? true,
+      hasPostureCheckin: plan.hasPostureCheckin ?? true,
+      hasDailyLog: plan.hasDailyLog ?? true
     });
     setIsModalOpen(true);
   };
@@ -273,9 +283,6 @@ export default function PlansPage() {
           </p>
         </div>
         <div style={styles.actions}>
-          <Button variant="outline" onClick={handleSeed} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <RefreshCw size={16} /> Seed Demo Plans
-          </Button>
           <Button onClick={handleOpenCreateModal} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Plus size={16} /> Create Plan
           </Button>
@@ -433,8 +440,65 @@ export default function PlansPage() {
             ))}
           </div>
 
+          {/* CLIENT PORTAL FEATURE ACCESS TOGGLES */}
+          <div style={styles.subSection}>
+            <div style={styles.subSectionHeader}>
+              <span style={styles.subSectionTitle}>Client Portal Feature Toggles</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px', backgroundColor: 'var(--card-hover)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>
+                <input 
+                  type="checkbox" 
+                  checked={formData.hasDiet ?? true}
+                  onChange={(e) => setFormData({ ...formData, hasDiet: e.target.checked })}
+                />
+                🥗 Enable Diet Plan Access
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>
+                <input 
+                  type="checkbox" 
+                  checked={formData.hasWorkout ?? true}
+                  onChange={(e) => setFormData({ ...formData, hasWorkout: e.target.checked })}
+                />
+                🏋️ Enable Workout Plan Access
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>
+                <input 
+                  type="checkbox" 
+                  checked={formData.hasTracking ?? true}
+                  onChange={(e) => setFormData({ ...formData, hasTracking: e.target.checked })}
+                />
+                📊 Enable Tracking & Daily Activity Logs
+              </label>
+
+              {(formData.hasTracking ?? true) && (
+                <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px', borderLeft: '2px solid var(--border)' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={formData.hasPostureCheckin ?? true}
+                      onChange={(e) => setFormData({ ...formData, hasPostureCheckin: e.target.checked })}
+                    />
+                    📸 10-Day Body Posture Submissions
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={formData.hasDailyLog ?? true}
+                      onChange={(e) => setFormData({ ...formData, hasDailyLog: e.target.checked })}
+                    />
+                    📝 Daily Activity & Water Logs
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
+
           <Button type="submit" fullWidth loading={saving} style={{ marginTop: '12px' }}>
-            {editingPlanId ? "Save Changes" : "Publish Plan"}
+            <Send size={15} /> Submit Plan
           </Button>
         </form>
       </Modal>

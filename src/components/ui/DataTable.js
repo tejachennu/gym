@@ -29,9 +29,9 @@ const DataTable = ({
   const wrapperStyle = {
     width: '100%',
     overflowX: 'auto',
-    backgroundColor: '#121214',
+    backgroundColor: 'var(--card)',
     borderRadius: '20px',
-    border: '1px solid #2a2a30'
+    border: '1px solid var(--border)'
   };
 
   const tableStyle = {
@@ -42,8 +42,8 @@ const DataTable = ({
 
   const thStyle = {
     padding: '16px',
-    borderBottom: '1px solid #2a2a30',
-    color: '#AAAAAA',
+    borderBottom: '1px solid var(--border)',
+    color: 'var(--text-secondary)',
     fontWeight: '600',
     fontSize: '14px',
     cursor: 'pointer',
@@ -53,8 +53,8 @@ const DataTable = ({
 
   const tdStyle = {
     padding: '16px',
-    borderBottom: '1px solid #2a2a30',
-    color: '#FFFFFF',
+    borderBottom: '1px solid var(--border)',
+    color: 'var(--text)',
     fontSize: '14px'
   };
 
@@ -77,7 +77,7 @@ const DataTable = ({
               <tr key={i}>
                 {columns.map((_, j) => (
                   <td key={j} style={tdStyle}>
-                    <div style={{ width: '100%', height: '20px', background: '#1a1a1e', borderRadius: '4px', animation: 'pulse 2s infinite' }} />
+                    <div style={{ width: '100%', height: '20px', background: 'var(--card-hover)', borderRadius: '4px', animation: 'pulse 2s infinite' }} />
                   </td>
                 ))}
               </tr>
@@ -90,7 +90,7 @@ const DataTable = ({
 
   if (data.length === 0) {
     return (
-      <div style={{ ...wrapperStyle, padding: '40px', textAlign: 'center', color: '#AAAAAA' }}>
+      <div style={{ ...wrapperStyle, padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
         {emptyMessage}
       </div>
     );
@@ -125,7 +125,7 @@ const DataTable = ({
               key={rowIdx} 
               style={trStyle(!!onRowClick)}
               onClick={() => onRowClick && onRowClick(row)}
-              onMouseEnter={e => { if(onRowClick) e.currentTarget.style.backgroundColor = '#1a1a1e'; }}
+              onMouseEnter={e => { if(onRowClick) e.currentTarget.style.backgroundColor = 'var(--card-hover)'; }}
               onMouseLeave={e => { if(onRowClick) e.currentTarget.style.backgroundColor = 'transparent'; }}
             >
               {columns.map((col, colIdx) => (

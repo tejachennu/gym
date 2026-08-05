@@ -18,19 +18,15 @@ import Modal from '@/components/ui/Modal';
 import Pagination from '@/components/ui/Pagination';
 import { 
   Activity, 
-  CheckCircle2, 
-  Clock, 
-  Eye, 
   Search, 
   Dumbbell, 
   Utensils, 
   Camera, 
   CheckSquare, 
   Square,
-  Sparkles,
   MessageSquare,
   Filter,
-  Layers
+  Send
 } from 'lucide-react';
 
 function getDirectImageUrl(url) {
@@ -67,16 +63,20 @@ export default function MonitoringPage() {
   const toast = useToast();
 
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'pending' | 'reviewed'
-  const [dateFilter, setDateFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   
+  // Date Filters (Default 1 Month)
+  const defaultToDate = new Date().toISOString().split('T')[0];
+  const defaultFromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const [fromDate, setFromDate] = useState(defaultFromDate);
+  const [toDate, setToDate] = useState(defaultToDate);
+
   const [loading, setLoading] = useState(true);
   const [masterCards, setMasterCards] = useState([]);
   const [remarksMap, setRemarksMap] = useState({});
   const [reviewingMap, setReviewingMap] = useState({});
   const [viewingPhotoUrl, setViewingPhotoUrl] = useState(null);
 
-  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
 
@@ -96,7 +96,6 @@ export default function MonitoringPage() {
       const clientMap = {};
       const workoutPlanMap = {};
 
-      // Load active workout plans for each client
       await Promise.all(
         clientsList.map(async (c) => {
           clientMap[c.id] = c.displayName || c.name || c.email || 'Client';
@@ -109,10 +108,8 @@ export default function MonitoringPage() {
         })
       );
 
-      // Group all submissions by `clientId_date`
       const cardGroupMap = {};
 
-      // 1. Ingest Daily Logs
       dailyLogsList.forEach(log => {
         const cId = log.clientId;
         const dStr = log.date || (log.createdAt?.seconds ? new Date(log.createdAt.seconds * 1000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
@@ -137,9 +134,17 @@ export default function MonitoringPage() {
         }
       });
 
-      // 2. Ingest Body Check-ins
       checkinsList.forEach(chk => {
         const cId = chk.clientId;
+        const clientObj = clientsList.find(c => c.id === cId);
+        
+        // Filter posture checkins for clients who have diet/workout plan assigned or posture checkin enabled
+        const planFeats = clientObj?.planFeatures;
+        const hasPlanOrWorkout = !!(clientObj?.currentPlan || workoutPlanMap[cId]);
+        const isPostureEnabled = !planFeats || planFeats.hasPostureCheckin !== false;
+
+        if (!hasPlanOrWorkout && !isPostureEnabled) return;
+
         const dStr = chk.date || (chk.createdAt?.seconds ? new Date(chk.createdAt.seconds * 1000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
         const key = `${cId}_${dStr}`;
 
@@ -162,7 +167,6 @@ export default function MonitoringPage() {
         }
       });
 
-      // 3. Convert to Array and Attach Workout Plan data
       const masterList = Object.values(cardGroupMap).map(card => {
         const wPlan = workoutPlanMap[card.clientId] || null;
         return {
@@ -171,12 +175,10 @@ export default function MonitoringPage() {
         };
       });
 
-      // Sort newest first
       masterList.sort((a, b) => b.timestamp - a.timestamp);
 
       setMasterCards(masterList);
 
-      // Pre-fill remarks
       const initialRemarks = {};
       masterList.forEach(c => {
         if (c.remarks) initialRemarks[c.id] = c.remarks;
@@ -213,21 +215,22 @@ export default function MonitoringPage() {
       }
 
       await Promise.all(promises);
-      toast.success(`Daily log for ${card.clientName} reviewed!`);
+      toast.success(`Daily log for ${card.clientName} submitted review!`);
       await fetchMasterDailyFeed();
     } catch (err) {
       console.error(err);
-      toast.error('Failed to save review status');
+      toast.error(err);
     } finally {
       setReviewingMap(prev => ({ ...prev, [card.id]: false }));
     }
   };
 
-  // Filtered Cards
   const filteredCards = masterCards.filter(card => {
     if (statusFilter === 'pending' && card.reviewed) return false;
     if (statusFilter === 'reviewed' && !card.reviewed) return false;
-    if (dateFilter && card.date !== dateFilter) return false;
+    
+    if (fromDate && card.date < fromDate) return false;
+    if (toDate && card.date > toDate) return false;
 
     if (search) {
       const q = search.toLowerCase();
@@ -239,21 +242,19 @@ export default function MonitoringPage() {
     return true;
   });
 
-  // Pagination Slice
   const totalItems = filteredCards.length;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedCards = filteredCards.slice(startIndex, startIndex + itemsPerPage);
 
   return (
     <div style={styles.container} className="animate-fade-up">
-      {/* Sleek Compact Header */}
+      {/* Header */}
       <header style={styles.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Activity size={20} color="var(--accent, #E00008)" />
-          <h1 style={styles.title}>Daily Client Monitoring</h1>
+          <Activity size={18} color="var(--accent, #E00008)" />
+          <h1 style={styles.title}>Daily Client Monitoring Feed</h1>
         </div>
 
-        {/* Compact Status Pill Filter */}
         <div style={styles.statusPillsRow}>
           <button 
             onClick={() => { setStatusFilter('all'); setCurrentPage(1); }}
@@ -278,46 +279,55 @@ export default function MonitoringPage() {
         </div>
       </header>
 
-      {/* Compact Search & Date Bar */}
-      <div style={styles.controlsBar}>
-        <div style={{ flex: 1, minWidth: '160px' }}>
-          <Input 
-            placeholder="Search client or date..." 
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
-            icon={<Search size={14} />}
-            style={{ fontSize: '0.8rem', padding: '6px 8px' }}
-          />
+      {/* Date Filter Bar */}
+      <Card style={{ padding: '8px 12px' }} className="glass-card">
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '160px' }}>
+            <Input 
+              placeholder="Search client or date..." 
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+              icon={<Search size={14} />}
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Filter size={14} color="var(--accent)" />
+            <Input 
+              type="date" 
+              label="From"
+              value={fromDate}
+              onChange={(e) => { setFromDate(e.target.value); setCurrentPage(1); }}
+              style={{ width: '130px' }}
+            />
+            <Input 
+              type="date" 
+              label="To"
+              value={toDate}
+              onChange={(e) => { setToDate(e.target.value); setCurrentPage(1); }}
+              style={{ width: '130px' }}
+            />
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => { setFromDate(defaultFromDate); setToDate(defaultToDate); setSearch(''); setCurrentPage(1); }}
+              style={{ alignSelf: 'flex-end' }}
+            >
+              Reset
+            </Button>
+          </div>
         </div>
+      </Card>
 
-        <Input 
-          type="date" 
-          value={dateFilter}
-          onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
-          style={{ width: '130px', fontSize: '0.78rem', padding: '6px 6px' }}
-        />
-
-        {(dateFilter || search) && (
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => { setDateFilter(''); setSearch(''); setCurrentPage(1); }}
-            style={{ fontSize: '0.72rem', padding: '4px 6px' }}
-          >
-            Clear
-          </Button>
-        )}
-      </div>
-
-      {/* Main Single Master Cards List */}
+      {/* Cards List */}
       {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '50px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
           <Spinner />
         </div>
       ) : paginatedCards.length === 0 ? (
         <EmptyState 
           title="No Logs Found" 
-          message="No daily client logs match your search or filters." 
+          message="No daily client logs match your search or date filter." 
           icon="📱"
         />
       ) : (
@@ -325,24 +335,20 @@ export default function MonitoringPage() {
           {paginatedCards.map(card => {
             const { dailyLog, checkin, workoutPlan, reviewed, clientName, date: cardDate, id: cardId } = card;
 
-            // Workout stats calculation
             const completedExerciseIndices = dailyLog?.completedExercises || [];
             const workoutPlanTitle = workoutPlan?.title || workoutPlan?.planName || dailyLog?.workoutPlanTitle || 'Workout Plan';
             const totalExercises = workoutPlan?.exercises?.length || 0;
             const completedCount = completedExerciseIndices.length;
             const workoutProgress = totalExercises > 0 ? Math.round((completedCount / totalExercises) * 100) : (dailyLog?.workoutCompleted ? 100 : 0);
 
-            // Meal photos map
             const mealPhotosMap = dailyLog?.mealPhotos || {};
             const mealSlotKeys = Object.keys(mealPhotosMap);
 
             return (
               <div key={cardId} style={styles.masterCard} className="glass-card">
                 
-                {/* 1. Header Row */}
                 <div style={styles.cardHeader}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-                    {/* Avatar */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
                     <div style={styles.avatarCircle}>
                       {clientName.charAt(0).toUpperCase()}
                     </div>
@@ -366,7 +372,6 @@ export default function MonitoringPage() {
                     </div>
                   </div>
 
-                  {/* Status Pill */}
                   <span style={{
                     ...styles.statusBadge, 
                     backgroundColor: reviewed ? 'rgba(0, 200, 83, 0.15)' : 'rgba(255, 214, 0, 0.15)',
@@ -377,7 +382,6 @@ export default function MonitoringPage() {
                   </span>
                 </div>
 
-                {/* 2. Compact Activity & Health Summary */}
                 <div style={styles.metricsRow}>
                   <div style={styles.miniStat}>
                     <span>👣</span>
@@ -410,29 +414,27 @@ export default function MonitoringPage() {
                   </div>
                 </div>
 
-                {/* 3. Workout Tracker Section */}
                 <div style={styles.innerBlock}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                     <div style={styles.blockTitleRow}>
-                      <Dumbbell size={13} color="#00c853" />
+                      <Dumbbell size={12} color="#00c853" />
                       <span style={styles.blockTitle}>Workout Progress</span>
                     </div>
 
                     {totalExercises > 0 && (
-                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: workoutProgress === 100 ? '#00c853' : 'var(--accent, #E00008)' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: workoutProgress === 100 ? '#00c853' : 'var(--accent, #E00008)' }}>
                         {completedCount}/{totalExercises} Done ({workoutProgress}%)
                       </span>
                     )}
                   </div>
 
                   {totalExercises > 0 && (
-                    <div style={{ height: '4px', backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: '10px', overflow: 'hidden', marginBottom: '8px' }}>
+                    <div style={{ height: '4px', backgroundColor: 'var(--border)', borderRadius: '10px', overflow: 'hidden', marginBottom: '6px' }}>
                       <div style={{ 
                         height: '100%', 
                         width: `${workoutProgress}%`,
                         backgroundColor: workoutProgress === 100 ? '#00c853' : 'var(--accent, #E00008)',
                         borderRadius: '10px',
-                        transition: 'width 0.5s ease'
                       }} />
                     </div>
                   )}
@@ -444,14 +446,14 @@ export default function MonitoringPage() {
                         return (
                           <div key={idx} style={{
                             ...styles.exerciseRow,
-                            backgroundColor: isDone ? 'rgba(0, 200, 83, 0.08)' : 'rgba(255, 255, 255, 0.02)',
-                            borderColor: isDone ? 'rgba(0, 200, 83, 0.25)' : 'rgba(255, 255, 255, 0.06)'
+                            backgroundColor: isDone ? 'rgba(0, 200, 83, 0.08)' : 'var(--card-hover)',
+                            borderColor: isDone ? 'rgba(0, 200, 83, 0.25)' : 'var(--border)'
                           }}>
-                            {isDone ? <CheckSquare size={13} color="#00c853" /> : <Square size={13} color="var(--text-secondary)" />}
-                            <span style={{ fontSize: '0.78rem', color: isDone ? '#FFFFFF' : 'var(--text-secondary)', fontWeight: isDone ? 600 : 400, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {isDone ? <CheckSquare size={12} color="#00c853" /> : <Square size={12} color="var(--text-secondary)" />}
+                            <span style={{ fontSize: '0.75rem', color: isDone ? 'var(--text)' : 'var(--text-secondary)', fontWeight: isDone ? 600 : 400, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {ex.name || `Exercise ${idx + 1}`}
                             </span>
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
                               {ex.sets}×{ex.reps} {ex.weight ? `@${ex.weight}` : ''}
                             </span>
                           </div>
@@ -465,10 +467,9 @@ export default function MonitoringPage() {
                   )}
                 </div>
 
-                {/* 4. Diet & Meal Photos */}
                 <div style={styles.innerBlock}>
                   <div style={styles.blockTitleRow}>
-                    <Utensils size={13} color="#ff9100" />
+                    <Utensils size={12} color="#ff9100" />
                     <span style={styles.blockTitle}>Meal Photos Stream</span>
                   </div>
 
@@ -492,57 +493,12 @@ export default function MonitoringPage() {
                   )}
                 </div>
 
-                {/* 5. Body Check-in (If available today) */}
-                {checkin && (
-                  <div style={styles.innerBlock}>
-                    <div style={styles.blockTitleRow}>
-                      <Camera size={13} color="#ab47bc" />
-                      <span style={styles.blockTitle}>10-Day Body Posture Check-in</span>
-                    </div>
-
-                    {checkin.measurements && (
-                      <div style={styles.measurePillRow}>
-                        {checkin.measurements.weight && <span style={styles.measureTag}>Weight: {checkin.measurements.weight}kg</span>}
-                        {checkin.measurements.waist && <span style={styles.measureTag}>Waist: {checkin.measurements.waist}"</span>}
-                        {checkin.measurements.chest && <span style={styles.measureTag}>Chest: {checkin.measurements.chest}"</span>}
-                      </div>
-                    )}
-
-                    {(checkin.photos || checkin.photoFront) && (
-                      <div style={styles.photoGrid}>
-                        {['front', 'back', 'left', 'right'].map(side => {
-                          const rawUrl = checkin.photos?.[side] || checkin[`photo${side.charAt(0).toUpperCase() + side.slice(1)}`];
-                          if (!rawUrl) return null;
-                          const imgUrl = getDirectImageUrl(rawUrl);
-                          return (
-                            <div key={side} style={styles.photoThumbCard} onClick={() => setViewingPhotoUrl(imgUrl)}>
-                              <img src={imgUrl} alt={side} style={styles.photoImg} />
-                              <div style={styles.photoCaption}>{side.toUpperCase()}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* 6. Client Remarks */}
-                {(dailyLog?.dailyNotes || dailyLog?.notes || checkin?.notes) && (
-                  <div style={styles.notesBox}>
-                    <MessageSquare size={13} color="var(--accent, #E00008)" />
-                    <span style={{ fontStyle: 'italic', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.78rem' }}>
-                      "{dailyLog?.dailyNotes || dailyLog?.notes || checkin?.notes}"
-                    </span>
-                  </div>
-                )}
-
-                {/* 7. Trainer Review Action Footer */}
+                {/* Trainer Action Footer */}
                 <div style={styles.actionRow}>
                   <Input 
                     placeholder="Trainer review remarks..." 
                     value={remarksMap[cardId] || ''} 
                     onChange={(e) => setRemarksMap({ ...remarksMap, [cardId]: e.target.value })}
-                    style={{ flex: 1, fontSize: '0.8rem', padding: '6px 8px' }} 
                   />
                   <Button 
                     onClick={() => handleReviewCard(card)}
@@ -551,12 +507,10 @@ export default function MonitoringPage() {
                     style={{
                       backgroundColor: reviewed ? 'rgba(0, 200, 83, 0.15)' : 'var(--accent, #E00008)',
                       color: reviewed ? '#00c853' : '#FFFFFF',
-                      border: reviewed ? '1px solid rgba(0, 200, 83, 0.3)' : 'none',
-                      whiteSpace: 'nowrap',
-                      fontSize: '0.8rem'
+                      whiteSpace: 'nowrap'
                     }}
                   >
-                    {reviewed ? '✓ Reviewed' : 'Review'}
+                    <Send size={14} /> {reviewed ? 'Submitted' : 'Submit Review'}
                   </Button>
                 </div>
 
@@ -566,7 +520,6 @@ export default function MonitoringPage() {
         </div>
       )}
 
-      {/* Pagination Controls */}
       {totalItems > 0 && (
         <Pagination 
           totalItems={totalItems}
@@ -578,14 +531,13 @@ export default function MonitoringPage() {
         />
       )}
 
-      {/* Photo Full-Screen Modal Preview */}
       {viewingPhotoUrl && (
         <Modal isOpen={!!viewingPhotoUrl} onClose={() => setViewingPhotoUrl(null)} title="Photo Full View" size="md">
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '10px' }}>
             <img 
               src={viewingPhotoUrl} 
               alt="Photo Full Preview" 
-              style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: '12px', objectFit: 'contain' }} 
+              style={{ maxWidth: '100%', maxHeight: '65vh', borderRadius: '8px', objectFit: 'contain' }} 
             />
           </div>
         </Modal>
@@ -595,58 +547,52 @@ export default function MonitoringPage() {
 }
 
 const styles = {
-  container: { display: 'flex', flexDirection: 'column', gap: '10px', paddingBottom: '40px' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' },
-  title: { fontSize: '1.1rem', fontWeight: 800, margin: 0, color: '#FFFFFF', letterSpacing: '-0.2px' },
+  container: { display: 'flex', flexDirection: 'column', gap: '10px', paddingBottom: '30px' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' },
+  title: { fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--text)', letterSpacing: '-0.2px' },
   statusPillsRow: { display: 'flex', gap: '4px' },
   pillBtn: {
-    padding: '4px 10px',
-    borderRadius: '12px',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    color: 'var(--text-secondary, #AAAAAA)',
-    fontSize: '0.75rem',
+    padding: '4px 8px',
+    borderRadius: '8px',
+    backgroundColor: 'var(--card-hover)',
+    border: '1px solid var(--border)',
+    color: 'var(--text-secondary)',
+    fontSize: '0.72rem',
     fontWeight: 600,
     cursor: 'pointer',
-    transition: 'all 0.2s ease',
   },
-  pillBtnActive: { backgroundColor: 'rgba(255, 255, 255, 0.12)', color: '#FFFFFF', borderColor: 'rgba(255, 255, 255, 0.25)' },
+  pillBtnActive: { backgroundColor: 'var(--accent-surface)', color: 'var(--accent)', borderColor: 'var(--accent)' },
   pillBtnActivePending: { backgroundColor: 'rgba(255, 214, 0, 0.15)', color: '#ffd600', borderColor: 'rgba(255, 214, 0, 0.3)' },
   pillBtnActiveReviewed: { backgroundColor: 'rgba(0, 200, 83, 0.15)', color: '#00c853', borderColor: 'rgba(0, 200, 83, 0.3)' },
-  controlsBar: { display: 'flex', gap: '6px', alignItems: 'center' },
-  cardList: { display: 'flex', flexDirection: 'column', gap: '12px' },
+  cardList: { display: 'flex', flexDirection: 'column', gap: '10px' },
   masterCard: { 
-    padding: '12px', 
+    padding: '10px', 
     display: 'flex', 
     flexDirection: 'column', 
-    gap: '10px', 
-    borderRadius: '14px',
-    background: 'rgba(18, 18, 20, 0.75)',
-    border: '1px solid rgba(255, 255, 255, 0.07)'
+    gap: '8px', 
+    borderRadius: '10px',
+    background: 'var(--card)',
+    border: '1px solid var(--border)'
   },
-  cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' },
-  avatarCircle: { width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'rgba(224, 0, 8, 0.15)', color: 'var(--accent, #E00008)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.9rem', border: '1px solid rgba(224, 0, 8, 0.3)', flexShrink: 0 },
-  clientName: { margin: 0, fontSize: '1rem', fontWeight: 700, color: '#FFFFFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  dateTag: { fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.55)', fontWeight: 500, whiteSpace: 'nowrap' },
-  planPill: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: '#00c853', fontWeight: 600, marginTop: '1px' },
-  statusBadge: { padding: '3px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 },
-  metricsRow: { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px', backgroundColor: 'rgba(255, 255, 255, 0.02)', padding: '6px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.05)' },
+  cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' },
+  avatarCircle: { width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--accent-surface)', color: 'var(--accent, #E00008)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.82rem', flexShrink: 0 },
+  clientName: { margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  dateTag: { fontSize: '0.68rem', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' },
+  planPill: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', color: '#00c853', fontWeight: 600 },
+  statusBadge: { padding: '2px 6px', borderRadius: '8px', fontSize: '0.68rem', fontWeight: 700, whiteSpace: 'nowrap' },
+  metricsRow: { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px', backgroundColor: 'var(--card-hover)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border)' },
   miniStat: { display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '1px' },
-  miniStatVal: { fontSize: '0.78rem', fontWeight: 800, color: '#FFFFFF' },
-  miniStatLbl: { fontSize: '0.62rem', color: 'var(--text-secondary, #AAAAAA)' },
-  innerBlock: { padding: '8px 10px', backgroundColor: 'rgba(0, 0, 0, 0.25)', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.05)' },
-  blockTitleRow: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' },
-  blockTitle: { fontSize: '0.78rem', fontWeight: 700, color: '#FFFFFF' },
-  exerciseList: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  exerciseRow: { display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 8px', borderRadius: '6px', border: '1px solid transparent' },
-  mutedText: { fontSize: '0.75rem', color: 'var(--text-secondary, #AAAAAA)', fontStyle: 'italic' },
-  photoStream: { display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '2px' },
-  photoGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' },
-  photoThumbCard: { minWidth: '70px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', cursor: 'pointer' },
-  photoImg: { width: '70px', height: '70px', objectFit: 'cover', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)' },
-  photoCaption: { fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-secondary, #AAAAAA)', textAlign: 'center' },
-  measurePillRow: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '6px' },
-  measureTag: { fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.85)', padding: '2px 6px', backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: '4px' },
-  notesBox: { display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', borderLeft: '3px solid var(--accent, #E00008)' },
-  actionRow: { display: 'flex', gap: '6px', alignItems: 'center', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '8px' }
+  miniStatVal: { fontSize: '0.75rem', fontWeight: 800, color: 'var(--text)' },
+  miniStatLbl: { fontSize: '0.6rem', color: 'var(--text-secondary)' },
+  innerBlock: { padding: '6px 8px', backgroundColor: 'var(--card-hover)', borderRadius: '8px', border: '1px solid var(--border)' },
+  blockTitleRow: { display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' },
+  blockTitle: { fontSize: '0.72rem', fontWeight: 700, color: 'var(--text)' },
+  exerciseList: { display: 'flex', flexDirection: 'column', gap: '2px' },
+  exerciseRow: { display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 6px', borderRadius: '4px', border: '1px solid transparent' },
+  mutedText: { fontSize: '0.7rem', color: 'var(--text-secondary)', fontStyle: 'italic' },
+  photoStream: { display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' },
+  photoThumbCard: { minWidth: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', cursor: 'pointer' },
+  photoImg: { width: '60px', height: '60px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border)' },
+  photoCaption: { fontSize: '0.62rem', fontWeight: 600, color: 'var(--text-secondary)', textAlign: 'center' },
+  actionRow: { display: 'flex', gap: '6px', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '6px' }
 };

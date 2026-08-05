@@ -1,6 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-:root {
+:root, :root[data-theme="dark"] {
   --bg: #080808;
   --card: #121214;
   --card-hover: #1a1a1e;
@@ -19,11 +19,43 @@
   --warning-glow: rgba(255, 214, 0, 0.2);
   --danger: #ff1744;
   --info: #29b6f6;
-  --radius: 20px;
-  --radius-sm: 12px;
-  --radius-xs: 8px;
-  --shadow-card: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  --shadow-glow: 0 0 25px rgba(224, 0, 8, 0.15);
+  --radius: 14px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+  --shadow-card: 0 4px 20px 0 rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 18px rgba(224, 0, 8, 0.15);
+  --glass-bg: rgba(18, 18, 20, 0.75);
+  --glass-card-bg: rgba(18, 18, 20, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="light"] {
+  --bg: #f4f6f9;
+  --card: #ffffff;
+  --card-hover: #f8fafc;
+  --card-border: #e2e8f0;
+  --border: #cbd5e1;
+  --text: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --accent: #d32f2f;
+  --accent-hover: #b71c1c;
+  --accent-glow: rgba(211, 47, 47, 0.2);
+  --accent-surface: rgba(211, 47, 47, 0.08);
+  --success: #16a34a;
+  --success-glow: rgba(22, 163, 74, 0.15);
+  --warning: #d97706;
+  --warning-glow: rgba(217, 119, 6, 0.15);
+  --danger: #dc2626;
+  --info: #0284c7;
+  --radius: 14px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+  --shadow-card: 0 4px 20px 0 rgba(0, 0, 0, 0.06);
+  --shadow-glow: 0 0 18px rgba(211, 47, 47, 0.12);
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-card-bg: rgba(255, 255, 255, 0.9);
+  --glass-border: rgba(0, 0, 0, 0.08);
 }
 
 * {
@@ -36,19 +68,18 @@ html, body {
   background-color: var(--bg);
   color: var(--text);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px; /* Reduced portal base scale */
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-image: 
-    radial-gradient(ellipse at top left, rgba(224, 0, 8, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at bottom right, rgba(224, 0, 8, 0.04) 0%, transparent 50%);
   background-attachment: fixed;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -57,7 +88,7 @@ html, body {
 
 ::-webkit-scrollbar-thumb {
   background: var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -66,7 +97,7 @@ html, body {
 
 /* Glassmorphism utility */
 .glass {
-  background: rgba(18, 18, 20, 0.75);
+  background: var(--glass-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border);
@@ -74,17 +105,17 @@ html, body {
 }
 
 .glass-card {
-  background: rgba(18, 18, 20, 0.65);
+  background: var(--glass-card-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-card:hover {
-  border-color: rgba(224, 0, 8, 0.3);
-  transform: translateY(-2px);
+  border-color: var(--accent-glow);
+  transform: translateY(-1px);
   box-shadow: var(--shadow-glow);
 }
 
@@ -112,10 +143,10 @@ html, body {
 /* Pulse animation */
 @keyframes pulseGlow {
   0%, 100% {
-    box-shadow: 0 0 10px rgba(224, 0, 8, 0.2);
+    box-shadow: 0 0 8px var(--accent-glow);
   }
   50% {
-    box-shadow: 0 0 25px rgba(224, 0, 8, 0.5);
+    box-shadow: 0 0 18px var(--accent-glow);
   }
 }
 
@@ -127,7 +158,7 @@ html, body {
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -136,7 +167,7 @@ html, body {
 }
 
 .animate-fade-up {
-  animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Hide Scrollbar helper */
@@ -148,6 +179,12 @@ html, body {
   scrollbar-width: none;
 }
 
+/* Compact global typography scaling */
+h1 { font-size: 1.25rem !important; }
+h2 { font-size: 1.05rem !important; }
+h3 { font-size: 0.95rem !important; }
+h4 { font-size: 0.875rem !important; }
+
 /* Input and Form autofill overrides */
 input:-webkit-autofill,
 input:-webkit-autofill:hover, 
@@ -155,9 +192,61 @@ input:-webkit-autofill:focus,
 input:-webkit-autofill:active,
 textarea:-webkit-autofill,
 select:-webkit-autofill {
-  -webkit-text-fill-color: #ffffff !important;
-  -webkit-box-shadow: 0 0 0px 1000px #121214 inset !important;
-  box-shadow: 0 0 0px 1000px #121214 inset !important;
-  caret-color: #ffffff !important;
+  -webkit-text-fill-color: var(--text) !important;
+  -webkit-box-shadow: 0 0 0px 1000px var(--card) inset !important;
+  box-shadow: 0 0 0px 1000px var(--card) inset !important;
+  caret-color: var(--text) !important;
   transition: background-color 5000s ease-in-out 0s !important;
 }
+
+/* Light mode shimmer */
+:root[data-theme="light"] .shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.04) 25%,
+    rgba(0, 0, 0, 0.08) 50%,
+    rgba(0, 0, 0, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite ease-in-out;
+}
+
+/* Light mode select elements */
+:root[data-theme="light"] select,
+:root[data-theme="light"] select option {
+  background-color: var(--card) !important;
+  color: var(--text) !important;
+}
+
+/* Light mode inputs */
+:root[data-theme="light"] input,
+:root[data-theme="light"] textarea {
+  color: var(--text) !important;
+}
+
+/* Light mode date inputs */
+:root[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none;
+}
+
+/* Light mode Recharts SVG text & grid lines */
+:root[data-theme="light"] .recharts-text {
+  fill: var(--text-secondary) !important;
+}
+:root[data-theme="light"] .recharts-cartesian-grid-line {
+  stroke: var(--border) !important;
+}
+
+/* Light mode glass utilities */
+:root[data-theme="light"] .glass {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: var(--border) !important;
+}
+
+:root[data-theme="light"] .glass-card {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05) !important;
+}
+
+

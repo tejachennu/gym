@@ -113,9 +113,9 @@ const ImageUpload = ({
   };
 
   const containerStyle = {
-    border: `2px dashed ${isDragging ? '#E00008' : '#2a2a30'}`,
+    border: `2px dashed ${isDragging ? 'var(--accent)' : 'var(--border)'}`,
     borderRadius: '16px',
-    backgroundColor: isDragging ? 'rgba(224, 0, 8, 0.05)' : '#121214',
+    backgroundColor: isDragging ? 'var(--accent-surface)' : 'var(--card)',
     padding: '40px 20px',
     textAlign: 'center',
     cursor: 'pointer',

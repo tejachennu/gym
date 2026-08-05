@@ -120,10 +120,20 @@ export const updateWorkoutPlan = (planId, data) => updateDocument("WorkoutPlans"
 export const deleteWorkoutPlan = (planId) => deleteDocument("WorkoutPlans", planId);
 
 // DailyLogs
-export const submitDailyLog = async (clientId, date, logData) => {
+export const submitDailyLog = async (arg1, arg2, arg3) => {
+  const clientId = typeof arg1 === 'string' ? arg1 : arg1?.clientId;
+  const date = typeof arg2 === 'string' ? arg2 : (arg2?.date || new Date().toISOString().split('T')[0]);
+  const logData = typeof arg2 === 'object' ? arg2 : (arg3 || {});
+
   const docId = `${clientId}_${date}`;
   const docRef = doc(db, "DailyLogs", docId);
-  await setDoc(docRef, { ...logData, clientId, date, updatedAt: serverTimestamp() }, { merge: true });
+  await setDoc(docRef, { 
+    ...logData, 
+    clientId, 
+    date, 
+    createdAt: logData.createdAt || serverTimestamp(),
+    updatedAt: serverTimestamp() 
+  }, { merge: true });
   return docId;
 };
 export const getDailyLog = async (clientId, date) => {
@@ -133,16 +143,38 @@ export const getDailyLog = async (clientId, date) => {
 };
 export const getClientDailyLogs = async (clientId) => {
   const list = await queryDocuments("DailyLogs", [{ field: "clientId", operator: "==", value: clientId }]);
-  return list.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  return list.sort((a, b) => {
+    const timeA = a.createdAt?.seconds || (a.date ? new Date(a.date).getTime() / 1000 : 0);
+    const timeB = b.createdAt?.seconds || (b.date ? new Date(b.date).getTime() / 1000 : 0);
+    return timeB - timeA;
+  });
 };
 export const reviewDailyLog = (logId, reviewData) => updateDocument("DailyLogs", logId, reviewData);
 
 // BodyCheckins
-export const submitCheckin = (checkinData) => addDocument("BodyCheckins", checkinData);
+export const submitCheckin = async (arg1, arg2) => {
+  const clientId = typeof arg1 === 'string' ? arg1 : arg1?.clientId;
+  const checkinData = typeof arg1 === 'object' ? arg1 : (arg2 || {});
+
+  const dataToSave = {
+    ...checkinData,
+    clientId: clientId || checkinData.clientId || '',
+    date: checkinData.date || new Date().toISOString().split('T')[0],
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  };
+
+  return addDocument("BodyCheckins", dataToSave);
+};
 export const getClientCheckins = async (clientId) => {
   const list = await queryDocuments("BodyCheckins", [{ field: "clientId", operator: "==", value: clientId }]);
-  return list.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  return list.sort((a, b) => {
+    const timeA = a.createdAt?.seconds || (a.date ? new Date(a.date).getTime() / 1000 : 0);
+    const timeB = b.createdAt?.seconds || (b.date ? new Date(b.date).getTime() / 1000 : 0);
+    return timeB - timeA;
+  });
 };
+export const getClientMeasurements = getClientCheckins;
 export const getCheckinById = (checkinId) => getDocument("BodyCheckins", checkinId);
 export const updateCheckin = (id, data) => updateDocument("BodyCheckins", id, data);
 export const deleteCheckin = (id) => deleteDocument("BodyCheckins", id);
@@ -159,12 +191,44 @@ export const deleteBloodReport = (id) => deleteDocument("BloodReports", id);
 // Notifications
 export const createNotification = (notificationData) => addDocument("Notifications", notificationData);
 export const getClientNotifications = async (clientId) => {
-  const list = await queryDocuments("Notifications", [{ field: "userId", operator: "==", value: clientId }]);
-  return list.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  const allNotifs = await getDocuments("Notifications");
+  const filtered = (allNotifs || []).filter(n => 
+    n.recipient === 'all' || 
+    n.recipient === clientId || 
+    n.userId === clientId
+  );
+  return filtered.sort((a, b) => {
+    const tA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.sentAt ? new Date(a.sentAt).getTime() : 0);
+    const tB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.sentAt ? new Date(b.sentAt).getTime() : 0);
+    return tB - tA;
+  });
 };
 export const markAsRead = (notificationId) => updateDocument("Notifications", notificationId, { read: true });
+export const deleteNotification = (notificationId) => deleteDocument("Notifications", notificationId);
 
 // Users
 export const getAllClients = () => queryDocuments("Users", [{ field: "role", operator: "==", value: "client" }]);
 export const getClientById = (clientId) => getDocument("Users", clientId);
 export const updateClientProfile = (clientId, profileData) => updateDocument("Users", clientId, profileData);
+export const deleteClient = (clientId) => deleteDocument("Users", clientId);
+
+export const clearSeedClients = async () => {
+  const seedEmails = [
+    'teja@powerhouse.com',
+    'client@powerhouse.com',
+    'rajesh@powerhouse.com',
+    'raghava@powerhouse.com',
+    'durga@powerhouse.com',
+    'satish@powerhouse.com',
+    'ganesh@powerhouse.com'
+  ];
+  const allUsers = await getAllClients();
+  let count = 0;
+  for (const user of allUsers) {
+    if (seedEmails.includes(user.email?.toLowerCase()) || user.id === 'demo-client-id') {
+      await deleteDocument("Users", user.id);
+      count++;
+    }
+  }
+  return count;
+};

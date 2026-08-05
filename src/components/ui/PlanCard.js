@@ -76,13 +76,13 @@ export default function PlanCard({
                 >
                   <span style={{
                     ...styles.pillDuration,
-                    color: isSelected ? '#FFFFFF' : 'var(--text-secondary, #AAAAAA)'
+                    color: isSelected ? '#FFFFFF' : 'var(--text-secondary)'
                   }}>
                     {(tier.duration || `${tier.durationVal || 1} ${tier.durationUnit || 'Months'}`).toUpperCase()}
                   </span>
                   <span style={{
                     ...styles.pillPrice,
-                    color: isSelected ? '#FFFFFF' : '#FFFFFF'
+                    color: isSelected ? '#FFFFFF' : 'var(--text)'
                   }}>
                     ₹{tier.price}
                   </span>
@@ -105,6 +105,27 @@ export default function PlanCard({
               <span style={styles.featureText}>{feat.toUpperCase()}</span>
             </div>
           ))}
+        </div>
+
+        {/* Client Portal Enabled Features */}
+        <div style={{ marginTop: '12px', padding: '8px 10px', backgroundColor: 'var(--card-hover)', borderRadius: '8px' }}>
+          <div style={styles.sectionHeader}>CLIENT PORTAL FEATURES</div>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+            <Badge variant={(plan.hasDiet ?? true) ? 'success' : 'secondary'} size="sm">
+              {(plan.hasDiet ?? true) ? '🥗 Diet' : '🥗 No Diet'}
+            </Badge>
+            <Badge variant={(plan.hasWorkout ?? true) ? 'success' : 'secondary'} size="sm">
+              {(plan.hasWorkout ?? true) ? '🏋️ Workout' : '🏋️ No Workout'}
+            </Badge>
+            <Badge variant={(plan.hasTracking ?? true) ? 'success' : 'secondary'} size="sm">
+              {(plan.hasTracking ?? true) ? '📊 Tracking' : '📊 No Tracking'}
+            </Badge>
+            {(plan.hasTracking ?? true) && (plan.hasPostureCheckin ?? true) && (
+              <Badge variant="success" size="sm">
+                📸 10-Day Posture
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
 
@@ -139,8 +160,8 @@ export default function PlanCard({
 
 const styles = {
   cardContainer: {
-    backgroundColor: '#0d0d0e',
-    border: '1px solid #222226',
+    backgroundColor: 'var(--card)',
+    border: '1px solid var(--border)',
     borderRadius: '24px',
     padding: '28px 24px',
     display: 'flex',
@@ -171,7 +192,7 @@ const styles = {
   planName: {
     fontSize: '1.4rem',
     fontWeight: 800,
-    color: '#FFFFFF',
+    color: 'var(--text)',
     margin: 0,
     letterSpacing: '-0.02em',
   },
@@ -190,8 +211,8 @@ const styles = {
     lineHeight: 1.4,
   },
   priceBox: {
-    backgroundColor: '#161619',
-    border: '1px solid #2a2a30',
+    backgroundColor: 'var(--card-hover)',
+    border: '1px solid var(--border)',
     borderRadius: '16px',
     padding: '20px 16px',
     textAlign: 'center',
@@ -244,8 +265,8 @@ const styles = {
     gap: '10px',
   },
   durationPill: {
-    backgroundColor: '#161619',
-    border: '1px solid #2a2a30',
+    backgroundColor: 'var(--card-hover)',
+    border: '1px solid var(--border)',
     borderRadius: '14px',
     padding: '12px 10px',
     display: 'flex',
@@ -301,7 +322,7 @@ const styles = {
   featureText: {
     fontSize: '0.78rem',
     fontWeight: 700,
-    color: '#FFFFFF',
+    color: 'var(--text)',
     letterSpacing: '0.02em',
     lineHeight: 1.3,
   },
@@ -310,7 +331,7 @@ const styles = {
     gap: '10px',
     marginTop: 'auto',
     paddingTop: '12px',
-    borderTop: '1px solid #222226',
+    borderTop: '1px solid var(--border)',
   },
   selectBtn: {
     marginTop: 'auto',

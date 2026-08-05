@@ -20,13 +20,13 @@ import {
   Heart, 
   Plus, 
   Trash2, 
-  Save, 
-  Calendar, 
   Edit, 
   FileText, 
   Link as LinkIcon,
   Upload,
-  Loader
+  Loader,
+  Filter,
+  Send
 } from 'lucide-react';
 
 export default function BloodReportsPage() {
@@ -38,11 +38,15 @@ export default function BloodReportsPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  // Modal state
+  // Date Filters (Default 1 Month)
+  const defaultToDate = new Date().toISOString().split('T')[0];
+  const defaultFromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const [fromDate, setFromDate] = useState(defaultFromDate);
+  const [toDate, setToDate] = useState(defaultToDate);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
-  // Form State
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
     reportName: '',
@@ -50,7 +54,7 @@ export default function BloodReportsPage() {
     notes: ''
   });
 
-   const [statusBanner, setStatusBanner] = useState(null);
+  const [statusBanner, setStatusBanner] = useState(null);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [viewerUrl, setViewerUrl] = useState('');
 
@@ -148,18 +152,13 @@ export default function BloodReportsPage() {
       
       if (data.success && data.fileUrl) {
         setForm(prev => ({ ...prev, fileUrl: data.fileUrl }));
-        if (data.local) {
-          toast.info(`Local Fallback: Saved "${file.name}" locally inside /public/uploads/`);
-        } else {
-          toast.success(`File "${file.name}" uploaded to Google Drive!`);
-        }
+        toast.success(`File "${file.name}" uploaded successfully!`);
       } else {
-        throw new Error(data.error || 'Upload returned unsuccessful status');
+        throw new Error(data.error || 'Upload failed');
       }
     } catch (err) {
-      console.error('File upload failure:', err);
-      toast.error(`Upload failed: ${err.message}`);
-      setStatusBanner({ type: 'error', message: `Upload failed: ${err.message}` });
+      console.error(err);
+      toast.error(err);
     } finally {
       setUploading(false);
     }
@@ -170,22 +169,10 @@ export default function BloodReportsPage() {
     setStatusBanner(null);
 
     if (!selectedClient) {
-      const msg = 'Mandatory Field Missing: Please select a client first.';
-      toast.warning(msg);
-      setStatusBanner({ type: 'error', message: msg });
-      return;
+      return toast.warning('Please select a client first.');
     }
     if (!form.reportName.trim()) {
-      const msg = 'Mandatory Field Missing: Please enter the test name.';
-      toast.warning(msg);
-      setStatusBanner({ type: 'error', message: msg });
-      return;
-    }
-    if (!form.date) {
-      const msg = 'Mandatory Field Missing: Please enter the test date.';
-      toast.warning(msg);
-      setStatusBanner({ type: 'error', message: msg });
-      return;
+      return toast.warning('Please enter the test name.');
     }
 
     setSaving(true);
@@ -203,18 +190,16 @@ export default function BloodReportsPage() {
 
       if (editingId) {
         await updateBloodReport(editingId, data);
-        toast.success('Blood report details updated successfully!');
+        toast.success('Blood report submitted successfully!');
       } else {
         await uploadBloodReport(data);
-        toast.success('New blood report details saved successfully!');
+        toast.success('New blood report submitted successfully!');
       }
       setIsModalOpen(false);
       await loadBloodReports(selectedClient);
     } catch (err) {
       console.error(err);
-      const errorMsg = `Save Error: ${err.message || 'Failed to save blood report details'}`;
-      toast.error(errorMsg);
-      setStatusBanner({ type: 'error', message: errorMsg });
+      toast.error(err);
     } finally {
       setSaving(false);
     }
@@ -233,30 +218,37 @@ export default function BloodReportsPage() {
 
   const selectedClientObj = clients.find(c => c.id === selectedClient);
 
+  const filteredReportsList = reportsList.filter(r => {
+    const rDate = r.date || '';
+    if (fromDate && rDate && rDate < fromDate) return false;
+    if (toDate && rDate && rDate > toDate) return false;
+    return true;
+  });
+
   return (
     <div style={styles.container} className="animate-fade-up">
       {/* Header */}
       <header style={styles.header}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={styles.headerIconWrapper}>
-              <Heart size={22} color="var(--accent, #E00008)" />
+              <Heart size={18} color="var(--accent, #E00008)" />
             </div>
             <h1 style={styles.title}>Blood Reports Management</h1>
           </div>
-          <p style={{ color: 'var(--text-secondary, #AAAAAA)', margin: '4px 0 0 0', fontSize: '0.9rem' }}>
+          <p style={{ color: 'var(--text-secondary)', margin: '2px 0 0 0', fontSize: '0.78rem' }}>
             Monitor client health vitals, hormone panels, and blood biomarkers
           </p>
         </div>
       </header>
 
-      {/* Client Selector Bar */}
-      <Card style={{ padding: '20px', position: 'relative', zIndex: 100 }} className="glass-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ flex: 1, minWidth: '280px', maxWidth: '500px' }}>
+      {/* Client Selector & Date Filter Bar */}
+      <Card style={{ padding: '12px' }} className="glass-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ flex: 1, minWidth: '220px', maxWidth: '400px' }}>
             <SearchableSelect 
               label="Search & Select Client *"
-              placeholder="Type name, phone, or email to search..."
+              placeholder="Type name, phone, or email..."
               value={selectedClient} 
               onChange={(e) => setSelectedClient(e.target.value)}
               options={clients.map((c) => ({
@@ -269,12 +261,30 @@ export default function BloodReportsPage() {
             />
           </div>
 
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Filter size={14} color="var(--accent)" />
+            <Input 
+              type="date" 
+              label="From Date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              style={{ width: '130px' }}
+            />
+            <Input 
+              type="date" 
+              label="To Date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              style={{ width: '130px' }}
+            />
+            <Button variant="outline" size="sm" onClick={() => { setFromDate(defaultFromDate); setToDate(defaultToDate); }} style={{ alignSelf: 'flex-end' }}>
+              Reset
+            </Button>
+          </div>
+
           {selectedClient && (
-            <Button 
-              onClick={handleOpenAddModal}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-            >
-              <Plus size={18} /> + Add Blood Report
+            <Button onClick={handleOpenAddModal} size="sm">
+              <Plus size={14} /> Submit Blood Report
             </Button>
           )}
         </div>
@@ -283,17 +293,17 @@ export default function BloodReportsPage() {
       {/* History Grid */}
       {selectedClient ? (
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '16px', color: '#FFFFFF' }}>
-            Blood Reports for <span style={{ color: 'var(--accent, #E00008)' }}>{selectedClientObj?.displayName || selectedClientObj?.name || 'Client'}</span> ({reportsList.length})
+          <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '10px', color: 'var(--text)' }}>
+            Blood Reports for <span style={{ color: 'var(--accent, #E00008)' }}>{selectedClientObj?.displayName || selectedClientObj?.name || 'Client'}</span> ({filteredReportsList.length})
           </h2>
 
           {loading ? (
             <div style={styles.historyList}>
               {Array.from({ length: 2 }).map((_, i) => <CardSkeleton key={i} />)}
             </div>
-          ) : reportsList.length > 0 ? (
+          ) : filteredReportsList.length > 0 ? (
             <div style={styles.historyList}>
-              {reportsList.map((report) => (
+              {filteredReportsList.map((report) => (
                 <Card key={report.id} style={styles.reportCard} className="glass-card">
                   <div style={styles.reportHeader}>
                     <div>
@@ -305,20 +315,18 @@ export default function BloodReportsPage() {
                     <Badge variant="danger">BLOOD TEST</Badge>
                   </div>
 
-                  {/* Notes / Abnormalities */}
                   <div style={styles.abnormalitiesBox}>
-                    <strong style={{ color: 'var(--accent, #E00008)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <FileText size={16} /> Key Notes & Vital Markers:
+                    <strong style={{ color: 'var(--accent, #E00008)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}>
+                      <FileText size={14} /> Key Notes & Vital Markers:
                     </strong>
-                    <p style={{ margin: '8px 0 0 0', fontSize: '0.9rem', lineHeight: 1.4, color: '#FFFFFF' }}>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', lineHeight: 1.4, color: 'var(--text)' }}>
                       {report.notes || 'No notes added for this report.'}
                     </p>
                   </div>
 
-                  {/* PDF attachment */}
                   {report.fileUrl && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}>
-                      <LinkIcon size={14} color="var(--accent, #E00008)" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}>
+                      <LinkIcon size={12} color="var(--accent, #E00008)" />
                       <button 
                         type="button"
                         onClick={() => {
@@ -333,7 +341,7 @@ export default function BloodReportsPage() {
                           textDecoration: 'underline',
                           cursor: 'pointer',
                           padding: 0,
-                          fontSize: '0.85rem'
+                          fontSize: '0.78rem'
                         }}
                       >
                         View Attached Lab PDF / Image
@@ -341,21 +349,21 @@ export default function BloodReportsPage() {
                     </div>
                   )}
 
-                  {/* Action Buttons */}
                   <div style={styles.cardActions}>
                     <Button 
                       variant="outline" 
+                      size="sm"
                       onClick={() => handleOpenEditModal(report)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
-                      <Edit size={14} /> Edit Entry
+                      <Edit size={12} /> Edit
                     </Button>
                     <Button 
                       variant="ghost" 
+                      size="sm"
                       onClick={() => handleDeleteReport(report.id)}
-                      style={{ color: '#ff1744', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      style={{ color: 'var(--danger)' }}
                     >
-                      <Trash2 size={14} /> Delete
+                      <Trash2 size={12} /> Delete
                     </Button>
                   </div>
                 </Card>
@@ -363,20 +371,20 @@ export default function BloodReportsPage() {
             </div>
           ) : (
             <div style={styles.emptyState}>
-              <Heart size={48} color="var(--text-muted, #666666)" />
-              <h3 style={{ margin: '16px 0 6px', color: '#FFFFFF' }}>No Blood Reports Found</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '20px' }}>
-                Click <strong>"+ Add Blood Report"</strong> above to record a new biomarker entry for {selectedClientObj?.displayName || 'this client'}.
+              <Heart size={36} color="var(--text-muted)" />
+              <h3 style={{ margin: '10px 0 4px', color: 'var(--text)' }}>No Blood Reports Found</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '12px' }}>
+                Click <strong>"Submit Blood Report"</strong> to record a report for {selectedClientObj?.displayName || 'this client'}.
               </p>
-              <Button onClick={handleOpenAddModal}>+ Add Blood Report Now</Button>
+              <Button onClick={handleOpenAddModal} size="sm">Submit Blood Report</Button>
             </div>
           )}
         </div>
       ) : (
         <div style={styles.emptyState}>
-          <Heart size={48} color="var(--text-muted, #666666)" />
-          <h3 style={{ margin: '16px 0 6px', color: '#FFFFFF' }}>Select a Client to View Blood Reports</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+          <Heart size={36} color="var(--text-muted)" />
+          <h3 style={{ margin: '10px 0 4px', color: 'var(--text)' }}>Select a Client to View Blood Reports</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
             Choose a client from the dropdown search above to view biomarker or hormone panel history.
           </p>
         </div>
@@ -386,32 +394,10 @@ export default function BloodReportsPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingId ? `Edit Blood Report for ${selectedClientObj?.displayName || 'Client'}` : `Upload New Blood Report for ${selectedClientObj?.displayName || 'Client'}`}
+        title={editingId ? `Edit Blood Report for ${selectedClientObj?.displayName || 'Client'}` : `Submit Blood Report for ${selectedClientObj?.displayName || 'Client'}`}
         size="lg"
       >
-        <form onSubmit={handleSaveReport} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {statusBanner && (
-            <div style={{
-              padding: '12px 16px',
-              borderRadius: '12px',
-              backgroundColor: statusBanner.type === 'success' ? 'rgba(0, 200, 83, 0.15)' : 'rgba(255, 23, 68, 0.15)',
-              border: `1px solid ${statusBanner.type === 'success' ? '#00c853' : '#ff1744'}`,
-              color: '#FFFFFF',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>{statusBanner.type === 'success' ? '✅' : '⚠️'}</span>
-                <span>{statusBanner.message}</span>
-              </div>
-              <button type="button" onClick={() => setStatusBanner(null)} style={{ background: 'none', border: 'none', color: '#AAAAAA', cursor: 'pointer' }}>✕</button>
-            </div>
-          )}
-
+        <form onSubmit={handleSaveReport} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div style={styles.modalFormGrid}>
             <Input 
               label="Test Name *" 
@@ -429,61 +415,25 @@ export default function BloodReportsPage() {
             />
           </div>
 
-          {/* File Attachment Status / Input */}
-          {form.fileUrl ? (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '14px 18px',
-              backgroundColor: 'rgba(0, 200, 83, 0.08)',
-              border: '1px solid rgba(0, 200, 83, 0.25)',
-              borderRadius: '12px',
-              color: '#FFFFFF',
-              fontSize: '0.9rem',
-              fontWeight: 500
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FileText size={18} color="#00c853" />
-                <span>Document Attachment Ready</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setForm(prev => ({ ...prev, fileUrl: '' }))}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#ff1744',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                Remove
-              </button>
-            </div>
-          ) : (
-            <Input 
-              label="File Attachment Link (PDF / Image URL)" 
-              placeholder="e.g. Paste link or upload file below..."
-              value={form.fileUrl}
-              onChange={(e) => setForm({ ...form, fileUrl: e.target.value })}
-            />
-          )}
+          <Input 
+            label="File Attachment Link (PDF / Image URL)" 
+            placeholder="Paste link or upload below..."
+            value={form.fileUrl}
+            onChange={(e) => setForm({ ...form, fileUrl: e.target.value })}
+          />
 
-          {/* File Upload Zone */}
           <div style={{
-            border: '2px dashed var(--border, #2a2a30)',
-            borderRadius: '12px',
-            padding: '24px 16px',
+            border: '1px dashed var(--border)',
+            borderRadius: '8px',
+            padding: '14px',
             textAlign: 'center',
-            backgroundColor: 'rgba(255, 255, 255, 0.01)',
+            backgroundColor: 'var(--card-hover)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: '12px'
+            gap: '8px'
           }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary, #AAAAAA)' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
               Or upload lab report directly from your device (PDF / JPG / PNG)
             </span>
             <input 
@@ -500,53 +450,35 @@ export default function BloodReportsPage() {
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px',
-                padding: '10px 20px',
-                borderRadius: '8px',
-                border: '1px solid var(--border, #2a2a30)',
-                backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                color: '#FFFFFF',
-                fontSize: '0.875rem',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                backgroundColor: 'var(--card)',
+                color: 'var(--text)',
+                fontSize: '0.78rem',
                 fontWeight: 600,
-                transition: 'all 0.2s',
-                opacity: uploading ? 0.6 : 1,
-                pointerEvents: uploading ? 'none' : 'auto'
               }}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)'}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.03)'}
             >
-              {uploading ? (
-                <>
-                  <Loader className="animate-spin" size={16} /> Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload size={16} color="var(--accent, #E00008)" /> Upload Lab Document
-                </>
-              )}
+              {uploading ? <Loader className="animate-spin" size={14} /> : <Upload size={14} color="var(--accent)" />}
+              {uploading ? 'Uploading...' : 'Upload Document'}
             </label>
-            {form.fileUrl && (
-              <span style={{ fontSize: '0.85rem', color: '#00c853', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                ✓ File uploaded successfully!
-              </span>
-            )}
           </div>
 
           <Textarea 
             label="Abnormalities / Biomarker Remarks" 
-            placeholder="e.g. Vitamin D: 22 ng/mL (Low), Fasting Glucose: 110 mg/dL (Elevated)..." 
+            placeholder="e.g. Vitamin D: 22 ng/mL (Low)..." 
             value={form.notes}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            rows={4}
+            rows={3}
           />
 
-          {/* Actions */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" loading={saving} style={{ padding: '12px 28px' }}>
-              <Save size={18} /> Save Blood Report
+            <Button type="submit" loading={saving}>
+              <Send size={14} /> Submit Blood Report
             </Button>
           </div>
         </form>
@@ -559,42 +491,34 @@ export default function BloodReportsPage() {
         title="Attached Lab Document Preview"
         size="lg"
       >
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
           {viewerUrl && (
             isImageUrl(viewerUrl) ? (
               <img 
                 src={viewerUrl} 
                 alt="Attached Lab Document" 
-                style={{ maxWidth: '100%', maxHeight: '65vh', objectFit: 'contain', borderRadius: '8px' }} 
+                style={{ maxWidth: '100%', maxHeight: '60vh', objectFit: 'contain', borderRadius: '8px' }} 
               />
             ) : (
               <iframe 
                 src={getEmbedUrl(viewerUrl)} 
-                style={{ width: '100%', height: '65vh', borderRadius: '8px', border: '1px solid var(--border, #2a2a30)' }} 
+                style={{ width: '100%', height: '60vh', borderRadius: '8px', border: '1px solid var(--border)' }} 
                 allow="autoplay"
               />
             )
           )}
-          <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', marginTop: '10px', alignItems: 'center' }}>
+          <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', marginTop: '6px', alignItems: 'center' }}>
             {viewerUrl && (
               <a 
                 href={viewerUrl} 
                 target="_blank" 
                 rel="noreferrer" 
-                style={{
-                  color: 'var(--accent, #E00008)',
-                  fontSize: '0.9rem',
-                  fontWeight: 600,
-                  textDecoration: 'underline',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
+                style={{ color: 'var(--accent)', fontSize: '0.8rem', fontWeight: 600, textDecoration: 'underline' }}
               >
-                <LinkIcon size={16} /> Open in New Tab
+                <LinkIcon size={14} /> Open in New Tab
               </a>
             )}
-            <Button onClick={() => setIsViewerOpen(false)}>Close Preview</Button>
+            <Button onClick={() => setIsViewerOpen(false)} size="sm">Close Preview</Button>
           </div>
         </div>
       </Modal>
@@ -603,43 +527,42 @@ export default function BloodReportsPage() {
 }
 
 const styles = {
-  container: { display: 'flex', flexDirection: 'column', gap: '16px' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' },
+  container: { display: 'flex', flexDirection: 'column', gap: '12px' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' },
   headerIconWrapper: {
-    width: '36px',
-    height: '36px',
-    borderRadius: '10px',
-    backgroundColor: 'rgba(224, 0, 8, 0.1)',
+    width: '32px',
+    height: '32px',
+    borderRadius: '8px',
+    backgroundColor: 'var(--accent-surface)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    border: '1px solid rgba(224, 0, 8, 0.2)',
   },
-  title: { fontSize: '1.25rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' },
-  historyList: { display: 'flex', flexDirection: 'column', gap: '14px' },
-  reportCard: { padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' },
-  reportHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border, #2a2a30)', paddingBottom: '10px' },
-  reportTitle: { margin: 0, fontSize: '1.05rem', color: '#FFFFFF', fontWeight: 700 },
-  reportDate: { margin: '2px 0 0 0', color: 'var(--text-secondary, #AAAAAA)', fontSize: '0.78rem' },
-  abnormalitiesBox: { backgroundColor: 'rgba(0, 0, 0, 0.3)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border, #2a2a30)' },
+  title: { fontSize: '1.1rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' },
+  historyList: { display: 'flex', flexDirection: 'column', gap: '10px' },
+  reportCard: { padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' },
+  reportHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border)', paddingBottom: '8px' },
+  reportTitle: { margin: 0, fontSize: '0.9rem', color: 'var(--text)', fontWeight: 700 },
+  reportDate: { margin: '2px 0 0 0', color: 'var(--text-secondary)', fontSize: '0.72rem' },
+  abnormalitiesBox: { backgroundColor: 'var(--card-hover)', padding: '8px', borderRadius: '8px', border: '1px solid var(--border)' },
   cardActions: {
     display: 'flex',
-    gap: '10px',
+    gap: '8px',
     flexWrap: 'wrap',
-    borderTop: '1px solid var(--border, #2a2a30)',
-    paddingTop: '12px',
+    borderTop: '1px solid var(--border)',
+    paddingTop: '8px',
   },
   modalFormGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '12px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: '10px',
   },
   emptyState: {
-    padding: '60px 20px',
+    padding: '40px 16px',
     textAlign: 'center',
-    backgroundColor: 'var(--card, #121214)',
-    borderRadius: 'var(--radius, 20px)',
-    border: '1px solid var(--border, #2a2a30)',
+    backgroundColor: 'var(--card)',
+    borderRadius: 'var(--radius)',
+    border: '1px solid var(--border)',
     width: '100%',
   },
 };

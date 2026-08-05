@@ -1,15 +1,17 @@
 'use client';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import { useEffect, useState } from 'react';
 import { PageLoader } from '@/components/ui/Loading';
 import { logoutUser } from '@/lib/auth';
-import { Menu, X, LogOut, ShieldCheck } from 'lucide-react';
+import { Menu, X, LogOut, ShieldCheck, Sun, Moon } from 'lucide-react';
 
 const NAV_ITEMS = [
   { name: 'Dashboard', path: '/admin', icon: '📊' },
   { name: 'Clients', path: '/admin/clients', icon: '🏋️' },
   { name: 'Plans', path: '/admin/plans', icon: '📋' },
+  { name: 'Billing', path: '/admin/billing', icon: '💰' },
   { name: 'Diet Plans', path: '/admin/diet-plans', icon: '🥗' },
   { name: 'Workout Plans', path: '/admin/workout-plans', icon: '💪' },
   { name: 'Monitoring', path: '/admin/monitoring', icon: '📱' },
@@ -21,6 +23,7 @@ export default function AdminLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, userData, loading } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -71,12 +74,18 @@ export default function AdminLayout({ children }) {
         display: isMobile ? 'flex' : 'none'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <ShieldCheck size={20} color="var(--accent, #E00008)" />
+          <ShieldCheck size={18} color="var(--accent, #E00008)" />
           <h1 style={styles.logo}>MRK FITNESS</h1>
         </div>
-        <button onClick={toggleMenu} style={styles.menuButton} aria-label="Toggle navigation menu">
-          {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button onClick={toggleTheme} style={styles.themeButton} aria-label="Toggle theme mode">
+            {theme === 'dark' ? <Sun size={15} color="#ffd600" /> : <Moon size={15} color="#0f172a" />}
+            <span style={{ fontSize: '0.7rem', fontWeight: 700 }}>{theme === 'dark' ? 'Light' : 'Dark'}</span>
+          </button>
+          <button onClick={toggleMenu} style={styles.menuButton} aria-label="Toggle navigation menu">
+            {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
       </div>
 
       {/* Sidebar (Desktop Fixed / Mobile Slide Drawer) */}
@@ -87,7 +96,13 @@ export default function AdminLayout({ children }) {
           : 'translateX(0)'
       }}>
         <div style={styles.sidebarHeader}>
-          <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: '36px', width: 'auto', objectFit: 'contain' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: '30px', width: 'auto', objectFit: 'contain' }} />
+            <button onClick={toggleTheme} style={styles.themeButton} aria-label="Toggle theme mode">
+              {theme === 'dark' ? <Sun size={15} color="#ffd600" /> : <Moon size={15} color="#475569" />}
+              <span style={{ fontSize: '0.7rem', fontWeight: 700 }}>{theme === 'dark' ? 'Light' : 'Dark'}</span>
+            </button>
+          </div>
           <p style={styles.adminName}>Management Portal</p>
         </div>
 
@@ -109,7 +124,7 @@ export default function AdminLayout({ children }) {
 
         <div style={styles.logoutWrapper}>
           <button style={styles.logoutButton} onClick={handleLogout}>
-            <LogOut size={16} /> Logout
+            <LogOut size={15} /> Logout
           </button>
         </div>
       </div>
@@ -117,9 +132,9 @@ export default function AdminLayout({ children }) {
       {/* Main Content Area */}
       <main style={{
         ...styles.mainContent,
-        marginLeft: isMobile ? 0 : '260px',
-        padding: isMobile ? '12px 14px 40px 14px' : '28px 36px',
-        paddingTop: isMobile ? '72px' : '28px',
+        marginLeft: isMobile ? 0 : '230px',
+        padding: isMobile ? '10px 12px 30px 12px' : '20px 28px',
+        paddingTop: isMobile ? '60px' : '20px',
       }}>
         {children}
       </main>
@@ -142,8 +157,8 @@ const styles = {
     overflowX: 'hidden',
   },
   mobileHeader: {
-    padding: '12px 16px',
-    backgroundColor: 'rgba(18, 18, 20, 0.95)',
+    padding: '10px 14px',
+    backgroundColor: 'var(--glass-bg, rgba(18, 18, 20, 0.95))',
     backdropFilter: 'blur(12px)',
     borderBottom: '1px solid var(--border, #2a2a30)',
     justifyContent: 'space-between',
@@ -153,29 +168,40 @@ const styles = {
     left: 0,
     right: 0,
     zIndex: 100,
-    height: '60px',
+    height: '52px',
     boxSizing: 'border-box',
   },
   logo: {
     margin: 0,
-    fontSize: '1.1rem',
+    fontSize: '1rem',
     fontWeight: 800,
     color: 'var(--accent, #E00008)',
     letterSpacing: '-0.2px',
   },
   menuButton: {
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    borderRadius: '8px',
+    background: 'var(--card-hover, rgba(255, 255, 255, 0.05))',
+    border: '1px solid var(--border, rgba(255, 255, 255, 0.1))',
+    borderRadius: '6px',
     color: 'var(--text, #FFFFFF)',
-    padding: '6px',
+    padding: '5px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  themeButton: {
+    background: 'var(--card-hover, rgba(255, 255, 255, 0.05))',
+    border: '1px solid var(--border, rgba(255, 255, 255, 0.1))',
+    borderRadius: '6px',
+    color: 'var(--text, #FFFFFF)',
+    padding: '5px 8px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
   },
   sidebar: {
-    width: '260px',
+    width: '230px',
     backgroundColor: 'var(--card, #121214)',
     borderRight: '1px solid var(--border, #2a2a30)',
     display: 'flex',
@@ -186,70 +212,64 @@ const styles = {
     top: 0,
     zIndex: 95,
     transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-    boxShadow: '4px 0 24px rgba(0,0,0,0.5)',
+    boxShadow: 'var(--shadow-card)',
   },
   sidebarHeader: {
-    padding: '24px 20px',
+    padding: '16px 16px',
     borderBottom: '1px solid var(--border, #2a2a30)',
-  },
-  logoDesktop: {
-    margin: 0,
-    fontSize: '1.3rem',
-    fontWeight: 800,
-    color: 'var(--accent, #E00008)',
   },
   adminName: {
     margin: '4px 0 0',
     color: 'var(--text-secondary, #AAAAAA)',
-    fontSize: '0.8rem',
+    fontSize: '0.75rem',
     fontWeight: 500,
   },
   nav: {
     flex: 1,
-    padding: '16px 10px',
+    padding: '12px 8px',
     overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
-    gap: '4px',
+    gap: '2px',
   },
   navItem: {
     display: 'flex',
     alignItems: 'center',
-    padding: '10px 14px',
-    borderRadius: '10px',
+    padding: '8px 12px',
+    borderRadius: '8px',
     color: 'var(--text-secondary, #AAAAAA)',
     textDecoration: 'none',
     transition: 'all 0.2s ease',
-    fontSize: '0.88rem',
+    fontSize: '0.82rem',
     fontWeight: 500,
   },
   navItemActive: {
-    backgroundColor: 'rgba(224, 0, 8, 0.12)',
+    backgroundColor: 'var(--accent-surface, rgba(224, 0, 8, 0.12))',
     color: 'var(--accent, #E00008)',
     fontWeight: 700,
-    border: '1px solid rgba(224, 0, 8, 0.25)',
+    border: '1px solid var(--accent-glow, rgba(224, 0, 8, 0.25))',
   },
   navIcon: {
-    marginRight: '10px',
-    fontSize: '1.1rem',
+    marginRight: '8px',
+    fontSize: '1rem',
   },
   logoutWrapper: {
-    padding: '16px 14px',
+    padding: '12px 12px',
     borderTop: '1px solid var(--border, #2a2a30)',
   },
   logoutButton: {
     width: '100%',
-    padding: '10px',
+    padding: '8px',
     backgroundColor: 'rgba(255, 82, 82, 0.08)',
     border: '1px solid rgba(255, 82, 82, 0.3)',
-    color: '#ff5252',
-    borderRadius: '10px',
+    color: 'var(--danger, #ff5252)',
+    borderRadius: '8px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '8px',
-    fontSize: '0.85rem',
+    gap: '6px',
+    fontSize: '0.8rem',
     fontWeight: 600,
     transition: 'all 0.2s ease',
   },

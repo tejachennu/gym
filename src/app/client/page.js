@@ -2,19 +2,54 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { getClientById, getDailyLog, getClientCheckins } from '@/lib/firestore';
+import { getClientById, getDailyLog, getClientCheckins, getPlans, getClientPlans, getDocuments } from '@/lib/firestore';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
+import { Select } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Loading';
 import Link from 'next/link';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { Activity, Droplets, Moon, Zap, Smile, Heart, TrendingUp, Calendar, ArrowRight, ActivitySquare, CheckCircle2, Circle } from 'lucide-react';
+import { 
+  Activity, 
+  Droplets, 
+  Moon, 
+  Zap, 
+  Smile, 
+  Heart, 
+  TrendingUp, 
+  Calendar, 
+  ArrowRight, 
+  CheckCircle2, 
+  Circle,
+  Dumbbell,
+  Utensils,
+  Camera,
+  Flame,
+  MessageCircle,
+  PlusCircle,
+  Clock,
+  Sparkles,
+  Lock,
+  ChevronRight,
+  Layers,
+  History,
+  ActivitySquare,
+  ExternalLink,
+  Bell
+} from 'lucide-react';
 
 export default function ClientDashboard() {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [todayLog, setTodayLog] = useState(null);
   const [checkins, setCheckins] = useState([]);
+  const [masterPlans, setMasterPlans] = useState([]);
+  const [clientPlansHistory, setClientPlansHistory] = useState([]);
+  const [selectedPlanIndex, setSelectedPlanIndex] = useState(0);
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,11 +59,46 @@ export default function ClientDashboard() {
       Promise.all([
         getClientById(user.uid),
         getDailyLog(user.uid, todayDateString),
-        getClientCheckins(user.uid)
-      ]).then(([profileData, logData, checkinsData]) => {
+        getClientCheckins(user.uid),
+        getPlans(),
+        getClientPlans(user.uid),
+        getDocuments('Notifications')
+      ]).then(([profileData, logData, checkinsData, plansData, cPlansData, notifsData]) => {
         setProfile(profileData);
         setTodayLog(logData);
         setCheckins(checkinsData || []);
+        setMasterPlans(plansData || []);
+
+        const clientNotifs = (notifsData || []).filter(n => n.recipient === 'all' || n.recipient === user.uid);
+        clientNotifs.sort((a, b) => new Date(b.sentAt || b.createdAt) - new Date(a.sentAt || a.createdAt));
+        setNotifications(clientNotifs);
+
+        // Combine profile.planHistory and cPlansData
+        let combinedPlans = profileData?.planHistory || [];
+        if (combinedPlans.length === 0 && cPlansData?.length > 0) {
+          combinedPlans = cPlansData;
+        } else if (combinedPlans.length === 0 && profileData?.currentPlan) {
+          combinedPlans = [{
+            id: 'current',
+            planName: profileData.currentPlan,
+            planStart: profileData.planStart,
+            planExpiry: profileData.planExpiry,
+            status: 'active',
+            planFeatures: profileData.planFeatures
+          }];
+        }
+
+        // Merge any extra cPlansData items not already present
+        if (cPlansData?.length > 0) {
+          cPlansData.forEach(cp => {
+            const exists = combinedPlans.some(p => p.planName === cp.planName && p.planStart === cp.planStart);
+            if (!exists) {
+              combinedPlans.push(cp);
+            }
+          });
+        }
+
+        setClientPlansHistory(combinedPlans);
       }).catch(console.error)
         .finally(() => setLoading(false));
     }
@@ -40,16 +110,26 @@ export default function ClientDashboard() {
     </div>
   );
 
-  // 1. Active Plan calculations
-  const hasPlan = profile?.currentPlan && profile?.planStart && profile?.planExpiry;
+  // Active or Selected Plan Data
+  const currentSelectedPlan = clientPlansHistory[selectedPlanIndex] || (profile?.currentPlan ? {
+    planName: profile.currentPlan,
+    planStart: profile.planStart,
+    planExpiry: profile.planExpiry,
+    status: 'active',
+    planFeatures: profile.planFeatures
+  } : null);
+
+  const isViewingPastPlan = selectedPlanIndex > 0;
+  const hasPlan = !!currentSelectedPlan?.planName;
+
   let daysRemaining = 0;
   let currentWeek = 0;
   let totalWeeks = 0;
   let progressPercentage = 0;
   
-  if (hasPlan) {
-    const start = profile.planStart.toDate ? profile.planStart.toDate() : new Date(profile.planStart);
-    const end = profile.planExpiry.toDate ? profile.planExpiry.toDate() : new Date(profile.planExpiry);
+  if (hasPlan && currentSelectedPlan.planStart && currentSelectedPlan.planExpiry) {
+    const start = currentSelectedPlan.planStart.toDate ? currentSelectedPlan.planStart.toDate() : new Date(currentSelectedPlan.planStart);
+    const end = currentSelectedPlan.planExpiry.toDate ? currentSelectedPlan.planExpiry.toDate() : new Date(currentSelectedPlan.planExpiry);
     const today = new Date();
     
     const diffTime = end - today;
@@ -64,6 +144,48 @@ export default function ClientDashboard() {
     progressPercentage = totalDays > 0 ? Math.min(100, Math.max(0, (daysElapsed / totalDays) * 100)) : 0;
   }
 
+  // Strict Posture Feature Verification for Selected Plan
+  const hasPostureCheckin = (() => {
+    if (!hasPlan) return false;
+    
+    const feats = currentSelectedPlan?.planFeatures || profile?.planFeatures;
+    if (feats && typeof feats.hasPostureCheckin === 'boolean') {
+      return feats.hasPostureCheckin === true;
+    }
+
+    const clientPlanName = (currentSelectedPlan?.planName || profile?.currentPlan || '').toLowerCase();
+    const matchedPlan = (masterPlans || []).find(mp => {
+      const pName = (mp.plan_name || mp.name || '').toLowerCase();
+      return pName && clientPlanName.includes(pName);
+    });
+
+    if (matchedPlan && typeof matchedPlan.hasPostureCheckin === 'boolean') {
+      return matchedPlan.hasPostureCheckin === true;
+    }
+
+    return false;
+  })();
+
+  const planFeatures = currentSelectedPlan?.planFeatures || profile?.planFeatures || {
+    hasDiet: hasPlan,
+    hasWorkout: hasPlan,
+    hasTracking: hasPlan,
+    hasPostureCheckin,
+    hasDailyLog: hasPlan
+  };
+
+  // Strictly filter checkins to ONLY match the selected plan's date window so past plan data is isolated
+  const planStartStr = currentSelectedPlan?.planStart || '';
+  const planExpiryStr = currentSelectedPlan?.planExpiry || '';
+
+  const selectedPlanCheckins = checkins.filter(c => {
+    const cDate = c.date || (c.createdAt?.seconds ? new Date(c.createdAt.seconds * 1000).toISOString().split('T')[0] : '');
+    if (!cDate) return true;
+    if (planStartStr && cDate < planStartStr) return false;
+    if (planExpiryStr && cDate > planExpiryStr) return false;
+    return true;
+  });
+
   // Activity calculations
   const steps = todayLog?.steps || 0;
   const stepsTarget = 10000;
@@ -74,9 +196,10 @@ export default function ClientDashboard() {
   const waterPercent = Math.min(100, (water / waterTarget) * 100);
 
   const sleepHours = todayLog?.sleepHours || 0;
+  const workoutWeight = todayLog?.workoutWeight || 0;
 
-  // Validated Weight Chart Data
-  const validWeightList = [...checkins, ...(todayLog ? [todayLog] : [])]
+  // Validated Weight Chart Data for current selected plan only
+  const validWeightList = [...selectedPlanCheckins, ...(todayLog ? [todayLog] : [])]
     .map(c => {
       const dateObj = c.date?.toDate ? c.date.toDate() : new Date(c.date);
       const wVal = parseFloat(c.weight || c.measurements?.weight || c.dailyWeight || 0);
@@ -90,8 +213,6 @@ export default function ClientDashboard() {
     .sort((a, b) => a.dateObj - b.dateObj);
 
   let chartData = validWeightList.slice(-7);
-  
-  // If only 1 data point, duplicate with start offset for smooth visual line
   if (chartData.length === 1) {
     const single = chartData[0];
     chartData = [
@@ -105,388 +226,487 @@ export default function ClientDashboard() {
     ? validWeightList[validWeightList.length - 1].weight 
     : (userProfileWeight > 0 ? userProfileWeight : '--');
 
-  // Task completion calculation for Today's Tasks
+  // Task completion calculation
   const isDietDone = !!(todayLog?.mealPhotos && Object.keys(todayLog.mealPhotos).length > 0);
   const isWorkoutDone = !!(todayLog?.workoutCompleted || (todayLog?.completedExercises && todayLog.completedExercises.length > 0));
   const isTrackingDone = !!(todayLog?.steps || todayLog?.water || todayLog?.sleepHours || todayLog?.dailyNotes);
 
-  const completedTasksCount = (isDietDone ? 1 : 0) + (isWorkoutDone ? 1 : 0) + (isTrackingDone ? 1 : 0);
-  const tasksPercent = Math.round((completedTasksCount / 3) * 100);
+  let totalEnabledTasks = 0;
+  let completedCount = 0;
+
+  if (planFeatures.hasDiet) {
+    totalEnabledTasks++;
+    if (isDietDone) completedCount++;
+  }
+  if (planFeatures.hasWorkout) {
+    totalEnabledTasks++;
+    if (isWorkoutDone) completedCount++;
+  }
+  if (planFeatures.hasTracking) {
+    totalEnabledTasks++;
+    if (isTrackingDone) completedCount++;
+  }
+
+  const tasksPercent = totalEnabledTasks > 0 ? Math.round((completedCount / totalEnabledTasks) * 100) : 100;
+
+  // 10-day posture check-in lock calculation for selected plan
+  const latestCheckinDate = selectedPlanCheckins[0]?.date ? new Date(selectedPlanCheckins[0].date) : null;
+  const daysPassedSinceCheckin = latestCheckinDate 
+    ? Math.floor((new Date().getTime() - latestCheckinDate.getTime()) / (1000 * 60 * 60 * 24))
+    : 999;
+  const isCheckinLocked = latestCheckinDate && daysPassedSinceCheckin < 10;
+  const checkinDaysLeft = 10 - daysPassedSinceCheckin;
+
+  const clientFirstName = (profile?.displayName || profile?.name || 'Member').split(' ')[0];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '80px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '80px' }} className="animate-fade-up">
       
-      {/* 1. Active Plan Banner */}
-      <section>
-        {hasPlan ? (
-          <Card style={{ 
-            padding: '14px', 
-            background: 'linear-gradient(145deg, rgba(224, 0, 8, 0.1) 0%, rgba(20, 20, 24, 0.8) 100%)',
-            border: '1px solid rgba(224, 0, 8, 0.2)',
-            backdropFilter: 'blur(10px)',
-            position: 'relative',
-            overflow: 'hidden',
-            borderRadius: '12px'
-          }}>
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
-                <div>
-                  <h2 style={{ margin: '0 0 6px 0', fontSize: '1.1rem', fontWeight: 'bold' }}>{profile.currentPlan}</h2>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <Badge style={{ backgroundColor: 'rgba(0, 200, 83, 0.15)', color: 'var(--success)', fontSize: '0.7rem', padding: '2px 6px' }}>
-                      Active
-                    </Badge>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Calendar size={12} /> Week {currentWeek} of {totalWeeks}
-                    </span>
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--accent)', lineHeight: '1' }}>
-                    {daysRemaining}
-                  </div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '4px' }}>
-                    Days Left
-                  </div>
-                </div>
-              </div>
 
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.8rem' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Plan Progress</span>
-                  <span>{Math.round(progressPercentage)}%</span>
-                </div>
-                <div style={{ height: '4px', backgroundColor: 'var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
-                  <div style={{ 
-                    width: `${progressPercentage}%`, 
-                    height: '100%', 
-                    backgroundColor: 'var(--accent)',
-                    borderRadius: '10px',
-                    transition: 'width 1s ease-in-out',
-                    boxShadow: '0 0 10px rgba(224, 0, 8, 0.5)'
-                  }} />
-                </div>
-              </div>
+
+      {/* PAST PLAN NOTICE BANNER */}
+      {isViewingPastPlan && (
+        <Card style={{ padding: '12px 16px', backgroundColor: 'rgba(255, 145, 0, 0.15)', border: '1px solid rgba(255, 145, 0, 0.4)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <History size={20} color="#ff9100" />
+          <div>
+            <strong style={{ display: 'block', fontSize: '0.85rem', color: '#ff9100' }}>Viewing Historical Dashboard Data</strong>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              You are inspecting historical dashboard stats, checklist, and posture photos for past plan <strong>{currentSelectedPlan.planName}</strong>.
+            </span>
+          </div>
+        </Card>
+      )}
+
+      {/* 1. HERO GREETING BANNER */}
+      <Card style={{ 
+        padding: '18px', 
+        background: 'linear-gradient(135deg, rgba(224, 0, 8, 0.18) 0%, rgba(18, 18, 20, 0.9) 100%)',
+        border: '1px solid rgba(224, 0, 8, 0.3)',
+        borderRadius: '16px',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 800, color: 'var(--accent, #E00008)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+              <Sparkles size={14} /> MRK FITNESS CLIENT PORTAL
             </div>
-            
-            <div style={{ 
-              position: 'absolute', 
-              top: '-50px', 
-              right: '-20px', 
-              width: '100px', 
-              height: '100px', 
-              background: 'radial-gradient(circle, rgba(224,0,8,0.15) 0%, rgba(0,0,0,0) 70%)',
-              zIndex: 0
-            }} />
-          </Card>
-        ) : (
-          <Card style={{ padding: '14px', textAlign: 'center', background: 'var(--card)', border: '1px dashed var(--border)', borderRadius: '12px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '18px', backgroundColor: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px auto' }}>
-              <ActivitySquare size={16} color="var(--text-secondary)" />
-            </div>
-            <h3 style={{ margin: '0 0 6px 0', fontSize: '0.95rem' }}>No Active Plan</h3>
-            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-              You don't have an active plan assigned right now.
+            <h1 style={{ margin: '0 0 6px 0', fontSize: '1.4rem', fontWeight: 900, color: '#FFFFFF' }}>
+              Welcome back, {clientFirstName}! 🔥
+            </h1>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary, #AAAAAA)' }}>
+              Let's crush your daily nutrition, workout split, and activity goals today.
             </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)', padding: '8px 14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>WEIGHT</div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#FFFFFF' }}>{latestWeight} kg</div>
+            </div>
+            <div style={{ width: '1px', height: '20px', backgroundColor: 'rgba(255,255,255,0.1)' }} />
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>GOAL</div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#00c853' }}>{profile?.goal || 'Fat Loss'}</div>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+
+
+      {/* 2. MEMBERSHIP PLAN CARD WITH POPUP TOGGLE BUTTON */}
+      {hasPlan ? (
+        <Card style={{ 
+          padding: '16px', 
+          backgroundColor: 'var(--card, #121214)',
+          border: isViewingPastPlan ? '1px solid #ff9100' : '1px solid var(--border, #2a2a30)',
+          borderRadius: '16px'
+        }} className="glass-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <Badge variant={isViewingPastPlan ? 'warning' : 'success'} style={{ padding: '2px 8px', fontSize: '0.68rem' }}>
+                  {isViewingPastPlan ? 'PAST PLAN HISTORY' : 'ACTIVE PLAN'}
+                </Badge>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Calendar size={12} color="var(--accent)" /> Week {currentWeek} of {totalWeeks}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '4px' }}>
+                <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#FFFFFF' }}>{currentSelectedPlan.planName}</h2>
+                
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => setIsPlanModalOpen(true)} 
+                  style={{ 
+                    padding: '3px 10px', 
+                    fontSize: '0.72rem', 
+                    fontWeight: 800, 
+                    borderColor: isViewingPastPlan ? '#ff9100' : 'var(--accent)',
+                    color: isViewingPastPlan ? '#ff9100' : 'var(--accent)'
+                  }}
+                >
+                  View All Plans 🔄
+                </Button>
+              </div>
+            </div>
+
+            <div style={{ textAlign: 'right', backgroundColor: isViewingPastPlan ? 'rgba(255, 145, 0, 0.12)' : 'rgba(224, 0, 8, 0.12)', padding: '6px 12px', borderRadius: '10px', border: isViewingPastPlan ? '1px solid rgba(255, 145, 0, 0.3)' : '1px solid rgba(224, 0, 8, 0.25)' }}>
+              <div style={{ fontSize: '1.2rem', fontWeight: 900, color: isViewingPastPlan ? '#ff9100' : 'var(--accent, #E00008)', lineHeight: '1' }}>
+                {daysRemaining}
+              </div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.68rem', marginTop: '2px', fontWeight: 700 }}>
+                {isViewingPastPlan ? 'Days Total' : 'Days Remaining'}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.78rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Membership Duration Progress</span>
+              <strong style={{ color: '#FFFFFF' }}>{Math.round(progressPercentage)}%</strong>
+            </div>
+            <div style={{ height: '6px', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '10px', overflow: 'hidden' }}>
+              <div style={{ 
+                width: `${progressPercentage}%`, 
+                height: '100%', 
+                backgroundColor: isViewingPastPlan ? '#ff9100' : 'var(--accent, #E00008)',
+                borderRadius: '10px',
+                transition: 'width 0.8s ease-in-out',
+                boxShadow: isViewingPastPlan ? '0 0 10px rgba(255, 145, 0, 0.6)' : '0 0 10px rgba(224, 0, 8, 0.6)'
+              }} />
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <Card style={{ padding: '16px', textAlign: 'center', backgroundColor: 'var(--card)', border: '1px dashed var(--border)', borderRadius: '16px' }}>
+          <ActivitySquare size={24} color="var(--text-secondary)" style={{ marginBottom: '6px' }} />
+          <h3 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#FFFFFF' }}>No Active Plan Assigned</h3>
+          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+            Contact Head Coach Radha Krishna Maram to assign your customized membership plan.
+          </p>
+        </Card>
+      )}
+
+      {/* 3. TODAY'S DASHBOARD TASKS GRID */}
+      {totalEnabledTasks > 0 && (
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ fontSize: '0.98rem', fontWeight: 800, margin: 0, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              Today's Program Checklist
+            </h3>
+            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: tasksPercent === 100 ? '#00c853' : 'var(--accent)' }}>
+              {tasksPercent}% Completed
+            </span>
+          </div>
+
+          <div style={{ height: '6px', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '10px', overflow: 'hidden' }}>
+            <div style={{ 
+              width: `${tasksPercent}%`, 
+              height: '100%', 
+              backgroundColor: tasksPercent === 100 ? '#00c853' : 'var(--accent)',
+              borderRadius: '10px',
+              transition: 'width 0.8s ease-in-out'
+            }} />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(totalEnabledTasks, 3)}, 1fr)`, gap: '10px' }}>
+            {planFeatures.hasDiet && (
+              <Link href="/client/diet" style={{ textDecoration: 'none' }}>
+                <Card style={{ padding: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '8px', borderRadius: '14px' }} className="glass-card">
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: isDietDone ? 'rgba(0, 200, 83, 0.15)' : 'rgba(255, 255, 255, 0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Utensils size={18} color={isDietDone ? '#00c853' : 'var(--accent)'} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#FFFFFF', marginBottom: '2px' }}>Diet Plan</div>
+                    <div style={{ fontSize: '0.72rem', color: isDietDone ? '#00c853' : 'var(--text-secondary)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                      {isDietDone ? <CheckCircle2 size={12} color="#00c853" /> : <Circle size={12} />}
+                      {isDietDone ? 'Submitted' : 'Pending'}
+                    </div>
+                  </div>
+                </Card>
+              </Link>
+            )}
+
+            {planFeatures.hasWorkout && (
+              <Link href="/client/workout" style={{ textDecoration: 'none' }}>
+                <Card style={{ padding: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '8px', borderRadius: '14px' }} className="glass-card">
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: isWorkoutDone ? 'rgba(0, 200, 83, 0.15)' : 'rgba(255, 255, 255, 0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Dumbbell size={18} color={isWorkoutDone ? '#00c853' : '#448aff'} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#FFFFFF', marginBottom: '2px' }}>Workout</div>
+                    <div style={{ fontSize: '0.72rem', color: isWorkoutDone ? '#00c853' : 'var(--text-secondary)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                      {isWorkoutDone ? <CheckCircle2 size={12} color="#00c853" /> : <Circle size={12} />}
+                      {isWorkoutDone ? 'Completed' : 'Pending'}
+                    </div>
+                  </div>
+                </Card>
+              </Link>
+            )}
+
+            {planFeatures.hasTracking && (
+              <Link href="/client/daily-log" style={{ textDecoration: 'none' }}>
+                <Card style={{ padding: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '8px', borderRadius: '14px' }} className="glass-card">
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: isTrackingDone ? 'rgba(0, 200, 83, 0.15)' : 'rgba(255, 255, 255, 0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Activity size={18} color={isTrackingDone ? '#00c853' : '#ffb300'} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#FFFFFF', marginBottom: '2px' }}>Activity</div>
+                    <div style={{ fontSize: '0.72rem', color: isTrackingDone ? '#00c853' : 'var(--text-secondary)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                      {isTrackingDone ? <CheckCircle2 size={12} color="#00c853" /> : <Circle size={12} />}
+                      {isTrackingDone ? 'Logged' : 'Pending'}
+                    </div>
+                  </div>
+                </Card>
+              </Link>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* 4. DAILY ACTIVITY METRICS SUMMARY */}
+      {planFeatures.hasTracking && (
+        <section>
+          <Card style={{ padding: '16px', borderRadius: '16px' }} className="glass-card">
+            <h3 style={{ fontSize: '0.98rem', fontWeight: 800, margin: '0 0 14px 0', color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Activity size={16} color="var(--accent)" /> Daily Activity & Workout Metrics
+            </h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+              {/* Steps Metric */}
+              <div style={{ padding: '12px', backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: profile?.targetSteps ? '6px' : '0' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    👟 Daily Steps
+                  </span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#4dabf7' }}>
+                    {steps ? Number(steps).toLocaleString() : '0'}{profile?.targetSteps ? ` / ${Number(profile.targetSteps).toLocaleString()} steps` : ' steps'}
+                  </span>
+                </div>
+                {profile?.targetSteps && (
+                  <div style={{ height: '5px', backgroundColor: 'rgba(255, 255, 255, 0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ width: `${Math.min(100, (steps / profile.targetSteps) * 100)}%`, height: '100%', backgroundColor: '#4dabf7', borderRadius: '4px' }} />
+                  </div>
+                )}
+              </div>
+
+              {/* Water Intake Metric */}
+              <div style={{ padding: '12px', backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: profile?.targetWater ? '6px' : '0' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Droplets size={14} color="#0288d1" /> Water Intake
+                  </span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0288d1' }}>
+                    {water ? `${water} L` : '0 L'}{profile?.targetWater ? ` / ${profile.targetWater} L` : ''}
+                  </span>
+                </div>
+                {profile?.targetWater && (
+                  <div style={{ height: '5px', backgroundColor: 'rgba(255, 255, 255, 0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ width: `${Math.min(100, (water / profile.targetWater) * 100)}%`, height: '100%', backgroundColor: '#0288d1', borderRadius: '4px' }} />
+                  </div>
+                )}
+              </div>
+
+              {/* Workout Weight */}
+              <div style={{ padding: '12px', backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Dumbbell size={14} color="#00c853" /> Workout Weight Lifted
+                  </span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#00c853' }}>
+                    {workoutWeight ? `${workoutWeight} kg` : '--'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Sleep Duration */}
+              <div style={{ padding: '12px', backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Moon size={14} color="#7c4dff" /> Sleep Duration
+                  </span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#7c4dff' }}>
+                    {sleepHours ? `${sleepHours} hrs` : '--'}
+                  </span>
+                </div>
+              </div>
+            </div>
           </Card>
-        )}
-      </section>
+        </section>
+      )}
 
-      {/* 2. Today's Tasks */}
-      <section style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ fontSize: '0.95rem', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-            Today's Tasks
-          </h3>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: tasksPercent === 100 ? '#00c853' : 'var(--accent)' }}>
-            {tasksPercent}% Completed
-          </span>
-        </div>
-
-        {/* Task Completion Progress Bar */}
-        <div style={{ height: '6px', backgroundColor: 'var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
-          <div style={{ 
-            width: `${tasksPercent}%`, 
-            height: '100%', 
-            backgroundColor: tasksPercent === 100 ? '#00c853' : 'var(--accent)',
-            borderRadius: '10px',
-            transition: 'width 0.8s ease-in-out',
-            boxShadow: tasksPercent === 100 ? '0 0 10px rgba(0, 200, 83, 0.6)' : '0 0 10px rgba(224, 0, 8, 0.5)'
-          }} />
-        </div>
-
-        {/* 3-Column Task Cards Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-          <Link href="/client/diet" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <Card style={{ 
-              padding: '10px', 
-              display: 'flex', 
-              flexDirection: 'column',
-              alignItems: 'center', 
-              textAlign: 'center',
-              gap: '6px',
-              borderRadius: '12px'
-            }}>
-              <div style={{ 
-                width: '32px', height: '32px', borderRadius: '8px', 
-                backgroundColor: isDietDone ? 'rgba(0, 200, 83, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-                <span style={{ fontSize: '14px' }}>🥗</span>
-              </div>
-              <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
-                <div style={{ fontWeight: '600', fontSize: '0.78rem', marginBottom: '2px' }}>Diet</div>
-                <div style={{ fontSize: '0.7rem', color: isDietDone ? 'var(--success)' : 'var(--warning)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
-                  {isDietDone ? <CheckCircle2 size={12} color="var(--success)" /> : <Circle size={12} color="var(--warning)" />}
-                  {isDietDone ? 'Done' : 'Pending'}
-                </div>
-              </div>
-            </Card>
-          </Link>
-
-          <Link href="/client/workout" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <Card style={{ 
-              padding: '10px', 
-              display: 'flex', 
-              flexDirection: 'column',
-              alignItems: 'center', 
-              textAlign: 'center',
-              gap: '6px',
-              borderRadius: '12px'
-            }}>
-              <div style={{ 
-                width: '32px', height: '32px', borderRadius: '8px', 
-                backgroundColor: isWorkoutDone ? 'rgba(0, 200, 83, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-                <span style={{ fontSize: '14px' }}>💪</span>
-              </div>
-              <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
-                <div style={{ fontWeight: '600', fontSize: '0.78rem', marginBottom: '2px' }}>Workout</div>
-                <div style={{ fontSize: '0.7rem', color: isWorkoutDone ? 'var(--success)' : 'var(--warning)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
-                  {isWorkoutDone ? <CheckCircle2 size={12} color="var(--success)" /> : <Circle size={12} color="var(--warning)" />}
-                  {isWorkoutDone ? 'Done' : 'Pending'}
-                </div>
-              </div>
-            </Card>
-          </Link>
-
-          <Link href="/client/daily-log" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <Card style={{ 
-              padding: '10px', 
-              display: 'flex', 
-              flexDirection: 'column',
-              alignItems: 'center', 
-              textAlign: 'center',
-              gap: '6px',
-              borderRadius: '12px'
-            }}>
-              <div style={{ 
-                width: '32px', height: '32px', borderRadius: '8px', 
-                backgroundColor: isTrackingDone ? 'rgba(0, 200, 83, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-                <span style={{ fontSize: '14px' }}>📝</span>
-              </div>
-              <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
-                <div style={{ fontWeight: '600', fontSize: '0.78rem', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Tracking</div>
-                <div style={{ fontSize: '0.7rem', color: isTrackingDone ? 'var(--success)' : 'var(--warning)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
-                  {isTrackingDone ? <CheckCircle2 size={12} color="var(--success)" /> : <Circle size={12} color="var(--warning)" />}
-                  {isTrackingDone ? 'Done' : 'Pending'}
-                </div>
-              </div>
-            </Card>
-          </Link>
-        </div>
-      </section>
-
-      {/* 3. Activity Section */}
+      {/* 5. WEIGHT TREND ANALYTICS */}
       <section>
-        <Card style={{ padding: '14px', borderRadius: '12px' }}>
-          <h3 style={{ fontSize: '0.95rem', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Activity size={16} color="var(--accent)" /> Daily Activity
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            
-            {/* Steps */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '14px' }}>👣</span>
-                  <span style={{ fontSize: '0.8rem' }}>Steps</span>
-                </div>
-                <div style={{ fontSize: '0.8rem' }}>
-                  <span style={{ fontWeight: 'bold' }}>{steps}</span> <span style={{ color: 'var(--text-secondary)' }}>/ {stepsTarget}</span>
-                </div>
-              </div>
-              <div style={{ height: '4px', backgroundColor: 'var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ width: `${stepsPercent}%`, height: '100%', backgroundColor: '#4dabf7', borderRadius: '4px' }} />
-              </div>
-            </div>
-
-            {/* Water */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Droplets size={14} color="#4dabf7" />
-                  <span style={{ fontSize: '0.8rem' }}>Water</span>
-                </div>
-                <div style={{ fontSize: '0.8rem' }}>
-                  <span style={{ fontWeight: 'bold' }}>{water}L</span> <span style={{ color: 'var(--text-secondary)' }}>/ {waterTarget}L</span>
-                </div>
-              </div>
-              <div style={{ height: '4px', backgroundColor: 'var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ width: `${waterPercent}%`, height: '100%', backgroundColor: '#4dabf7', borderRadius: '4px' }} />
-              </div>
-            </div>
-
-            {/* Sleep */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Moon size={14} color="#9775fa" />
-                  <span style={{ fontSize: '0.8rem' }}>Sleep</span>
-                </div>
-                <div style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
-                  {sleepHours} <span style={{ color: 'var(--text-secondary)', fontWeight: 'normal' }}>h</span>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </Card>
-      </section>
-
-      {/* 4. Wellness Section */}
-      <section>
-        <Card style={{ padding: '14px', borderRadius: '12px' }}>
-          <h3 style={{ fontSize: '0.95rem', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Heart size={16} color="#ff8787" /> Wellness
-          </h3>
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'space-between' }}>
-            
-            <div style={{ flex: '1', background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '10px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Zap size={12} /> Energy
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <div style={{ 
-                  width: '6px', height: '6px', borderRadius: '50%', 
-                  backgroundColor: todayLog?.energyLevel === 'High' ? 'var(--success)' : todayLog?.energyLevel === 'Medium' ? 'var(--warning)' : '#ff6b6b' 
-                }} />
-                <span style={{ fontWeight: '500', fontSize: '0.85rem' }}>{todayLog?.energyLevel || '--'}</span>
-              </div>
-            </div>
-
-            <div style={{ flex: '1', background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '10px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Smile size={12} /> Mood
-              </div>
-              <div style={{ fontWeight: '500', fontSize: '0.85rem' }}>
-                {todayLog?.mood ? `${todayLog.mood}` : '--'}
-              </div>
-            </div>
-
-            <div style={{ flex: '1', background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '10px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Moon size={12} /> Quality
-              </div>
-              <div style={{ fontWeight: '500', fontSize: '0.85rem' }}>
-                {todayLog?.sleepQuality || '--'}
-              </div>
-            </div>
-
-          </div>
-        </Card>
-      </section>
-
-      {/* 5. Mini Weight Trend Chart */}
-      <section>
-        <Card style={{ padding: '14px', borderRadius: '12px' }}>
+        <Card style={{ padding: '16px', borderRadius: '16px' }} className="glass-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
             <div>
-              <h3 style={{ fontSize: '0.95rem', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <TrendingUp size={16} color="var(--accent)" /> Weight Trend
+              <h3 style={{ fontSize: '0.98rem', fontWeight: 800, margin: '0 0 2px 0', color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <TrendingUp size={16} color="var(--accent)" /> Weight Progress Trend
               </h3>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                {isViewingPastPlan ? 'Historical weight logs for selected past plan' : 'Weight updates logged for current active plan'}
+              </p>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{latestWeight} <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'normal' }}>kg</span></div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#FFFFFF' }}>
+                {latestWeight} <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'normal' }}>kg</span>
+              </div>
             </div>
           </div>
           
-          <div style={{ height: '150px', width: '100%', marginLeft: '-20px' }}>
+          <div style={{ height: '160px', width: '100%', marginLeft: '-20px' }}>
             {chartData.length > 1 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3}/>
+                      <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.35}/>
                       <stop offset="95%" stopColor="var(--accent)" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a30" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
                   <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={10} tickLine={false} axisLine={false} />
                   <YAxis domain={['dataMin - 2', 'dataMax + 2']} stroke="var(--text-secondary)" fontSize={10} tickLine={false} axisLine={false} />
                   <Tooltip 
-                    contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '10px', padding: '6px' }}
+                    contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '11px', padding: '6px' }}
                     itemStyle={{ color: 'var(--accent)' }}
                   />
                   <Area type="monotone" dataKey="weight" stroke="var(--accent)" strokeWidth={2} fillOpacity={1} fill="url(#colorWeight)" />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                Not enough data
+              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                Submit check-ins to track your weight progress line.
               </div>
             )}
           </div>
         </Card>
       </section>
 
-      {/* 6. Quick Actions */}
-      <section>
-        <h3 style={{ fontSize: '0.95rem', marginBottom: '10px' }}>Quick Actions</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-          <Link href="/client/daily-log" style={{ textDecoration: 'none' }}>
-            <div style={{ 
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '12px', padding: '10px',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-              transition: 'all 0.2s', cursor: 'pointer', textAlign: 'center'
-            }}>
-              <span style={{ fontSize: '16px' }}>📝</span>
-              <div style={{ fontWeight: '500', fontSize: '0.75rem' }}>Log Day</div>
-            </div>
-          </Link>
-          
-          <Link href="/client/checkin" style={{ textDecoration: 'none' }}>
-            <div style={{ 
-              background: 'linear-gradient(135deg, rgba(224,0,8,0.1) 0%, rgba(255,255,255,0.01) 100%)',
-              border: '1px solid rgba(224,0,8,0.2)',
-              borderRadius: '12px', padding: '10px',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-              transition: 'all 0.2s', cursor: 'pointer', textAlign: 'center'
-            }}>
-              <span style={{ fontSize: '16px' }}>📸</span>
-              <div style={{ fontWeight: '500', fontSize: '0.75rem' }}>Check-in</div>
-            </div>
-          </Link>
+      {/* 6. 10-DAY POSTURE CHECK-IN QUICK ACTION */}
+      {hasPostureCheckin && (
+        <section>
+          <Card style={{ padding: '16px', borderRadius: '16px', borderLeft: '4px solid var(--accent, #E00008)' }} className="glass-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '12px', backgroundColor: 'rgba(224, 0, 8, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Camera size={20} color="var(--accent, #E00008)" />
+                </div>
+                <div>
+                  <h3 style={{ margin: '0 0 2px 0', fontSize: '0.95rem', fontWeight: 800, color: '#FFFFFF' }}>
+                    10-Day Body Posture & Sizing Check-in
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                    {isCheckinLocked 
+                      ? `Next check-in unlocks in ${checkinDaysLeft} day(s)` 
+                      : 'Your 10-day posture photo check-in is ready to submit!'}
+                  </p>
+                </div>
+              </div>
 
-          <Link href="/client/history" style={{ textDecoration: 'none' }}>
-            <div style={{ 
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '12px', padding: '10px',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-              transition: 'all 0.2s', cursor: 'pointer', textAlign: 'center'
-            }}>
-              <span style={{ fontSize: '16px' }}>📊</span>
-              <div style={{ fontWeight: '500', fontSize: '0.75rem' }}>History</div>
+              <Link href="/client/daily-log" style={{ textDecoration: 'none' }}>
+                <Button size="sm" style={{ padding: '8px 16px', fontSize: '0.82rem' }}>
+                  {isCheckinLocked ? 'View History' : 'Submit Check-in'} <ChevronRight size={16} />
+                </Button>
+              </Link>
             </div>
-          </Link>
-        </div>
-      </section>
+          </Card>
+        </section>
+      )}
+
+      {/* 7. ALL MEMBERSHIP PLANS & HISTORY POPUP MODAL */}
+      {isPlanModalOpen && (
+        <Modal 
+          isOpen={isPlanModalOpen} 
+          onClose={() => setIsPlanModalOpen(false)} 
+          title="My Membership Plans & History"
+          size="lg"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <p style={{ margin: '0 0 4px 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              Select any membership plan below to switch your dashboard view and inspect historical workout splits, diet plans, and check-in photos.
+            </p>
+
+            {clientPlansHistory.length === 0 ? (
+              <Card style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                No membership plan history recorded yet.
+              </Card>
+            ) : (
+              clientPlansHistory.map((planItem, idx) => {
+                const isSelected = idx === selectedPlanIndex;
+                const isCurrentActive = idx === 0;
+                const feats = planItem.planFeatures || {};
+
+                return (
+                  <Card 
+                    key={idx}
+                    onClick={() => {
+                      setSelectedPlanIndex(idx);
+                      setIsPlanModalOpen(false);
+                    }}
+                    style={{
+                      padding: '14px',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      backgroundColor: isSelected ? 'rgba(224, 0, 8, 0.1)' : 'var(--card)',
+                      border: isSelected ? '2px solid var(--accent, #E00008)' : '1px solid var(--border)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Badge variant={isCurrentActive ? 'success' : 'warning'}>
+                          {isCurrentActive ? '🟢 ACTIVE PLAN' : '📁 PAST PLAN'}
+                        </Badge>
+                        <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#FFFFFF' }}>
+                          {planItem.planName || planItem.name}
+                        </h4>
+                      </div>
+
+                      {isSelected ? (
+                        <Badge variant="success" style={{ padding: '4px 10px', fontSize: '0.72rem' }}>
+                          ✓ Currently Inspecting Dashboard
+                        </Badge>
+                      ) : (
+                        <Button size="sm" variant="outline" style={{ fontSize: '0.72rem', padding: '4px 10px' }}>
+                          Switch to Plan ⚡
+                        </Button>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                      <span>🗓️ Duration: <strong>{planItem.planStart || 'Start'}</strong> to <strong>{planItem.planExpiry || 'Expiry'}</strong></span>
+                      {planItem.amountPaid !== undefined && <span>💰 Paid: <strong>₹{planItem.amountPaid}</strong></span>}
+                    </div>
+
+                    {/* Feature Badges */}
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+                      <Badge variant={feats.hasDiet !== false ? 'info' : 'outline'} style={{ fontSize: '0.65rem' }}>
+                        {feats.hasDiet !== false ? '✓ Diet Plan' : '✗ No Diet'}
+                      </Badge>
+                      <Badge variant={feats.hasWorkout !== false ? 'info' : 'outline'} style={{ fontSize: '0.65rem' }}>
+                        {feats.hasWorkout !== false ? '✓ Workout Split' : '✗ No Workout'}
+                      </Badge>
+                      <Badge variant={feats.hasTracking !== false ? 'info' : 'outline'} style={{ fontSize: '0.65rem' }}>
+                        {feats.hasTracking !== false ? '✓ Daily Activity' : '✗ No Activity'}
+                      </Badge>
+                      <Badge variant={feats.hasPostureCheckin === true ? 'danger' : 'outline'} style={{ fontSize: '0.65rem' }}>
+                        {feats.hasPostureCheckin === true ? '📸 10-Day Posture Photos' : '✗ No Posture'}
+                      </Badge>
+                    </div>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+        </Modal>
+      )}
 
     </div>
   );

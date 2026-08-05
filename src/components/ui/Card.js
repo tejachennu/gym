@@ -17,13 +17,13 @@ const Card = ({
   const [isHovered, setIsHovered] = useState(false);
 
   const cardStyle = {
-    backgroundColor: '#121214',
-    borderRadius: '20px',
-    border: '1px solid #2a2a30',
+    backgroundColor: 'var(--card)',
+    borderRadius: 'var(--radius)',
+    border: '1px solid var(--border)',
     padding: padding,
     transition: 'all 0.3s ease',
     transform: isHovered && hoverable ? 'translateY(-4px)' : 'translateY(0)',
-    boxShadow: isHovered && hoverable ? '0 10px 30px rgba(0,0,0,0.5)' : 'none',
+    boxShadow: isHovered && hoverable ? 'var(--shadow-card)' : 'none',
     cursor: hoverable || onClick ? 'pointer' : 'default',
     ...style
   };
@@ -39,8 +39,8 @@ const Card = ({
     width: '40px',
     height: '40px',
     borderRadius: '12px',
-    backgroundColor: 'rgba(224, 0, 8, 0.1)',
-    color: '#E00008',
+    backgroundColor: 'var(--accent-surface)',
+    color: 'var(--accent)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -48,14 +48,14 @@ const Card = ({
   };
 
   const titleStyle = {
-    color: '#FFFFFF',
+    color: 'var(--text)',
     fontSize: '18px',
     fontWeight: '600',
     margin: 0
   };
 
   const subtitleStyle = {
-    color: '#AAAAAA',
+    color: 'var(--text-secondary)',
     fontSize: '14px',
     margin: '4px 0 0 0'
   };

@@ -1,4 +1,5 @@
 'use client';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { loginUser, registerUser, resetPassword } from '@/lib/auth';
@@ -65,11 +66,7 @@ export default function LoginPage() {
       const targetRole = email.toLowerCase().includes('admin') ? '/admin' : '/client';
       window.location.href = targetRole;
     } catch (err) {
-      if (err.message?.includes('PASSWORD_LOGIN_DISABLED') || err.code === 'auth/operation-not-allowed') {
-        toast.error('Email/Password login is not enabled in Firebase Console!');
-      } else {
-        toast.error(err.message || 'Login failed');
-      }
+      toast.error(err);
     } finally {
       setLoading(false);
     }
@@ -85,7 +82,7 @@ export default function LoginPage() {
       setShowReset(false);
       setResetEmail('');
     } catch (err) {
-      toast.error(err.message || 'Failed to send password reset email');
+      toast.error(err);
     }
   };
 
@@ -105,14 +102,14 @@ export default function LoginPage() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'radial-gradient(circle at center, #1a1a1e 0%, var(--bg) 100%)',
-      padding: '20px'
+      background: 'radial-gradient(circle at center, var(--card-hover) 0%, var(--bg) 100%)',
+      padding: '16px'
     }}>
-      <Card style={{ width: '100%', maxWidth: '420px', padding: '36px 24px', textAlign: 'center', borderRadius: '16px' }} className="glass-card">
-        <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: '55px', width: 'auto', objectFit: 'contain', marginBottom: '10px' }} />
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.825rem', marginBottom: '24px' }}>Radha Krishna Maram — Management Portal</p>
+      <Card style={{ width: '100%', maxWidth: '380px', padding: '24px 20px', textAlign: 'center', borderRadius: '14px' }} className="glass-card">
+        <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: '42px', width: 'auto', objectFit: 'contain', marginBottom: '8px' }} />
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', marginBottom: '18px' }}>Radha Krishna Maram — Management Portal</p>
         
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <Input 
             type="email" 
             placeholder="Email Address" 
@@ -129,34 +126,32 @@ export default function LoginPage() {
             required 
             icon="🔒"
           />
-          <div style={{ textAlign: 'right', marginTop: '-4px' }}>
-            <span style={{ color: 'var(--accent)', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => setShowReset(true)}>
+          <div style={{ textAlign: 'right', marginTop: '-2px' }}>
+            <span style={{ color: 'var(--accent)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => setShowReset(true)}>
               Forgot password?
             </span>
           </div>
           <Button type="submit" loading={loading} style={{ backgroundColor: 'var(--accent)', color: 'white', marginTop: '4px', fontWeight: 800 }}>
-            Sign In
+            Submit Sign In
           </Button>
         </form>
 
-        {/* Quick Demo Autofill Section */}
-        <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-          <p style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>⚡ Quick Demo Logins</p>
-          <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border)' }}>
+          <p style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>⚡ Quick Demo Logins</p>
+          <div style={{ display: 'flex', gap: '6px' }}>
             <button 
               type="button" 
               onClick={fillDemoAdmin}
               style={{
                 flex: 1,
-                padding: '8px 10px',
-                borderRadius: '8px',
-                border: '1px solid rgba(224, 0, 8, 0.4)',
-                backgroundColor: 'rgba(224, 0, 8, 0.15)',
-                color: 'white',
-                fontSize: '0.8rem',
+                padding: '6px 8px',
+                borderRadius: '6px',
+                border: '1px solid var(--accent)',
+                backgroundColor: 'var(--accent-surface)',
+                color: 'var(--text)',
+                fontSize: '0.75rem',
                 fontWeight: 700,
                 cursor: 'pointer',
-                transition: 'all 0.2s'
               }}
             >
               👑 Fill Admin
@@ -166,15 +161,14 @@ export default function LoginPage() {
               onClick={fillDemoClient}
               style={{
                 flex: 1,
-                padding: '8px 10px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                color: 'white',
-                fontSize: '0.8rem',
+                padding: '6px 8px',
+                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                backgroundColor: 'var(--card-hover)',
+                color: 'var(--text)',
+                fontSize: '0.75rem',
                 fontWeight: 700,
                 cursor: 'pointer',
-                transition: 'all 0.2s'
               }}
             >
               🏋️ Fill Client
@@ -182,7 +176,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div style={{ marginTop: '18px', fontSize: '0.85rem' }}>
+        <div style={{ marginTop: '14px', fontSize: '0.8rem' }}>
           <span style={{ color: 'var(--text-secondary)' }}>Don't have an account? </span>
           <Link href="/register" style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>Register</Link>
         </div>
@@ -196,8 +190,8 @@ export default function LoginPage() {
             value={resetEmail} 
             onChange={(e) => setResetEmail(e.target.value)} 
           />
-          <Button onClick={handleReset} style={{ marginTop: '15px', width: '100%', backgroundColor: 'var(--accent)', color: 'white' }}>
-            Send Reset Link
+          <Button onClick={handleReset} style={{ marginTop: '12px', width: '100%', backgroundColor: 'var(--accent)', color: 'white' }}>
+            Submit Reset Link
           </Button>
         </Modal>
       )}

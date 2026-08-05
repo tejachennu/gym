@@ -12,14 +12,31 @@ export default function StatsCard({
   icon: Icon,
   description,
   loading = false,
-  color = 'var(--accent, #E00008)'
+  color = 'var(--accent, #E00008)',
+  onClick,
+  isActive = false,
+  style = {}
 }) {
   if (loading) return <StatsSkeleton />;
 
   const isUp = changeType === 'up';
 
+  const cardStyle = {
+    padding: '12px 14px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    borderRadius: '14px',
+    cursor: onClick ? 'pointer' : 'default',
+    border: isActive ? `2px solid ${color}` : '1px solid var(--border)',
+    boxShadow: isActive ? `0 0 16px ${color}40` : 'var(--shadow-card)',
+    transform: isActive ? 'translateY(-2px)' : 'none',
+    transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+    ...style
+  };
+
   return (
-    <div style={styles.card} className="glass-card">
+    <div style={cardStyle} className="glass-card" onClick={onClick}>
       <div style={styles.header}>
         <span style={styles.title}>{title}</span>
         {Icon && (
@@ -55,13 +72,6 @@ export default function StatsCard({
 }
 
 const styles = {
-  card: {
-    padding: '12px 14px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-    borderRadius: '14px'
-  },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -71,7 +81,7 @@ const styles = {
   title: {
     fontSize: '0.72rem',
     fontWeight: 700,
-    color: 'var(--text-secondary, #AAAAAA)',
+    color: 'var(--text-secondary)',
     letterSpacing: '0.2px',
     textTransform: 'uppercase',
     overflow: 'hidden',
@@ -97,7 +107,7 @@ const styles = {
   value: {
     fontSize: '1.4rem',
     fontWeight: 900,
-    color: '#FFFFFF',
+    color: 'var(--text)',
     letterSpacing: '-0.02em',
     lineHeight: 1,
   },
@@ -113,6 +123,6 @@ const styles = {
   },
   description: {
     fontSize: '0.7rem',
-    color: 'var(--text-muted, #666666)',
+    color: 'var(--text-secondary)',
   },
 };

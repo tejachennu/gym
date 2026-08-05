@@ -1,0 +1,22 @@
+{
+  "name": "MRK FITNESS — Transform Your Body",
+  "short_name": "MRK FITNESS",
+  "description": "Personalized fitness coaching, strength training, fat-loss diets, and 10-day posture check-ins by Head Coach Radha Krishna Maram.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080808",
+  "theme_color": "#E00008",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/mrk-logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/mrk-logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

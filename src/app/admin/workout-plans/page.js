@@ -30,7 +30,8 @@ import {
   Edit, 
   Sparkles,
   Award,
-  BookOpen
+  BookOpen,
+  Send
 } from 'lucide-react';
 
 function formatDateNice(dateStr) {
@@ -544,9 +545,6 @@ export default function WorkoutPlansPage() {
               Create reusable workout routine templates for 1-click client assignment mapping.
             </p>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <Button variant="outline" onClick={handleSeedTemplates}>
-                🌱 Seed Templates
-              </Button>
               <Button onClick={() => {
                 setEditingTemplateId(null);
                 setTemplateForm({ templateName: '', description: '', exercises: [{ name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }] });
@@ -745,8 +743,8 @@ export default function WorkoutPlansPage() {
             <Button variant="outline" onClick={() => setIsWorkoutModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveClientWorkoutPlan} loading={saving} style={{ padding: '12px 28px' }}>
-              <Save size={18} /> Save Workout Plan for Client
+            <Button onClick={handleSaveClientWorkoutPlan} loading={saving} style={{ padding: '10px 24px' }}>
+              <Send size={15} /> Submit Workout Plan for Client
             </Button>
           </div>
         </div>
@@ -820,7 +818,7 @@ export default function WorkoutPlansPage() {
           </div>
 
           <Button type="submit" fullWidth loading={saving} style={{ marginTop: '10px' }}>
-            {editingTemplateId ? "Save Template Changes" : "Create Workout Template"}
+            <Send size={15} /> Submit Workout Template
           </Button>
         </form>
       </Modal>

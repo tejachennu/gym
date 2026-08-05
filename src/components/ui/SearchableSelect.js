@@ -69,7 +69,7 @@ export default function SearchableSelect({
             boxShadow: isOpen ? '0 0 0 1px var(--accent, #E00008), 0 0 12px rgba(224, 0, 8, 0.2)' : 'none',
           }}
         >
-          <span style={{ color: selectedOption ? '#FFFFFF' : 'var(--text-secondary, #AAAAAA)', fontSize: '0.95rem' }}>
+          <span style={{ color: selectedOption ? 'var(--text)' : 'var(--text-secondary)', fontSize: '0.85rem' }}>
             {selectedOption ? selectedOption.label : placeholder}
           </span>
           <ChevronDown size={18} style={{ color: 'var(--text-secondary)', marginLeft: 'auto' }} />
@@ -113,7 +113,7 @@ export default function SearchableSelect({
                         ...styles.optionRow,
                         backgroundColor: isSelected ? 'rgba(224, 0, 8, 0.15)' : 'transparent',
                       }}
-                      onMouseEnter={e => e.currentTarget.style.backgroundColor = isSelected ? 'rgba(224, 0, 8, 0.2)' : 'rgba(255,255,255,0.03)'}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = isSelected ? 'rgba(224, 0, 8, 0.2)' : 'var(--card-hover)'}
                       onMouseLeave={e => e.currentTarget.style.backgroundColor = isSelected ? 'rgba(224, 0, 8, 0.15)' : 'transparent'}
                     >
                       <div style={styles.optionDetails}>
@@ -172,7 +172,7 @@ const styles = {
     top: 'calc(100% + 6px)',
     left: 0,
     right: 0,
-    backgroundColor: '#121214',
+    backgroundColor: 'var(--card)',
     border: '1px solid var(--border, #2a2a30)',
     borderRadius: '16px',
     boxShadow: '0 20px 50px rgba(0, 0, 0, 0.9)',
@@ -186,7 +186,7 @@ const styles = {
     position: 'relative',
     display: 'flex',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: 'var(--card-hover)',
     borderRadius: '10px',
     border: '1px solid var(--border, #2a2a30)',
     padding: '0 12px',
@@ -198,7 +198,7 @@ const styles = {
     width: '100%',
     backgroundColor: 'transparent',
     border: 'none',
-    color: '#FFFFFF',
+    color: 'var(--text)',
     padding: '10px 8px',
     fontSize: '0.875rem',
     outline: 'none',
@@ -235,7 +235,7 @@ const styles = {
   optionName: {
     fontSize: '0.9rem',
     fontWeight: 600,
-    color: '#FFFFFF',
+    color: 'var(--text)',
   },
   optionMeta: {
     fontSize: '0.75rem',
@@ -251,6 +251,6 @@ const styles = {
   },
   errorText: {
     fontSize: '0.75rem',
-    color: '#ff1744',
+    color: 'var(--danger, #ff1744)',
   }
 };

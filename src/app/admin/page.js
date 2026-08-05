@@ -2,10 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { getAllClients, getClientDailyLogs } from '@/lib/firestore';
+import { getAllClients, getClientDailyLogs, getClientCheckins, getPlans } from '@/lib/firestore';
 import Card from '@/components/ui/Card';
 import StatsCard from '@/components/ui/StatsCard';
 import Button from '@/components/ui/Button';
+import Avatar from '@/components/ui/Avatar';
+import Modal from '@/components/ui/Modal';
+import Pagination from '@/components/ui/Pagination';
+import Badge from '@/components/ui/Badge';
+import { Input } from '@/components/ui/Input';
 import { StatsSkeleton, TableSkeleton } from '@/components/ui/Loading';
 import { useRouter } from 'next/navigation';
 import { 
@@ -16,12 +21,15 @@ import {
   AlertTriangle, 
   Calendar, 
   Plus, 
-  Bell, 
-  Flame, 
-  CheckCircle2, 
-  ArrowUpRight,
-  TrendingUp,
-  Sparkles
+  Sparkles,
+  Eye,
+  Camera,
+  Search,
+  ChevronRight,
+  CheckCircle2,
+  XCircle,
+  Wallet,
+  Receipt
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -35,8 +43,60 @@ export default function AdminDashboard() {
     activeMemberships: 0,
     expiringSoon: 0,
     upcomingCheckins: 0,
+    totalRevenue: 0,
+    pendingDues: 0,
+    paidMembers: 0,
   });
-  const [recentLogs, setRecentLogs] = useState([]);
+  
+  const [clientsList, setClientsList] = useState([]);
+  const [masterPlansList, setMasterPlansList] = useState([]);
+  const [logsMap, setLogsMap] = useState({}); // { client_id: { 'YYYY-MM-DD': logData } }
+  const [allLogs, setAllLogs] = useState([]);
+
+  // Selected Stat Card for rendering details below
+  const [selectedCard, setSelectedCard] = useState('upcomingCheckins');
+  const [cardSearch, setCardSearch] = useState('');
+  const [cardPage, setCardPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+
+  // Posture viewer modal state
+  const [selectedSubmission, setSelectedSubmission] = useState(null);
+
+  const checkPostureEnabled = (client, plansList = masterPlansList) => {
+    if (!client.currentPlan || client.currentPlan === 'None' || client.currentPlan === 'Not Assigned') {
+      return false;
+    }
+    if (client.planFeatures && typeof client.planFeatures.hasPostureCheckin === 'boolean') {
+      return client.planFeatures.hasPostureCheckin === true;
+    }
+    const clientPlanName = (client.currentPlan || '').toLowerCase();
+    const matchedPlan = (plansList || []).find(mp => {
+      const pName = (mp.plan_name || mp.name || '').toLowerCase();
+      return pName && clientPlanName.includes(pName);
+    });
+    if (matchedPlan && typeof matchedPlan.hasPostureCheckin === 'boolean') {
+      return matchedPlan.hasPostureCheckin === true;
+    }
+    return false;
+  };
+
+  // Generate 11-day dates window: [Today - 5, ..., Today, ..., Today + 5]
+  const generate11DaysWindow = () => {
+    const dates = [];
+    const today = new Date();
+    for (let i = -5; i <= 5; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const isoStr = d.toISOString().split('T')[0];
+      const dayLabel = i === 0 ? 'Today' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
+      dates.push({ isoStr, dayLabel, weekday, isToday: i === 0, isFuture: i > 0, isPast: i < 0 });
+    }
+    return dates;
+  };
+
+  const datesWindow = generate11DaysWindow();
+  const last5PastDays = datesWindow.slice(1, 6);
 
   useEffect(() => {
     fetchDashboardData();
@@ -45,10 +105,15 @@ export default function AdminDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const clients = await getAllClients();
+      const [clients, fetchedPlans] = await Promise.all([
+        getAllClients(),
+        getPlans()
+      ]);
+      setClientsList(clients);
+      setMasterPlansList(fetchedPlans || []);
       
       const total = clients.length;
-      const active = clients.filter(c => c.status === 'active').length;
+      const active = clients.filter(c => c.status === 'active' || (c.currentPlan && c.currentPlan !== 'None')).length;
       
       const now = new Date();
       const nextWeek = new Date();
@@ -59,17 +124,64 @@ export default function AdminDashboard() {
         return expiryDate > now && expiryDate <= nextWeek;
       }).length;
 
-      let allLogs = [];
-      for (const client of clients.slice(0, 10)) {
+      // Billing & Revenue Totals
+      const totalRev = clients.reduce((acc, c) => acc + (parseFloat(c.amountPaid) || 0), 0);
+      const totalPending = clients.reduce((acc, c) => acc + (parseFloat(c.balance) || 0), 0);
+      const paidCount = clients.filter(c => (parseFloat(c.balance) || 0) <= 0 && parseFloat(c.amountPaid || 0) > 0).length;
+
+      let logsListCombined = [];
+      const tempLogsMap = {};
+
+      for (const client of clients) {
         const logs = await getClientDailyLogs(client.id);
-        allLogs = [...allLogs, ...logs.map(log => ({ ...log, clientName: client.displayName || client.name || 'Unknown' }))];
+        const checkins = await getClientCheckins(client.id);
+        
+        tempLogsMap[client.id] = {};
+        
+        logs.forEach(log => {
+          if (log.date) {
+            const enriched = {
+              ...log,
+              type: 'daily-log',
+              clientId: client.id,
+              clientName: client.displayName || client.name || 'Client',
+              clientPhoto: client.photoURL || client.profileImage,
+              clientPhone: client.phone || '',
+              clientEmail: client.email || ''
+            };
+            tempLogsMap[client.id][log.date] = enriched;
+            logsListCombined.push(enriched);
+          }
+        });
+
+        checkins.forEach(chk => {
+          const chkDate = chk.createdAt?.toDate ? chk.createdAt.toDate().toISOString().split('T')[0] : (chk.date || '');
+          if (chkDate) {
+            const enriched = {
+              ...(tempLogsMap[client.id][chkDate] || {}),
+              ...chk,
+              type: 'checkin',
+              clientId: client.id,
+              clientName: client.displayName || client.name || 'Client',
+              clientPhoto: client.photoURL || client.profileImage,
+              clientPhone: client.phone || '',
+              clientEmail: client.email || ''
+            };
+            tempLogsMap[client.id][chkDate] = enriched;
+            logsListCombined.push(enriched);
+          }
+        });
       }
       
-      allLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
+      setLogsMap(tempLogsMap);
+      logsListCombined.sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+      setAllLogs(logsListCombined);
       
       const todayStr = new Date().toISOString().split('T')[0];
-      const todays = allLogs.filter(log => log.date === todayStr).length;
-      const pending = allLogs.filter(log => !log.reviewed).length;
+      const todays = logsListCombined.filter(log => log.date === todayStr).length;
+      const pending = logsListCombined.filter(log => !log.reviewed).length;
+
+      const upcomingCount = clients.filter(c => checkPostureEnabled(c, fetchedPlans || [])).length;
 
       setStats({
         totalClients: total,
@@ -77,10 +189,11 @@ export default function AdminDashboard() {
         pendingReviews: pending,
         activeMemberships: active,
         expiringSoon: expiring,
-        upcomingCheckins: Math.ceil(total * 0.3),
+        upcomingCheckins: upcomingCount,
+        totalRevenue: totalRev,
+        pendingDues: totalPending,
+        paidMembers: paidCount,
       });
-
-      setRecentLogs(allLogs.slice(0, 5));
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
     } finally {
@@ -88,15 +201,145 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleSeedData = async () => {
-    try {
-      const { seedPlans } = await import('@/lib/seedPlans');
-      await seedPlans();
-      await fetchDashboardData();
-    } catch (err) {
-      console.error(err);
+  const handleCardClick = (cardKey) => {
+    setSelectedCard(cardKey);
+    setCardPage(1);
+    setCardSearch('');
+  };
+
+  // Compute dataset for the selected Stat Card
+  const getCardDataset = () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const nextWeek = new Date();
+    nextWeek.setDate(now.getDate() + 7);
+
+    switch (selectedCard) {
+      case 'totalRevenue':
+        return clientsList.filter(c => parseFloat(c.amountPaid || 0) > 0);
+
+      case 'pendingDues':
+        return clientsList.filter(c => parseFloat(c.balance || 0) > 0);
+
+      case 'paidMembers':
+        return clientsList.filter(c => parseFloat(c.balance || 0) <= 0 && parseFloat(c.amountPaid || 0) > 0);
+
+      case 'todaysUploads':
+        return allLogs.filter(log => log.date === todayStr);
+
+      case 'pendingReviews':
+        return allLogs.filter(log => !log.reviewed);
+
+      case 'activeMemberships':
+        return clientsList.filter(c => c.status === 'active' || (c.currentPlan && c.currentPlan !== 'None'));
+
+      case 'expiringSoon':
+        return clientsList.filter(c => {
+          if (!c.planExpiry) return false;
+          const exp = new Date(c.planExpiry);
+          return exp > now && exp <= nextWeek;
+        });
+
+      case 'upcomingCheckins':
+        return clientsList
+          .filter(c => checkPostureEnabled(c, masterPlansList))
+          .map(c => {
+            const cLogs = logsMap[c.id] ? Object.values(logsMap[c.id]) : [];
+            const checkinLogs = cLogs.filter(l => l.type === 'checkin' || l.photos || l.measurements);
+            checkinLogs.sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+            
+            let lastDate = checkinLogs.length > 0 ? new Date(checkinLogs[0].date || checkinLogs[0].createdAt) : null;
+            if (!lastDate || isNaN(lastDate.getTime())) {
+              lastDate = c.createdAt?.seconds ? new Date(c.createdAt.seconds * 1000) : new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+            }
+            
+            const nextCheckinDate = new Date(lastDate);
+            nextCheckinDate.setDate(nextCheckinDate.getDate() + 10);
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const diffDays = Math.ceil((nextCheckinDate - today) / (1000 * 60 * 60 * 24));
+            
+            let dueStatus = '';
+            let dueVariant = 'success';
+            if (diffDays < 0) {
+              dueStatus = `Overdue by ${Math.abs(diffDays)} day(s)`;
+              dueVariant = 'danger';
+            } else if (diffDays === 0) {
+              dueStatus = 'Due Today 🔥';
+              dueVariant = 'warning';
+            } else {
+              dueStatus = `Due in ${diffDays} day(s)`;
+              dueVariant = 'success';
+            }
+
+            return {
+              ...c,
+              lastCheckinDateStr: lastDate ? lastDate.toISOString().split('T')[0] : 'None',
+              nextCheckinDateStr: nextCheckinDate.toISOString().split('T')[0],
+              diffDays,
+              dueStatus,
+              dueVariant
+            };
+          });
+
+      case 'totalClients':
+      default:
+        return clientsList;
     }
   };
+
+  const rawCardData = getCardDataset();
+
+  // Search filter
+  const filteredCardData = rawCardData.filter(item => {
+    if (!cardSearch.trim()) return true;
+    const q = cardSearch.toLowerCase().trim();
+    const name = (item.displayName || item.name || item.clientName || '').toLowerCase();
+    const email = (item.email || item.clientEmail || '').toLowerCase();
+    const phone = (item.phone || item.clientPhone || '').toLowerCase();
+    const plan = (item.currentPlan || item.planName || '').toLowerCase();
+    return name.includes(q) || email.includes(q) || phone.includes(q) || plan.includes(q);
+  });
+
+  // Pagination slice
+  const startIndex = (cardPage - 1) * itemsPerPage;
+  const paginatedCardData = filteredCardData.slice(startIndex, startIndex + itemsPerPage);
+
+  const getCardMeta = () => {
+    switch (selectedCard) {
+      case 'totalRevenue':
+        return { title: 'Total Revenue Collected', icon: Wallet, color: '#00c853' };
+
+      case 'pendingDues':
+        return { title: 'Pending Dues & Unpaid Balances', icon: Receipt, color: '#ff9100' };
+
+      case 'paidMembers':
+        return { title: 'Fully Paid Memberships', icon: CheckCircle2, color: '#00e676' };
+
+      case 'todaysUploads':
+        return { title: "Today's Submissions & Uploads", icon: Activity, color: '#29b6f6' };
+
+      case 'pendingReviews':
+        return { title: 'Pending Client Reviews', icon: Clock, color: '#ffd600' };
+
+      case 'activeMemberships':
+        return { title: 'Active Client Memberships', icon: CreditCard, color: '#00b0ff' };
+
+      case 'expiringSoon':
+        return { title: 'Memberships Expiring Soon', icon: AlertTriangle, color: '#ff1744' };
+
+      case 'upcomingCheckins':
+        return { title: 'Upcoming 10-Day Transformation Check-ins', icon: Calendar, color: '#ab47bc' };
+
+      case 'totalClients':
+      default:
+        return { title: 'All Registered Gym Clients', icon: Users, color: 'var(--accent, #E00008)' };
+    }
+  };
+
+  const currentCardMeta = getCardMeta();
+  const MetaIcon = currentCardMeta.icon;
 
   return (
     <div style={styles.container} className="animate-fade-up">
@@ -104,31 +347,25 @@ export default function AdminDashboard() {
       <header style={styles.header}>
         <div>
           <div style={styles.badgeRow}>
-            <span style={styles.badge}><Sparkles size={12} /> System Online</span>
+            <span style={styles.badge}><Sparkles size={12} /> System Active</span>
             <span style={styles.dateTag}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
           </div>
           <h1 style={styles.title}>
             Welcome back, <span style={{ color: 'var(--accent, #E00008)' }}>{userData?.displayName || 'Admin Trainer'}</span> 👋
           </h1>
-          <p style={styles.subtitle}>Here is your fitness ecosystem performance & client activity summary for today.</p>
+          <p style={styles.subtitle}>Click on any card below to render detailed client check-in dates & submission status indicators.</p>
         </div>
         <div style={styles.actions}>
-          <Button onClick={handleSeedData} variant="outline" size="sm" style={{ borderColor: 'var(--accent, #E00008)', color: 'var(--accent, #E00008)', fontSize: '0.78rem', padding: '4px 10px' }}>
-            🌱 Seed Data
-          </Button>
-          <Button onClick={() => router.push('/admin/clients')} size="sm" style={{ fontSize: '0.78rem', padding: '4px 10px' }}>
+          <Button onClick={() => router.push('/admin/clients')} size="sm">
             <Plus size={14} /> Add Client
-          </Button>
-          <Button variant="outline" onClick={() => router.push('/admin/notifications')} size="sm" style={{ fontSize: '0.78rem', padding: '4px 10px' }}>
-            <Bell size={14} /> Alert
           </Button>
         </div>
       </header>
 
-      {/* Stats Cards Row */}
+      {/* Interactive Stats Cards Grid (Clickable) */}
       {loading ? (
         <div style={styles.statsGrid}>
-          {Array.from({ length: 6 }).map((_, i) => (
+          {Array.from({ length: 9 }).map((_, i) => (
             <StatsSkeleton key={i} />
           ))}
         </div>
@@ -138,230 +375,380 @@ export default function AdminDashboard() {
             title="TOTAL CLIENTS" 
             value={stats.totalClients} 
             change="+12% this month" 
-            changeType="up"
+            changeType="up" 
             icon={Users} 
-            color="var(--accent, #E00008)"
+            color="var(--accent, #E00008)" 
+            onClick={() => handleCardClick('totalClients')}
+            isActive={selectedCard === 'totalClients'}
           />
           <StatsCard 
-            title="TODAY'S MEAL UPLOADS" 
+            title="TOTAL REVENUE" 
+            value={`₹${(stats.totalRevenue || 0).toLocaleString('en-IN')}`} 
+            change="Collected paid fees" 
+            changeType="up" 
+            icon={Wallet} 
+            color="#00c853" 
+            onClick={() => handleCardClick('totalRevenue')}
+            isActive={selectedCard === 'totalRevenue'}
+          />
+          <StatsCard 
+            title="PENDING DUES" 
+            value={`₹${(stats.pendingDues || 0).toLocaleString('en-IN')}`} 
+            change={stats.pendingDues > 0 ? "Unpaid balances" : "All dues cleared"} 
+            changeType={stats.pendingDues > 0 ? "down" : "up"} 
+            icon={Receipt} 
+            color="#ff9100" 
+            onClick={() => handleCardClick('pendingDues')}
+            isActive={selectedCard === 'pendingDues'}
+          />
+          <StatsCard 
+            title="PAID MEMBERS" 
+            value={stats.paidMembers} 
+            change="Cleared balance" 
+            changeType="up" 
+            icon={CheckCircle2} 
+            color="#00e676" 
+            onClick={() => handleCardClick('paidMembers')}
+            isActive={selectedCard === 'paidMembers'}
+          />
+          <StatsCard 
+            title="TODAY'S UPLOADS" 
             value={stats.todaysUploads} 
             change="Active submissions" 
-            changeType="up"
+            changeType="up" 
             icon={Activity} 
-            color="#29b6f6"
+            color="#29b6f6" 
+            onClick={() => handleCardClick('todaysUploads')}
+            isActive={selectedCard === 'todaysUploads'}
           />
           <StatsCard 
             title="PENDING REVIEWS" 
             value={stats.pendingReviews} 
             change={stats.pendingReviews > 0 ? "Requires review" : "All reviewed"} 
-            changeType={stats.pendingReviews > 0 ? "down" : "up"}
+            changeType={stats.pendingReviews > 0 ? "down" : "up"} 
             icon={Clock} 
-            color="#ffd600"
+            color="#ffd600" 
+            onClick={() => handleCardClick('pendingReviews')}
+            isActive={selectedCard === 'pendingReviews'}
           />
           <StatsCard 
             title="ACTIVE MEMBERSHIPS" 
             value={stats.activeMemberships} 
             change="Current members" 
-            changeType="up"
+            changeType="up" 
             icon={CreditCard} 
-            color="#00c853"
+            color="#00b0ff" 
+            onClick={() => handleCardClick('activeMemberships')}
+            isActive={selectedCard === 'activeMemberships'}
           />
           <StatsCard 
             title="EXPIRING SOON" 
             value={stats.expiringSoon} 
             change="Within 7 days" 
-            changeType="down"
+            changeType="down" 
             icon={AlertTriangle} 
-            color="#ff1744"
+            color="#ff1744" 
+            onClick={() => handleCardClick('expiringSoon')}
+            isActive={selectedCard === 'expiringSoon'}
           />
           <StatsCard 
             title="UPCOMING CHECK-INS" 
             value={stats.upcomingCheckins} 
             change="Transformation logs" 
-            changeType="up"
+            changeType="up" 
             icon={Calendar} 
-            color="#ab47bc"
+            color="#ab47bc" 
+            onClick={() => handleCardClick('upcomingCheckins')}
+            isActive={selectedCard === 'upcomingCheckins'}
           />
         </div>
       )}
 
-      {/* Main Section */}
-      <div style={styles.mainGrid}>
-        {/* Recent Client Activity Stream */}
-        <Card style={styles.activityCard} className="glass-card">
-          <div style={styles.cardHeader}>
-            <div style={styles.cardHeaderTitle}>
-              <Flame size={20} color="var(--accent, #E00008)" />
-              <h2 style={styles.cardTitle}>Recent Client Submissions</h2>
+      {/* DYNAMIC DETAILS TABLE SECTION (Renders based on selected Card) */}
+      <Card style={{ padding: '14px' }} className="glass-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '32px', height: '32px', borderRadius: '8px',
+              backgroundColor: `${currentCardMeta.color}15`,
+              border: `1px solid ${currentCardMeta.color}30`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <MetaIcon size={18} color={currentCardMeta.color} />
             </div>
-            <Button variant="ghost" size="sm" onClick={() => router.push('/admin/monitoring')}>
-              View All <ArrowUpRight size={14} />
-            </Button>
-          </div>
-
-          {loading ? (
-            <TableSkeleton rows={4} />
-          ) : recentLogs.length > 0 ? (
-            <div style={styles.logList}>
-              {recentLogs.map((log) => (
-                <div key={log.id} style={styles.logItem}>
-                  <div style={styles.logAvatar}>
-                    {log.clientName.charAt(0)}
-                  </div>
-                  <div style={styles.logDetails}>
-                    <div style={styles.logClientName}>{log.clientName}</div>
-                    <div style={styles.logMeta}>
-                      Submitted daily monitoring log for {log.date}
-                    </div>
-                  </div>
-                  <div style={styles.logStatus}>
-                    {log.reviewed ? (
-                      <span style={{ ...styles.statusTag, backgroundColor: 'rgba(0, 200, 83, 0.15)', color: '#00c853' }}>
-                        <CheckCircle2 size={12} /> Reviewed
-                      </span>
-                    ) : (
-                      <span style={{ ...styles.statusTag, backgroundColor: 'rgba(255, 214, 0, 0.15)', color: '#ffd600' }}>
-                        <Clock size={12} /> Pending Review
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div style={styles.emptyLogs}>
-              <Activity size={36} color="var(--text-muted, #666666)" />
-              <p style={{ color: 'var(--text-secondary)', marginTop: '8px', fontSize: '0.9rem' }}>
-                No recent daily logs found. Click <strong>Seed Sample Data</strong> above to populate sample logs.
+            <div>
+              <h2 style={{ fontSize: '1rem', fontWeight: 800, margin: 0, color: 'var(--text)' }}>
+                {currentCardMeta.title} ({filteredCardData.length})
+              </h2>
+              <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                Showing client details and status overview
               </p>
             </div>
-          )}
-        </Card>
-
-        {/* Quick Actions Panel */}
-        <Card style={styles.quickActionsCard} className="glass-card">
-          <h2 style={styles.cardTitle}>Quick Trainer Actions</h2>
-          <div style={styles.actionList}>
-            <button style={styles.actionItem} onClick={() => router.push('/admin/clients')}>
-              <div style={styles.actionIconWrapper}><Users size={18} color="var(--accent, #E00008)" /></div>
-              <div style={styles.actionText}>
-                <div style={styles.actionTitle}>Add New Client</div>
-                <div style={styles.actionSub}>Create profile & credentials</div>
-              </div>
-            </button>
-
-            <button style={styles.actionItem} onClick={() => router.push('/admin/diet-plans')}>
-              <div style={styles.actionIconWrapper}><Flame size={18} color="#29b6f6" /></div>
-              <div style={styles.actionText}>
-                <div style={styles.actionTitle}>Assign Diet Plan</div>
-                <div style={styles.actionSub}>Build 9 meal slots with macros</div>
-              </div>
-            </button>
-
-            <button style={styles.actionItem} onClick={() => router.push('/admin/workout-plans')}>
-              <div style={styles.actionIconWrapper}><TrendingUp size={18} color="#00c853" /></div>
-              <div style={styles.actionText}>
-                <div style={styles.actionTitle}>Assign Workout Plan</div>
-                <div style={styles.actionSub}>Sets, reps & exercise routines</div>
-              </div>
-            </button>
           </div>
-        </Card>
-      </div>
+
+          <Input 
+            placeholder="Search within this list..."
+            value={cardSearch}
+            onChange={(e) => { setCardSearch(e.target.value); setCardPage(1); }}
+            icon={<Search size={14} />}
+            containerStyle={{ width: '220px' }}
+          />
+        </div>
+
+        {/* Data Table */}
+        {loading ? (
+          <TableSkeleton rows={4} />
+        ) : paginatedCardData.length > 0 ? (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'var(--card-hover)' }}>
+                  <th style={{ padding: '10px', textAlign: 'left', color: 'var(--text-secondary)' }}>Client</th>
+                  <th style={{ padding: '10px', textAlign: 'left', color: 'var(--text-secondary)' }}>
+                    {selectedCard === 'upcomingCheckins' ? 'Next Check-in Date' : 'Contact / Code'}
+                  </th>
+                  <th style={{ padding: '10px', textAlign: 'left', color: 'var(--text-secondary)' }}>Plan / Category</th>
+                  <th style={{ padding: '10px', textAlign: 'left', color: 'var(--text-secondary)' }}>
+                    {['totalRevenue', 'pendingDues', 'paidMembers'].includes(selectedCard)
+                      ? 'Billing Financials'
+                      : (selectedCard === 'upcomingCheckins' ? '10-Day Posture Submissions' : 'Recent Submissions')}
+                  </th>
+                  <th style={{ padding: '10px', textAlign: 'right', color: 'var(--text-secondary)' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedCardData.map((item, idx) => {
+                  const clientName = item.displayName || item.name || item.clientName || 'Client';
+                  const photo = item.photoURL || item.profileImage || item.clientPhoto;
+                  const rawId = item.clientId || item.id;
+                  const clientId = typeof rawId === 'string' && rawId.includes('_') ? rawId.split('_')[0] : rawId;
+                  const code = item.clientCode || 'Member';
+
+                  return (
+                    <tr key={item.id || idx} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Avatar src={photo} name={clientName} size="sm" />
+                          <div>
+                            <span style={{ fontWeight: 700, color: 'var(--text)', display: 'block' }}>{clientName}</span>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{code}</span>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>
+                        {selectedCard === 'upcomingCheckins' ? (
+                          <div>
+                            <div style={{ fontWeight: 800, color: 'var(--text)', fontSize: '0.85rem' }}>
+                              📅 Next: {item.nextCheckinDateStr}
+                            </div>
+                            <Badge variant={item.dueVariant || 'success'} size="sm" style={{ marginTop: '2px' }}>
+                              {item.dueStatus}
+                            </Badge>
+                          </div>
+                        ) : (
+                          <div>
+                            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text)' }}>{code}</div>
+                            <div style={{ fontSize: '0.72rem' }}>{item.phone || item.clientPhone || item.email || '--'}</div>
+                          </div>
+                        )}
+                      </td>
+
+                      <td style={{ padding: '10px' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)' }}>
+                          {item.currentPlan || item.planName || item.type || 'Standard'}
+                        </span>
+                      </td>
+
+                      {/* BILLING / SUBMISSIONS COLUMN */}
+                      <td style={{ padding: '10px' }}>
+                        {['totalRevenue', 'pendingDues', 'paidMembers'].includes(selectedCard) ? (
+                          <div>
+                            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#00c853' }}>
+                              Paid: ₹{parseFloat(item.amountPaid || 0).toLocaleString('en-IN')}
+                            </div>
+                            {parseFloat(item.balance || 0) > 0 ? (
+                              <Badge variant="warning" size="sm" style={{ marginTop: '2px' }}>
+                                Balance Due: ₹{parseFloat(item.balance).toLocaleString('en-IN')}
+                              </Badge>
+                            ) : (
+                              <Badge variant="success" size="sm" style={{ marginTop: '2px' }}>
+                                ✓ Fully Cleared
+                              </Badge>
+                            )}
+                          </div>
+                        ) : (
+                          (() => {
+                            const cLogs = logsMap[clientId] ? Object.values(logsMap[clientId]) : [];
+                            const postureLogs = cLogs.filter(l => l.type === 'checkin' || l.photos || l.frontPhoto || l.backPhoto || l.sidePhoto || l.treadmillPhoto);
+                            postureLogs.sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+
+                            if (selectedCard === 'upcomingCheckins' || postureLogs.length > 0) {
+                              if (postureLogs.length === 0) {
+                                return (
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                                    No posture check-in submitted yet
+                                  </span>
+                                );
+                              }
+
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  {postureLogs.slice(0, 3).map((pLog, pIdx) => (
+                                    <Button
+                                      key={pIdx}
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setSelectedSubmission({ ...pLog, clientName })}
+                                      style={{ fontSize: '0.7rem', padding: '3px 8px' }}
+                                    >
+                                      📸 {pLog.date || 'Log'}
+                                    </Button>
+                                  ))}
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                {cLogs.length} total logs submitted
+                              </span>
+                            );
+                          })()
+                        )}
+                      </td>
+
+                      <td style={{ padding: '10px', textAlign: 'right' }}>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => router.push(`/admin/clients/${clientId}`)}
+                          style={{ fontSize: '0.75rem' }}
+                        >
+                          Manage <ChevronRight size={14} />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-secondary)' }}>
+            No records match the selected stat category or search filter.
+          </div>
+        )}
+
+        {/* Pagination Bar */}
+        {filteredCardData.length > itemsPerPage && (
+          <Pagination
+            currentPage={cardPage}
+            totalItems={filteredCardData.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={(page) => setCardPage(page)}
+          />
+        )}
+      </Card>
+
+      {/* POSTURE SUBMISSION MODAL */}
+      {selectedSubmission && (
+        <Modal
+          isOpen={!!selectedSubmission}
+          onClose={() => setSelectedSubmission(null)}
+          title={`10-Day Posture Submission: ${selectedSubmission.clientName}`}
+          size="lg"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Logged Date: <strong>{selectedSubmission.date}</strong>
+            </div>
+
+            {/* Posture Photos Grid */}
+            <div>
+              <h4 style={{ margin: '0 0 8px 0', fontSize: '0.88rem', color: 'var(--text)' }}>Submitted Posture Photos</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
+                {['frontPhoto', 'backPhoto', 'sidePhoto', 'treadmillPhoto'].map((photoKey, idx) => {
+                  const photoUrl = selectedSubmission[photoKey] || (selectedSubmission.photos ? selectedSubmission.photos[photoKey] : null);
+                  const labels = ['Front View', 'Back View', 'Side View', 'Treadmill / Active'];
+                  return (
+                    <div key={idx} style={{ textAlign: 'center', backgroundColor: 'var(--card)', padding: '6px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                      <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>{labels[idx]}</span>
+                      {photoUrl ? (
+                        <a href={photoUrl} target="_blank" rel="noopener noreferrer">
+                          <img src={photoUrl} alt={labels[idx]} style={{ width: '100%', height: '110px', objectFit: 'cover', borderRadius: '6px' }} />
+                        </a>
+                      ) : (
+                        <div style={{ height: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.03)', color: 'var(--text-secondary)', fontSize: '0.7rem', borderRadius: '6px' }}>
+                          Not Provided
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
     </div>
   );
 }
 
 const styles = {
-  container: { display: 'flex', flexDirection: 'column', gap: '16px' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '14px' },
-  badgeRow: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' },
-  badge: { fontSize: '0.7rem', padding: '3px 8px', borderRadius: '12px', background: 'rgba(0,200,83,0.12)', color: '#00c853', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' },
-  dateTag: { fontSize: '0.75rem', color: 'var(--text-secondary, #AAAAAA)' },
-  title: { fontSize: '1.25rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' },
-  subtitle: { color: 'var(--text-secondary, #AAAAAA)', margin: '4px 0 0 0', fontSize: '0.825rem' },
-  actions: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
-  statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-    gap: '10px',
+  container: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    paddingBottom: '40px',
   },
-  mainGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-    gap: '14px',
-    alignItems: 'start',
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
+    gap: '12px',
   },
-  activityCard: { padding: '14px' },
-  cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
-  cardHeaderTitle: { display: 'flex', alignItems: 'center', gap: '10px' },
-  cardTitle: { fontSize: '1.15rem', fontWeight: 700, margin: 0 },
-  logList: { display: 'flex', flexDirection: 'column', gap: '12px' },
-  logItem: {
+  badgeRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '14px',
-    padding: '12px 16px',
-    borderRadius: '12px',
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-    border: '1px solid rgba(255, 255, 255, 0.05)',
+    gap: '8px',
+    marginBottom: '4px',
   },
-  logAvatar: {
-    width: '38px',
-    height: '38px',
-    borderRadius: '50%',
-    backgroundColor: 'var(--accent-surface, rgba(224, 0, 8, 0.15))',
-    color: 'var(--accent, #E00008)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontWeight: 700,
-    fontSize: '0.9rem',
-  },
-  logDetails: { flex: 1 },
-  logClientName: { fontSize: '0.9rem', fontWeight: 600, color: '#FFFFFF' },
-  logMeta: { fontSize: '0.8rem', color: 'var(--text-secondary, #AAAAAA)', marginTop: '2px' },
-  logStatus: { fontSize: '0.75rem' },
-  statusTag: {
+  badge: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: '4px',
-    padding: '4px 10px',
-    borderRadius: '20px',
-    fontWeight: 600,
-  },
-  emptyLogs: {
-    padding: '40px 20px',
-    textAlign: 'center',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-  },
-  quickActionsCard: { padding: '24px' },
-  actionList: { display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' },
-  actionItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '12px 14px',
+    padding: '2px 8px',
     borderRadius: '12px',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    border: '1px solid var(--border, #2a2a30)',
-    textAlign: 'left',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    color: '#FFFFFF',
+    backgroundColor: 'rgba(224, 0, 8, 0.15)',
+    color: 'var(--accent, #E00008)',
+    fontSize: '0.7rem',
+    fontWeight: 700,
   },
-  actionIconWrapper: {
-    width: '36px',
-    height: '36px',
-    borderRadius: '10px',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  dateTag: {
+    fontSize: '0.72rem',
+    color: 'var(--text-secondary)',
+  },
+  title: {
+    fontSize: '1.4rem',
+    fontWeight: 900,
+    margin: '0 0 4px 0',
+    color: 'var(--text)',
+  },
+  subtitle: {
+    fontSize: '0.78rem',
+    color: 'var(--text-secondary)',
+    margin: 0,
+  },
+  actions: {
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: '8px',
   },
-  actionText: { flex: 1 },
-  actionTitle: { fontSize: '0.875rem', fontWeight: 600 },
-  actionSub: { fontSize: '0.75rem', color: 'var(--text-secondary, #AAAAAA)', marginTop: '2px' },
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+    gap: '12px',
+  },
 };

@@ -31,7 +31,8 @@ import {
   Edit, 
   Sparkles,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Send
 } from 'lucide-react';
 
 const MEAL_SLOTS = [
@@ -222,6 +223,79 @@ export default function DietPlansPage() {
         instructions: text
       }
     }));
+  };
+
+  const handleTemplateFoodChange = (slotId, foodIndex, field, value) => {
+    setTemplateForm((prev) => {
+      const currentMeals = prev.mealsState || getEmptyMealsState();
+      const slotData = currentMeals[slotId] || { foods: [], instructions: '' };
+      const updatedFoods = [...(slotData.foods || [])];
+      updatedFoods[foodIndex] = {
+        ...updatedFoods[foodIndex],
+        [field]: ['calories', 'protein', 'carbs', 'fat'].includes(field) ? (value === '' ? '' : Number(value)) : value
+      };
+      return {
+        ...prev,
+        mealsState: {
+          ...currentMeals,
+          [slotId]: {
+            ...slotData,
+            foods: updatedFoods
+          }
+        }
+      };
+    });
+  };
+
+  const handleAddTemplateFood = (slotId) => {
+    setTemplateForm((prev) => {
+      const currentMeals = prev.mealsState || getEmptyMealsState();
+      const slotData = currentMeals[slotId] || { foods: [], instructions: '' };
+      return {
+        ...prev,
+        mealsState: {
+          ...currentMeals,
+          [slotId]: {
+            ...slotData,
+            foods: [...(slotData.foods || []), { name: '', qty: '', calories: '', protein: '', carbs: '', fat: '' }]
+          }
+        }
+      };
+    });
+  };
+
+  const handleRemoveTemplateFood = (slotId, foodIndex) => {
+    setTemplateForm((prev) => {
+      const currentMeals = prev.mealsState || getEmptyMealsState();
+      const slotData = currentMeals[slotId] || { foods: [], instructions: '' };
+      return {
+        ...prev,
+        mealsState: {
+          ...currentMeals,
+          [slotId]: {
+            ...slotData,
+            foods: (slotData.foods || []).filter((_, i) => i !== foodIndex)
+          }
+        }
+      };
+    });
+  };
+
+  const handleTemplateInstructionsChange = (slotId, text) => {
+    setTemplateForm((prev) => {
+      const currentMeals = prev.mealsState || getEmptyMealsState();
+      const slotData = currentMeals[slotId] || { foods: [], instructions: '' };
+      return {
+        ...prev,
+        mealsState: {
+          ...currentMeals,
+          [slotId]: {
+            ...slotData,
+            instructions: text
+          }
+        }
+      };
+    });
   };
 
   // Total macros calculation
@@ -592,9 +666,6 @@ export default function DietPlansPage() {
               Master diet templates for 1-click client assignment and mapping.
             </p>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <Button variant="outline" onClick={handleSeedTemplates}>
-                🌱 Seed Templates
-              </Button>
               <Button onClick={() => {
                 setEditingTemplateId(null);
                 setTemplateForm({ templateName: '', description: '', mealsState: getEmptyMealsState() });
@@ -855,8 +926,8 @@ export default function DietPlansPage() {
             <Button variant="outline" onClick={() => setIsDietModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveClientDietPlan} loading={saving} style={{ padding: '12px 28px' }}>
-              <Save size={18} /> Save Diet Plan for Client
+            <Button onClick={handleSaveClientDietPlan} loading={saving} style={{ padding: '10px 24px' }}>
+              <Send size={15} /> Submit Diet Plan for Client
             </Button>
           </div>
         </div>
@@ -867,7 +938,7 @@ export default function DietPlansPage() {
         isOpen={isTemplateModalOpen}
         onClose={() => setIsTemplateModalOpen(false)}
         title={editingTemplateId ? "Edit Master Diet Template" : "Create Master Diet Template"}
-        size="lg"
+        size="xl"
       >
         <form onSubmit={handleSaveTemplateModal} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <Input 
@@ -882,11 +953,138 @@ export default function DietPlansPage() {
             placeholder="Template target audience and nutritional goals..." 
             value={templateForm.description}
             onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
+            rows={2}
           />
 
-          <Button type="submit" fullWidth loading={saving}>
-            {editingTemplateId ? "Save Template Changes" : "Create Template"}
-          </Button>
+          {/* Target Macro Summary Bar for Template */}
+          {(() => {
+            const tmplTotals = calculateTotals(templateForm.mealsState || getEmptyMealsState());
+            return (
+              <div style={styles.modalMacroBar}>
+                <div style={styles.macroStat}>
+                  <div style={styles.macroVal}><Flame size={16} color="var(--accent, #E00008)" /> {tmplTotals.calories}</div>
+                  <div style={styles.macroLbl}>Target Kcal</div>
+                </div>
+                <div style={styles.macroStat}>
+                  <div style={{ ...styles.macroVal, color: '#ff5252' }}>{tmplTotals.protein}g</div>
+                  <div style={styles.macroLbl}>Protein</div>
+                </div>
+                <div style={styles.macroStat}>
+                  <div style={{ ...styles.macroVal, color: '#448aff' }}>{tmplTotals.carbs}g</div>
+                  <div style={styles.macroLbl}>Carbs</div>
+                </div>
+                <div style={styles.macroStat}>
+                  <div style={{ ...styles.macroVal, color: '#ffb300' }}>{tmplTotals.fat}g</div>
+                  <div style={styles.macroLbl}>Fats</div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 5 Meal Slots Builder for Template */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {MEAL_SLOTS.map((slot) => {
+              const currentMeals = templateForm.mealsState || getEmptyMealsState();
+              const slotData = currentMeals[slot.id] || { foods: [], instructions: '' };
+              const slotCalories = (slotData.foods || []).reduce((acc, f) => acc + (f.calories || 0), 0);
+
+              return (
+                <div key={slot.id} style={styles.modalMealCard}>
+                  <div style={styles.mealHeader}>
+                    <div style={styles.mealTitleGroup}>
+                      <span style={{ fontSize: '1.3rem' }}>{slot.icon}</span>
+                      <div>
+                        <h3 style={styles.mealTitle}>{slot.name}</h3>
+                        <span style={styles.mealTime}><Clock size={12} /> Time: {slot.defaultTime}</span>
+                      </div>
+                    </div>
+                    <div style={styles.mealCalorieBadge}>
+                      {slotCalories} Kcal
+                    </div>
+                  </div>
+
+                  <div style={styles.foodList}>
+                    {(slotData.foods || []).map((food, fIdx) => (
+                      <div key={fIdx} style={styles.foodItemRow}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
+                          <Input 
+                            placeholder="Food Item (e.g. Oats / Chicken)" 
+                            value={food.name || ''} 
+                            onChange={(e) => handleTemplateFoodChange(slot.id, fIdx, 'name', e.target.value)}
+                          />
+                          <Input 
+                            placeholder="Qty (e.g. 1 Bowl)" 
+                            value={food.qty || ''} 
+                            onChange={(e) => handleTemplateFoodChange(slot.id, fIdx, 'qty', e.target.value)}
+                          />
+                        </div>
+                        
+                        <div style={styles.macroInputGrid}>
+                          <Input 
+                            type="number" 
+                            placeholder="Cal" 
+                            value={food.calories || ''} 
+                            onChange={(e) => handleTemplateFoodChange(slot.id, fIdx, 'calories', e.target.value)}
+                          />
+                          <Input 
+                            type="number" 
+                            placeholder="P(g)" 
+                            value={food.protein || ''} 
+                            onChange={(e) => handleTemplateFoodChange(slot.id, fIdx, 'protein', e.target.value)}
+                          />
+                          <Input 
+                            type="number" 
+                            placeholder="C(g)" 
+                            value={food.carbs || ''} 
+                            onChange={(e) => handleTemplateFoodChange(slot.id, fIdx, 'carbs', e.target.value)}
+                          />
+                          <Input 
+                            type="number" 
+                            placeholder="F(g)" 
+                            value={food.fat || ''} 
+                            onChange={(e) => handleTemplateFoodChange(slot.id, fIdx, 'fat', e.target.value)}
+                          />
+                          <button 
+                            type="button" 
+                            onClick={() => handleRemoveTemplateFood(slot.id, fIdx)}
+                            style={styles.trashBtn}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      type="button"
+                      onClick={() => handleAddTemplateFood(slot.id)}
+                      style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <Plus size={14} /> Add Food Item
+                    </Button>
+                  </div>
+
+                  <Textarea 
+                    placeholder="Instructions / remarks for this meal slot..." 
+                    value={slotData.instructions || ''}
+                    onChange={(e) => handleTemplateInstructionsChange(slot.id, e.target.value)}
+                    style={{ marginTop: '10px' }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '10px' }}>
+            <Button variant="outline" type="button" onClick={() => setIsTemplateModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={saving} style={{ padding: '10px 24px' }}>
+              <Send size={15} /> Submit Template
+            </Button>
+          </div>
         </form>
       </Modal>
     </div>

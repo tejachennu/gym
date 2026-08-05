@@ -131,7 +131,7 @@ export default function ProgressPage() {
                         <XAxis dataKey="date" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
                         <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} domain={['dataMin - 2', 'dataMax + 2']} />
                         <Tooltip 
-                          contentStyle={{ backgroundColor: '#1a1a1e', borderColor: '#2a2a30', borderRadius: '8px', color: '#fff' }}
+                          contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', borderRadius: '8px', color: 'var(--text)' }}
                           itemStyle={{ color: '#E00008' }}
                         />
                         <Area type="monotone" dataKey="weight" stroke="#E00008" strokeWidth={2} fillOpacity={1} fill="url(#colorWeight)" />

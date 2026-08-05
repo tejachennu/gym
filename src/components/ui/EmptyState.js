@@ -17,9 +17,9 @@ const EmptyState = ({
     justifyContent: 'center',
     padding: '60px 20px',
     textAlign: 'center',
-    backgroundColor: '#121214',
+    backgroundColor: 'var(--card)',
     borderRadius: '20px',
-    border: '1px dashed #2a2a30',
+    border: '1px dashed var(--border)',
     ...style
   };
 
@@ -30,7 +30,7 @@ const EmptyState = ({
   };
 
   const titleStyle = {
-    color: '#FFFFFF',
+    color: 'var(--text)',
     fontSize: '20px',
     fontWeight: '600',
     marginBottom: '8px',
@@ -38,14 +38,14 @@ const EmptyState = ({
   };
 
   const descStyle = {
-    color: '#AAAAAA',
+    color: 'var(--text-secondary)',
     fontSize: '14px',
     maxWidth: '400px',
     marginBottom: actionLabel ? '24px' : '0'
   };
 
   const btnStyle = {
-    backgroundColor: '#E00008',
+    backgroundColor: 'var(--accent)',
     color: '#FFFFFF',
     border: 'none',
     padding: '12px 24px',
@@ -65,8 +65,8 @@ const EmptyState = ({
         <button 
           style={btnStyle} 
           onClick={onAction}
-          onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#ff1a22'; e.currentTarget.style.boxShadow = '0 0 15px rgba(224,0,8,0.4)'; }}
-          onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#E00008'; e.currentTarget.style.boxShadow = 'none'; }}
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'var(--accent-hover)'; e.currentTarget.style.boxShadow = 'var(--shadow-glow)'; }}
+          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'var(--accent)'; e.currentTarget.style.boxShadow = 'none'; }}
         >
           {actionLabel}
         </button>

@@ -4,39 +4,30 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { logoutUser } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
-import { getClientById, updateClientProfile, getClientCheckins, getClientDailyLogs } from '@/lib/firestore';
+import { getClientById, updateClientProfile } from '@/lib/firestore';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Avatar from '@/components/ui/Avatar';
-import Badge from '@/components/ui/Badge';
 import { Input, Textarea, Select } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Loading';
 import { useToast } from '@/components/ui/Toast';
+import { validateField } from '@/lib/validation';
 import { 
   User, 
-  Mail, 
   Phone, 
-  Calendar, 
   LogOut, 
-  Edit3, 
-  Target, 
-  Activity, 
-  Sparkles, 
-  Save,
-  MapPin,
-  Briefcase,
-  Scale,
-  Ruler,
-  Utensils,
+  Scale, 
+  HeartPulse, 
+  Brain, 
+  CheckCircle2, 
+  CreditCard, 
+  Camera,
+  Send,
   AlertCircle,
-  HeartPulse,
-  Brain,
-  CheckCircle2,
-  XCircle,
-  CreditCard,
-  Clock,
-  ShieldCheck,
-  Check
+  Sparkles,
+  Calendar,
+  Briefcase,
+  MapPin
 } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -47,6 +38,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [profileImage, setProfileImage] = useState(null);
 
   const [form, setForm] = useState({
     name: '',
@@ -77,12 +70,15 @@ export default function ProfilePage() {
     stressSources: ''
   });
 
+  const [errors, setErrors] = useState({});
+
   useEffect(() => {
     async function loadData() {
       if (user?.uid) {
         try {
           const clientData = await getClientById(user.uid);
           if (clientData) {
+            setProfileImage(clientData.photoURL || clientData.profileImage || user.photoURL || null);
             setForm({
               name: clientData.displayName || clientData.name || user.displayName || '',
               clientCode: clientData.clientCode || `PH-${user.uid.slice(0, 6).toUpperCase()}`,
@@ -126,9 +122,72 @@ export default function ProfilePage() {
     loadData();
   }, [user, authLoading]);
 
-  const handleSave = async (e) => {
+  // Instagram-style Profile Picture Upload
+  const handleInstagramPhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+
+      if (data.success && data.fileUrl) {
+        setProfileImage(data.fileUrl);
+        if (user?.uid) {
+          await updateClientProfile(user.uid, { 
+            photoURL: data.fileUrl, 
+            profileImage: data.fileUrl 
+          });
+        }
+        toast.success("Instagram profile photo updated!");
+      } else {
+        throw new Error(data.error || 'Photo upload failed');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to upload profile picture");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    const nameErr = validateField('Client Name', form.name, { required: true });
+    if (nameErr) newErrors.name = nameErr;
+
+    const phoneErr = validateField('Mobile Number', form.phone, { phone: true });
+    if (phoneErr) newErrors.phone = phoneErr;
+
+    const ageErr = validateField('Age', form.age, { numeric: true, maxDigits: 3, max: 120 });
+    if (ageErr) newErrors.age = ageErr;
+
+    const heightErr = validateField('Height', form.height, { numeric: true, allowDecimal: true, maxDigits: 3, max: 300 });
+    if (heightErr) newErrors.height = heightErr;
+
+    const weightErr = validateField('Weight', form.weight, { numeric: true, allowDecimal: true, maxDigits: 3, max: 500 });
+    if (weightErr) newErrors.weight = weightErr;
+
+    const targetWeightErr = validateField('Target Weight', form.targetWeight, { numeric: true, allowDecimal: true, maxDigits: 3, max: 500 });
+    if (targetWeightErr) newErrors.targetWeight = targetWeightErr;
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user?.uid) return;
+
+    if (!validateForm()) {
+      toast.error('Please fix validation errors in the form.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -154,14 +213,16 @@ export default function ProfilePage() {
         medications: form.medications,
         stressLevel: form.stressLevel,
         stressSources: form.stressSources,
+        photoURL: profileImage,
+        profileImage: profileImage,
         updatedAt: new Date().toISOString()
       });
 
-      toast.success('Profile updated successfully!');
+      toast.success('Profile details submitted successfully!');
       setIsEditing(false);
     } catch (err) {
       console.error(err);
-      toast.error('Failed to update profile');
+      toast.error(err);
     } finally {
       setSaving(false);
     }
@@ -173,7 +234,7 @@ export default function ProfilePage() {
       toast.success('Logged out successfully');
       router.push('/login');
     } catch (error) {
-      toast.error('Logout failed');
+      toast.error(error);
     }
   };
 
@@ -188,14 +249,30 @@ export default function ProfilePage() {
   return (
     <div style={styles.container} className="animate-fade-up">
       
-      {/* 1. Ultra-Premium Glass Banner Card */}
+      {/* 1. INSTAGRAM-STYLE PROFILE BANNER HEADER */}
       <Card style={styles.headerCard} className="glass-card">
-        <div style={styles.headerRow}>
-          <div style={styles.avatarWrapper}>
-            <Avatar name={form.name || 'Client'} size="xl" />
+        <div style={styles.instaBannerRow}>
+          
+          {/* Instagram Avatar Ring */}
+          <div style={styles.instaAvatarContainer}>
+            <div style={styles.instaRing}>
+              <Avatar src={profileImage} name={form.name || 'Client'} size="xl" />
+            </div>
+            
+            <input 
+              type="file" 
+              accept="image/*" 
+              id="insta-avatar-upload" 
+              onChange={handleInstagramPhotoUpload} 
+              style={{ display: 'none' }}
+              disabled={uploadingPhoto}
+            />
+            <label htmlFor="insta-avatar-upload" style={styles.instaCameraBadge} title="Upload Profile Picture (Instagram style)">
+              {uploadingPhoto ? <Spinner size={12} /> : <Camera size={14} color="#FFFFFF" />}
+            </label>
           </div>
 
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: '180px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <h2 style={styles.nameText}>{form.name || 'Client'}</h2>
               <span style={styles.codePill}>ID: {form.clientCode}</span>
@@ -209,11 +286,20 @@ export default function ProfilePage() {
           </div>
 
           {/* Action Header Buttons */}
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <Button 
+              variant="outline" 
+              onClick={() => router.push('/install-pwa')}
+              size="sm"
+              style={{ backgroundColor: 'rgba(224, 0, 8, 0.15)', borderColor: 'var(--accent, #E00008)', color: '#FFFFFF' }}
+            >
+              📱 Install App
+            </Button>
+
             <Button 
               variant={isEditing ? 'ghost' : 'outline'} 
               onClick={() => setIsEditing(!isEditing)}
-              style={{ fontSize: '0.8rem', padding: '8px 14px', fontWeight: 800 }}
+              size="sm"
             >
               {isEditing ? 'Cancel Edit' : '✏️ Edit Profile'}
             </Button>
@@ -221,28 +307,29 @@ export default function ProfilePage() {
             <Button 
               variant="outline" 
               onClick={handleLogout}
-              style={{ borderColor: 'rgba(255,23,68,0.4)', color: '#ff1744', fontSize: '0.8rem', padding: '8px 14px', fontWeight: 800 }}
+              size="sm"
+              style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}
             >
-              <LogOut size={15} /> Sign Out
+              <LogOut size={14} /> Sign Out
             </Button>
           </div>
         </div>
       </Card>
 
-      {/* 2. MODE SWITCH: READ-ONLY PROFILE DASHBOARD vs EDIT FORM */}
+      {/* 2. MODE SWITCH: READ-ONLY DASHBOARD vs EDIT FORM */}
       {!isEditing ? (
-        /* READ-ONLY DASHBOARD VIEW */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        /* READ-ONLY COMPLETE PROFILE VIEW */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           
-          {/* Active Subscription Glass Hero Box */}
+          {/* Active Membership Box */}
           <Card style={styles.subHeroCard} className="glass-card">
             <div style={styles.subHeroHeader}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={styles.subIconBadge}>
-                  <CreditCard size={20} color="#00c853" />
+                  <CreditCard size={18} color="#00c853" />
                 </div>
                 <div>
-                  <span style={{ fontSize: '0.7rem', color: '#00c853', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>
+                  <span style={{ fontSize: '0.65rem', color: '#00c853', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     Active Membership Plan
                   </span>
                   <h3 style={styles.subPlanTitle}>{form.currentPlan || 'Cardio + Strength'}</h3>
@@ -265,29 +352,13 @@ export default function ProfilePage() {
                 <span style={styles.subStatLabel}>Expiry Date</span>
                 <span style={{ ...styles.subStatVal, color: '#00c853' }}>{form.planExpiry || '02 Sep 2026'}</span>
               </div>
-              <div style={styles.subStatDivider} />
-              <div style={styles.subStatBox}>
-                <span style={styles.subStatLabel}>Days Left</span>
-                <span style={{ ...styles.subStatVal, color: '#00c853' }}>30 Days</span>
-              </div>
-            </div>
-
-            {/* Glowing Membership Progress Bar */}
-            <div style={{ marginTop: '14px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                <span>Membership Progress</span>
-                <span style={{ color: '#00c853', fontWeight: 800 }}>85% Validity Remaining</span>
-              </div>
-              <div style={styles.progressTrack}>
-                <div style={{ ...styles.progressFill, width: '85%' }} />
-              </div>
             </div>
           </Card>
 
-          {/* Basic Personal Details Card */}
+          {/* 1. Basic Personal Details */}
           <Card style={styles.sectionCard} className="glass-card">
             <div style={styles.sectionHeader}>
-              <User size={18} color="var(--accent, #E00008)" />
+              <User size={16} color="var(--accent, #E00008)" />
               <h3 style={styles.sectionTitle}>Basic Personal Details</h3>
             </div>
 
@@ -319,10 +390,10 @@ export default function ProfilePage() {
             </div>
           </Card>
 
-          {/* Physical Metrics Summary */}
+          {/* 2. Physical Metrics Summary */}
           <Card style={styles.sectionCard} className="glass-card">
             <div style={styles.sectionHeader}>
-              <Scale size={18} color="#00c853" />
+              <Scale size={16} color="#00c853" />
               <h3 style={styles.sectionTitle}>Physical Metrics & Fitness Goals</h3>
             </div>
 
@@ -337,15 +408,15 @@ export default function ProfilePage() {
               </div>
               <div style={styles.summaryItem}>
                 <span style={styles.summaryLabel}>🎯 Target Weight</span>
-                <span style={{ ...styles.summaryVal, color: '#00c853', fontWeight: 900 }}>{form.targetWeight ? `${form.targetWeight} kg` : 'Not Set'}</span>
+                <span style={{ ...styles.summaryVal, color: '#00c853', fontWeight: 800 }}>{form.targetWeight ? `${form.targetWeight} kg` : 'Not Set'}</span>
               </div>
               <div style={styles.summaryItem}>
                 <span style={styles.summaryLabel}>🥗 Diet Preference</span>
                 <span style={styles.summaryVal}>{form.diet}</span>
               </div>
               <div style={styles.summaryItem}>
-                <span style={styles.summaryLabel}>🔥 Primary Fitness Goal</span>
-                <span style={{ ...styles.summaryVal, color: 'var(--accent, #E00008)', fontWeight: 900 }}>{form.goal}</span>
+                <span style={styles.summaryLabel}>🔥 Fitness Goal</span>
+                <span style={{ ...styles.summaryVal, color: 'var(--accent, #E00008)', fontWeight: 800 }}>{form.goal}</span>
               </div>
               <div style={styles.summaryItem}>
                 <span style={styles.summaryLabel}>📆 Days Available / Week</span>
@@ -354,72 +425,72 @@ export default function ProfilePage() {
             </div>
           </Card>
 
-          {/* Health & Injury Summary */}
+          {/* 3. Health & Injury Record */}
           <Card style={styles.sectionCard} className="glass-card">
             <div style={styles.sectionHeader}>
-              <HeartPulse size={18} color="#ff1744" />
+              <HeartPulse size={16} color="var(--danger)" />
               <h3 style={styles.sectionTitle}>Injuries & Medical Conditions</h3>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
               <div style={styles.healthBox}>
                 <span style={styles.summaryLabel}>Injuries Record:</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: form.hasInjuries === 'YES' ? '#ff1744' : '#00c853', fontWeight: 800, marginTop: '6px', fontSize: '0.88rem' }}>
-                  {form.hasInjuries === 'YES' ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: form.hasInjuries === 'YES' ? 'var(--danger)' : '#00c853', fontWeight: 700, marginTop: '4px', fontSize: '0.82rem' }}>
+                  {form.hasInjuries === 'YES' ? <AlertCircle size={14} /> : <CheckCircle2 size={14} />}
                   <span>{form.hasInjuries === 'YES' ? `YES — ${form.injuriesDetails || 'Details not specified'}` : 'No Past Injuries Logged'}</span>
                 </div>
               </div>
 
               <div style={styles.healthBox}>
                 <span style={styles.summaryLabel}>Medical Conditions:</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: form.hasHealthIssues === 'YES' ? '#ffd600' : '#00c853', fontWeight: 800, marginTop: '6px', fontSize: '0.88rem' }}>
-                  {form.hasHealthIssues === 'YES' ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: form.hasHealthIssues === 'YES' ? '#ffd600' : '#00c853', fontWeight: 700, marginTop: '4px', fontSize: '0.82rem' }}>
+                  {form.hasHealthIssues === 'YES' ? <AlertCircle size={14} /> : <CheckCircle2 size={14} />}
                   <span>{form.hasHealthIssues === 'YES' ? `YES — ${form.healthIssuesDetails || 'Details not specified'}` : 'No Medical Conditions Logged'}</span>
                 </div>
                 {form.medications && (
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
-                    Medications: <span style={{ color: '#FFFFFF' }}>{form.medications}</span>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    Medications: <span style={{ color: 'var(--text)' }}>{form.medications}</span>
                   </div>
                 )}
               </div>
             </div>
           </Card>
 
-          {/* Stress Summary */}
+          {/* 4. Stress Levels & Lifestyle */}
           <Card style={styles.sectionCard} className="glass-card">
             <div style={styles.sectionHeader}>
-              <Brain size={18} color="#ab47bc" />
+              <Brain size={16} color="#ab47bc" />
               <h3 style={styles.sectionTitle}>Stress Levels & Lifestyle</h3>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={styles.summaryLabel}>Stress Level Rating:</span>
                 <span style={styles.stressBadge}>
                   Level {form.stressLevel} / 10
                 </span>
               </div>
               {form.stressSources && (
-                <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                  Main Stress Sources: <span style={{ color: '#FFFFFF' }}>{form.stressSources}</span>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  Main Stress Sources: <span style={{ color: 'var(--text)' }}>{form.stressSources}</span>
                 </div>
               )}
             </div>
           </Card>
 
-          <Button onClick={() => setIsEditing(true)} style={{ padding: '14px', fontSize: '0.95rem', fontWeight: 800 }}>
+          <Button onClick={() => setIsEditing(true)} size="md" style={{ padding: '10px' }}>
             ✏️ Edit Profile Information
           </Button>
 
         </div>
       ) : (
         /* EDIT FORM VIEW */
-        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           
-          {/* Basic Personal Details Edit */}
+          {/* Personal Details Edit */}
           <Card style={styles.sectionCard} className="glass-card">
             <div style={styles.sectionHeader}>
-              <User size={18} color="var(--accent, #E00008)" />
+              <User size={16} color="var(--accent, #E00008)" />
               <h3 style={styles.sectionTitle}>Edit Personal Details</h3>
             </div>
 
@@ -428,6 +499,7 @@ export default function ProfilePage() {
                 label="Client Name *" 
                 value={form.name} 
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
+                error={errors.name}
                 required 
               />
 
@@ -438,17 +510,20 @@ export default function ProfilePage() {
               />
 
               <Input 
-                label="Mobile Number *" 
+                label="Mobile Number (Only numbers) *" 
                 value={form.phone} 
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                numeric={true}
+                error={errors.phone}
               />
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <Input 
-                  label="Age" 
-                  type="number" 
+                  label="Age (Max 3 digits)" 
                   value={form.age} 
                   onChange={(e) => setForm({ ...form, age: e.target.value })}
+                  numeric={true}
+                  error={errors.age}
                 />
 
                 <Select 
@@ -481,43 +556,42 @@ export default function ProfilePage() {
                 value={form.location} 
                 onChange={(e) => setForm({ ...form, location: e.target.value })}
               />
-
-              <Input 
-                label="Joining Date" 
-                type="date"
-                value={form.joiningDate} 
-                disabled={true}
-              />
             </div>
           </Card>
 
           {/* Physical Metrics Edit */}
           <Card style={styles.sectionCard} className="glass-card">
             <div style={styles.sectionHeader}>
-              <Scale size={18} color="#00c853" />
+              <Scale size={16} color="#00c853" />
               <h3 style={styles.sectionTitle}>Edit Physical Metrics & Goals</h3>
             </div>
 
             <div style={styles.gridTwo}>
               <Input 
-                label="Height (cm)" 
-                type="number" 
+                label="Height cm (Max 3 digits)" 
                 value={form.height} 
                 onChange={(e) => setForm({ ...form, height: e.target.value })}
+                numeric={true}
+                allowDecimal={true}
+                error={errors.height}
               />
 
               <Input 
-                label="Current Weight (kg)" 
-                type="number" 
+                label="Current Weight kg (Max 3 digits)" 
                 value={form.weight} 
                 onChange={(e) => setForm({ ...form, weight: e.target.value })}
+                numeric={true}
+                allowDecimal={true}
+                error={errors.weight}
               />
 
               <Input 
-                label="Target Weight (kg)" 
-                type="number" 
+                label="Target Weight kg (Max 3 digits)" 
                 value={form.targetWeight} 
                 onChange={(e) => setForm({ ...form, targetWeight: e.target.value })}
+                numeric={true}
+                allowDecimal={true}
+                error={errors.targetWeight}
               />
 
               <Select 
@@ -558,27 +632,33 @@ export default function ProfilePage() {
             </div>
           </Card>
 
-          {/* Medical Edit */}
+          {/* Medical Record Edit */}
           <Card style={styles.sectionCard} className="glass-card">
             <div style={styles.sectionHeader}>
-              <HeartPulse size={18} color="#ff1744" />
+              <HeartPulse size={16} color="var(--danger)" />
               <h3 style={styles.sectionTitle}>Edit Health & Injury Record</h3>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={styles.subBlock}>
-                <label style={styles.subLabel}>Current or Past Injuries?</label>
-                <div style={{ display: 'flex', gap: '10px', margin: '6px 0' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Current or Past Injuries?</label>
+                <div style={{ display: 'flex', gap: '8px', margin: '4px 0' }}>
                   {['YES', 'NO'].map(val => (
                     <button
                       key={val}
                       type="button"
                       onClick={() => setForm({ ...form, hasInjuries: val })}
                       style={{
-                        ...styles.toggleBtn,
-                        backgroundColor: form.hasInjuries === val ? 'rgba(255,23,68,0.2)' : 'rgba(255,255,255,0.03)',
-                        borderColor: form.hasInjuries === val ? '#ff1744' : 'rgba(255,255,255,0.08)',
-                        color: form.hasInjuries === val ? '#ff1744' : 'var(--text-secondary)'
+                        flex: 1,
+                        padding: '5px 10px',
+                        borderRadius: '6px',
+                        border: '1px solid',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        backgroundColor: form.hasInjuries === val ? 'rgba(255,23,68,0.15)' : 'var(--card-hover)',
+                        borderColor: form.hasInjuries === val ? 'var(--danger)' : 'var(--border)',
+                        color: form.hasInjuries === val ? 'var(--danger)' : 'var(--text)'
                       }}
                     >
                       {val}
@@ -596,19 +676,25 @@ export default function ProfilePage() {
                 )}
               </div>
 
-              <div style={styles.subBlock}>
-                <label style={styles.subLabel}>Medical Conditions?</label>
-                <div style={{ display: 'flex', gap: '10px', margin: '6px 0' }}>
+              <div>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Medical Conditions?</label>
+                <div style={{ display: 'flex', gap: '8px', margin: '4px 0' }}>
                   {['YES', 'NO'].map(val => (
                     <button
                       key={val}
                       type="button"
                       onClick={() => setForm({ ...form, hasHealthIssues: val })}
                       style={{
-                        ...styles.toggleBtn,
-                        backgroundColor: form.hasHealthIssues === val ? 'rgba(255,214,0,0.2)' : 'rgba(255,255,255,0.03)',
-                        borderColor: form.hasHealthIssues === val ? '#ffd600' : 'rgba(255,255,255,0.08)',
-                        color: form.hasHealthIssues === val ? '#ffd600' : 'var(--text-secondary)'
+                        flex: 1,
+                        padding: '5px 10px',
+                        borderRadius: '6px',
+                        border: '1px solid',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        backgroundColor: form.hasHealthIssues === val ? 'var(--warning-glow)' : 'var(--card-hover)',
+                        borderColor: form.hasHealthIssues === val ? 'var(--warning)' : 'var(--border)',
+                        color: form.hasHealthIssues === val ? 'var(--warning)' : 'var(--text)'
                       }}
                     >
                       {val}
@@ -637,12 +723,12 @@ export default function ProfilePage() {
           {/* Stress Edit */}
           <Card style={styles.sectionCard} className="glass-card">
             <div style={styles.sectionHeader}>
-              <Brain size={18} color="#ab47bc" />
+              <Brain size={16} color="var(--accent)" />
               <h3 style={styles.sectionTitle}>Edit Stress & Lifestyle</h3>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <label style={styles.subLabel}>Rate Stress Level (1 = Low, 10 = Extremely High):</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Rate Stress Level (1 = Low, 10 = High):</label>
               
               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                 {Array.from({ length: 10 }).map((_, i) => {
@@ -655,14 +741,14 @@ export default function ProfilePage() {
                       onClick={() => setForm({ ...form, stressLevel: num })}
                       style={{
                         flex: 1,
-                        minWidth: '28px',
-                        padding: '6px',
-                        borderRadius: '8px',
-                        backgroundColor: active ? 'rgba(171, 71, 188, 0.25)' : 'rgba(255, 255, 255, 0.03)',
-                        border: `1px solid ${active ? '#ab47bc' : 'rgba(255, 255, 255, 0.08)'}`,
-                        color: active ? '#ab47bc' : '#FFFFFF',
+                        minWidth: '24px',
+                        padding: '4px',
+                        borderRadius: '6px',
+                        backgroundColor: active ? 'var(--accent-surface)' : 'var(--card-hover)',
+                        border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                        color: active ? 'var(--accent)' : 'var(--text)',
                         fontWeight: 700,
-                        fontSize: '0.8rem',
+                        fontSize: '0.75rem',
                         cursor: 'pointer'
                       }}
                     >
@@ -681,11 +767,11 @@ export default function ProfilePage() {
             </div>
           </Card>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <Button type="submit" loading={saving} style={{ flex: 1, padding: '14px', fontSize: '0.95rem', fontWeight: 800 }}>
-              <Save size={18} /> Save Changes
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Button type="submit" loading={saving} style={{ flex: 1, padding: '10px', fontSize: '0.85rem' }}>
+              <Send size={15} /> Submit Profile Changes
             </Button>
-            <Button variant="ghost" type="button" onClick={() => setIsEditing(false)} style={{ padding: '14px' }}>
+            <Button variant="ghost" type="button" onClick={() => setIsEditing(false)}>
               Cancel
             </Button>
           </div>
@@ -697,38 +783,56 @@ export default function ProfilePage() {
 }
 
 const styles = {
-  container: { display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '90px' },
-  headerCard: { padding: '16px' },
-  headerRow: { display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' },
-  avatarWrapper: { flexShrink: 0 },
-  nameText: { margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#FFFFFF' },
-  codePill: { padding: '2px 8px', borderRadius: '8px', backgroundColor: 'rgba(0, 200, 83, 0.15)', border: '1px solid rgba(0, 200, 83, 0.3)', color: '#00c853', fontSize: '0.72rem', fontWeight: 800 },
-  emailText: { margin: '2px 0 6px 0', fontSize: '0.8rem', color: 'var(--text-secondary, #AAAAAA)' },
-  metaRow: { display: 'flex', gap: '6px', fontSize: '0.75rem', color: 'var(--text-muted, #AAAAAA)' },
-  subHeroCard: { padding: '16px', background: 'linear-gradient(135deg, rgba(0, 200, 83, 0.12) 0%, rgba(18, 18, 20, 0.95) 100%)', border: '1px solid rgba(0, 200, 83, 0.35)' },
-  subHeroHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' },
-  subIconBadge: { width: '38px', height: '38px', borderRadius: '10px', backgroundColor: 'rgba(0, 200, 83, 0.15)', border: '1px solid rgba(0, 200, 83, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  subPlanTitle: { margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#FFFFFF' },
-  liveStatusPill: { display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '20px', backgroundColor: 'rgba(0, 200, 83, 0.2)', border: '1px solid #00c853', color: '#00c853', fontSize: '0.75rem', fontWeight: 800 },
-  livePulseDot: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#00c853', boxShadow: '0 0 10px #00c853' },
-  subStatsRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '14px', padding: '10px 14px', borderRadius: '12px', backgroundColor: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.05)' },
+  container: { display: 'flex', flexDirection: 'column', gap: '10px', paddingBottom: '60px' },
+  headerCard: { padding: '12px' },
+  instaBannerRow: { display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' },
+  instaAvatarContainer: { position: 'relative', display: 'inline-block', flexShrink: 0 },
+  instaRing: { 
+    padding: '3px', 
+    borderRadius: '50%', 
+    background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  instaCameraBadge: {
+    position: 'absolute',
+    bottom: '0px',
+    right: '0px',
+    width: '26px',
+    height: '26px',
+    borderRadius: '50%',
+    backgroundColor: 'var(--accent, #E00008)',
+    border: '2px solid var(--card, #121214)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    boxShadow: 'var(--shadow-card)'
+  },
+  nameText: { margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text)' },
+  codePill: { padding: '2px 6px', borderRadius: '6px', backgroundColor: 'rgba(0, 200, 83, 0.15)', border: '1px solid rgba(0, 200, 83, 0.3)', color: '#00c853', fontSize: '0.68rem', fontWeight: 800 },
+  emailText: { margin: '1px 0 4px 0', fontSize: '0.75rem', color: 'var(--text-secondary)' },
+  metaRow: { display: 'flex', gap: '4px', fontSize: '0.72rem', color: 'var(--text-muted)' },
+  subHeroCard: { padding: '12px', background: 'linear-gradient(135deg, rgba(0, 200, 83, 0.1) 0%, var(--card) 100%)', border: '1px solid rgba(0, 200, 83, 0.3)' },
+  subHeroHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' },
+  subIconBadge: { width: '32px', height: '32px', borderRadius: '8px', backgroundColor: 'rgba(0, 200, 83, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  subPlanTitle: { margin: 0, fontSize: '0.98rem', fontWeight: 800, color: 'var(--text)' },
+  liveStatusPill: { display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '14px', backgroundColor: 'rgba(0, 200, 83, 0.2)', border: '1px solid #00c853', color: '#00c853', fontSize: '0.7rem', fontWeight: 700 },
+  livePulseDot: { width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#00c853' },
+  subStatsRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', padding: '8px 12px', borderRadius: '8px', backgroundColor: 'var(--card-hover)', border: '1px solid var(--border)' },
   subStatBox: { textAlign: 'center', flex: 1 },
-  subStatLabel: { fontSize: '0.68rem', color: 'var(--text-secondary, #AAAAAA)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' },
-  subStatVal: { fontSize: '0.9rem', fontWeight: 900, color: '#FFFFFF', marginTop: '2px', display: 'block' },
-  subStatDivider: { width: '1px', height: '24px', backgroundColor: 'rgba(255, 255, 255, 0.08)' },
-  progressTrack: { width: '100%', height: '8px', borderRadius: '4px', backgroundColor: 'rgba(255, 255, 255, 0.08)', overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: '4px', backgroundColor: '#00c853', boxShadow: '0 0 12px rgba(0, 200, 83, 0.5)', transition: 'width 0.4s ease' },
-  sectionCard: { padding: '16px' },
-  sectionHeader: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '8px' },
-  sectionTitle: { fontSize: '0.95rem', fontWeight: 800, margin: 0, color: '#FFFFFF' },
-  gridTwo: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' },
-  gridSummary: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' },
-  summaryItem: { display: 'flex', flexDirection: 'column', gap: '3px', padding: '10px 12px', borderRadius: '10px', backgroundColor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)' },
-  summaryLabel: { fontSize: '0.72rem', color: 'var(--text-secondary, #AAAAAA)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 },
-  summaryVal: { fontSize: '0.88rem', fontWeight: 700, color: '#FFFFFF' },
-  healthBox: { padding: '12px', borderRadius: '10px', backgroundColor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)' },
-  stressBadge: { padding: '4px 10px', borderRadius: '8px', backgroundColor: 'rgba(171, 71, 188, 0.2)', border: '1px solid #ab47bc', color: '#ab47bc', fontWeight: 800, fontSize: '0.8rem' },
-  subBlock: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  subLabel: { fontSize: '0.8rem', color: 'var(--text-secondary, #AAAAAA)', fontWeight: 600 },
-  toggleBtn: { flex: 1, padding: '6px 14px', borderRadius: '8px', border: '1px solid', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }
+  subStatLabel: { fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block', textTransform: 'uppercase' },
+  subStatVal: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text)', marginTop: '1px', display: 'block' },
+  subStatDivider: { width: '1px', height: '20px', backgroundColor: 'var(--border)' },
+  sectionCard: { padding: '12px' },
+  sectionHeader: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', borderBottom: '1px solid var(--border)', paddingBottom: '6px' },
+  sectionTitle: { fontSize: '0.88rem', fontWeight: 700, margin: 0, color: 'var(--text)' },
+  gridTwo: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' },
+  gridSummary: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' },
+  summaryItem: { display: 'flex', flexDirection: 'column', gap: '2px', padding: '8px 10px', borderRadius: '8px', backgroundColor: 'var(--card-hover)', border: '1px solid var(--border)' },
+  summaryLabel: { fontSize: '0.68rem', color: 'var(--text-secondary)', fontWeight: 600 },
+  summaryVal: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text)' },
+  healthBox: { padding: '10px', borderRadius: '8px', backgroundColor: 'var(--card-hover)', border: '1px solid var(--border)' },
+  stressBadge: { padding: '3px 8px', borderRadius: '6px', backgroundColor: 'rgba(171, 71, 188, 0.2)', border: '1px solid #ab47bc', color: '#ab47bc', fontWeight: 800, fontSize: '0.75rem' }
 };

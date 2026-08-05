@@ -1,61 +1,104 @@
 'use client';
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getAllClients } from '@/lib/firestore';
-import { registerUser } from '@/lib/auth';
+import { 
+  getAllClients, 
+  deleteClient, 
+  clearSeedClients,
+  getPlans,
+  addDocument,
+  updateClientProfile
+} from '@/lib/firestore';
+import { registerUserByAdmin } from '@/lib/auth';
 import { useToast } from '@/components/ui/Toast';
+import { validateField } from '@/lib/validation';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import { Input, Select } from '@/components/ui/Input';
+import { Input, Select, Textarea } from '@/components/ui/Input';
 import Avatar from '@/components/ui/Avatar';
 import Badge from '@/components/ui/Badge';
-import { CardSkeleton } from '@/components/ui/Loading';
+import { TableSkeleton } from '@/components/ui/Loading';
 import Modal from '@/components/ui/Modal';
 import Pagination from '@/components/ui/Pagination';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { 
   Users, 
   UserPlus, 
   Search, 
   Phone, 
-  Calendar, 
   User as UserIcon, 
   CreditCard,
   ChevronRight,
-  Filter
+  Filter,
+  Send,
+  Trash2,
+  Calendar,
+  Percent,
+  IndianRupee
 } from 'lucide-react';
 
 export default function ClientsPage() {
   const router = useRouter();
   const toast = useToast();
   const [clients, setClients] = useState([]);
+  const [allPlansList, setAllPlansList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [clearingSeed, setClearingSeed] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   
-  const [newClient, setNewClient] = useState({
+  const initialClientForm = {
     name: '',
     email: '',
     phone: '',
+    clientCode: '100',
     age: '',
+    dob: '',
     gender: 'Male',
-    password: ''
-  });
+    profession: '',
+    location: '',
+    height: '',
+    weight: '',
+    targetWeight: '',
+    diet: 'VEG',
+    goal: 'Fat Loss',
+    daysAvailable: '',
+    hasInjuries: 'NO',
+    injuriesDetails: '',
+    hasHealthIssues: 'NO',
+    healthIssuesDetails: '',
+    medications: '',
+    stressLevel: 5,
+    stressSources: '',
+    password: '',
+    planIdCombo: '',
+    planStart: new Date().toISOString().split('T')[0],
+    originalAmount: '',
+    discountType: 'percentage',
+    discountValue: '',
+    amountPaid: '',
+    paymentMethod: 'Cash',
+    notes: ''
+  };
+
+  const [newClient, setNewClient] = useState(initialClientForm);
 
   useEffect(() => {
     fetchClients();
+    fetchPlans();
   }, []);
 
   const fetchClients = async () => {
     try {
       setLoading(true);
       const data = await getAllClients();
-      setClients(data);
+      setClients(data || []);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load clients');
@@ -64,34 +107,249 @@ export default function ClientsPage() {
     }
   };
 
+  const fetchPlans = async () => {
+    try {
+      const data = await getPlans();
+      setAllPlansList(data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handlePlanSelectChange = (e) => {
+    const combo = e.target.value;
+    let priceStr = '';
+
+    if (combo) {
+      const [planId, tierIndexStr] = combo.split('||');
+      const tierIndex = parseInt(tierIndexStr, 10) || 0;
+      const selectedPlan = allPlansList.find(p => p.id === planId);
+      if (selectedPlan) {
+        const tier = selectedPlan.pricing?.[tierIndex] || { price: selectedPlan.price || 0 };
+        priceStr = String(tier.price || 0);
+      }
+    }
+
+    setNewClient(prev => ({
+      ...prev,
+      planIdCombo: combo,
+      originalAmount: priceStr,
+      amountPaid: priceStr
+    }));
+  };
+
+  const calculateFinalAmount = () => {
+    const original = parseFloat(newClient.originalAmount) || 0;
+    const discountVal = parseFloat(newClient.discountValue) || 0;
+
+    if (newClient.discountType === 'percentage') {
+      const discountAmt = (original * discountVal) / 100;
+      return Math.max(0, original - discountAmt);
+    } else {
+      return Math.max(0, original - discountVal);
+    }
+  };
+
+  const calculateBalance = () => {
+    const finalAmt = calculateFinalAmount();
+    const paid = parseFloat(newClient.amountPaid) || 0;
+    return Math.max(0, finalAmt - paid);
+  };
+
   const handleCreateClient = async (e) => {
     e.preventDefault();
-    if (!newClient.name || !newClient.email || !newClient.password) {
-      return toast.error('Please fill in Name, Email and Password');
+    
+    // Validations
+    const nameErr = validateField('Client Name', newClient.name, { required: true });
+    const emailErr = validateField('Email Address', newClient.email, { email: true, required: true });
+    const passErr = validateField('Password', newClient.password, { required: true });
+    const ageErr = validateField('Age', newClient.age, { numeric: true, maxDigits: 3, max: 120 });
+    const phoneErr = validateField('Phone Number', newClient.phone, { phone: true });
+
+    if (nameErr || emailErr || passErr || ageErr || phoneErr) {
+      toast.error(nameErr || emailErr || passErr || ageErr || phoneErr);
+      return;
     }
+
+    if (newClient.password.length < 6) {
+      toast.error('Password must be at least 6 characters long.');
+      return;
+    }
+
     setCreating(true);
     try {
-      await registerUser({
+      // 1. Create User with full intake fields
+      const createdUser = await registerUserByAdmin({
         name: newClient.name,
         email: newClient.email,
         phone: newClient.phone,
+        clientCode: newClient.clientCode || '100',
         age: newClient.age,
-        gender: newClient.gender,
-        password: newClient.password,
-        role: 'client'
+        dob: newClient.dob || '',
+        gender: newClient.gender || 'Male',
+        profession: newClient.profession || '',
+        location: newClient.location || '',
+        height: newClient.height || '',
+        weight: newClient.weight || '',
+        targetWeight: newClient.targetWeight || '',
+        diet: newClient.diet || 'VEG',
+        goal: newClient.goal || 'Fat Loss',
+        daysAvailable: newClient.daysAvailable || '',
+        hasInjuries: newClient.hasInjuries || 'NO',
+        injuriesDetails: newClient.injuriesDetails || '',
+        hasHealthIssues: newClient.hasHealthIssues || 'NO',
+        healthIssuesDetails: newClient.healthIssuesDetails || '',
+        medications: newClient.medications || '',
+        stressLevel: newClient.stressLevel || 5,
+        stressSources: newClient.stressSources || '',
+        password: newClient.password
       });
-      toast.success(`Client ${newClient.name} added successfully!`);
+
+      const clientId = createdUser.id || createdUser.uid;
+
+      // 2. If a plan was selected, assign plan & create billing invoice
+      if (newClient.planIdCombo && clientId) {
+        const [planId, tierIndexStr] = newClient.planIdCombo.split('||');
+        const tierIndex = parseInt(tierIndexStr, 10) || 0;
+
+        const selectedPlan = allPlansList.find(p => p.id === planId);
+        if (selectedPlan) {
+          const tier = selectedPlan.pricing?.[tierIndex] || {
+            durationVal: parseInt(selectedPlan.durationVal, 10) || 1,
+            durationUnit: selectedPlan.durationUnit || 'Months',
+            price: selectedPlan.price || 0
+          };
+
+          const start = new Date(newClient.planStart);
+          const expiry = new Date(start);
+          const durationVal = parseInt(tier.durationVal, 10) || 1;
+          const durationUnit = tier.durationUnit || 'Months';
+          
+          if (durationUnit === 'Days') {
+            expiry.setDate(expiry.getDate() + durationVal);
+          } else if (durationUnit === 'Years') {
+            expiry.setFullYear(expiry.getFullYear() + durationVal);
+          } else {
+            expiry.setMonth(expiry.getMonth() + durationVal);
+          }
+
+          const originalAmt = parseFloat(newClient.originalAmount) || 0;
+          const discountVal = parseFloat(newClient.discountValue) || 0;
+          const finalAmt = calculateFinalAmount();
+          const discountAmt = originalAmt - finalAmt;
+          const paidAmt = parseFloat(newClient.amountPaid) || 0;
+          const balanceAmt = Math.max(0, finalAmt - paidAmt);
+          const planNameFormatted = `${selectedPlan.plan_name || selectedPlan.name} (${durationVal} ${durationUnit})`;
+
+          const newPlanFeatures = {
+            hasDiet: selectedPlan.hasDiet !== false,
+            hasWorkout: selectedPlan.hasWorkout !== false,
+            hasTracking: selectedPlan.hasTracking !== false,
+            hasPostureCheckin: selectedPlan.hasPostureCheckin === true,
+            hasDailyLog: selectedPlan.hasDailyLog !== false
+          };
+
+          const newPlanHistoryItem = {
+            id: `plan_${Date.now()}`,
+            planName: planNameFormatted,
+            planId: selectedPlan.id,
+            planStart: newClient.planStart,
+            planExpiry: expiry.toISOString().split('T')[0],
+            originalAmount: originalAmt,
+            discountType: newClient.discountType,
+            discountValue: discountVal,
+            discountAmount: discountAmt,
+            finalAmount: finalAmt,
+            amountPaid: paidAmt,
+            balance: balanceAmt,
+            paymentStatus: balanceAmt <= 0 ? 'Paid' : 'Partial',
+            status: 'active',
+            planFeatures: newPlanFeatures,
+            assignedAt: new Date().toISOString()
+          };
+
+          // Update Client Profile with plan info
+          await updateClientProfile(clientId, {
+            currentPlan: planNameFormatted,
+            planStart: newClient.planStart,
+            planExpiry: expiry.toISOString().split('T')[0],
+            amountPaid: paidAmt,
+            balance: balanceAmt,
+            paymentStatus: balanceAmt <= 0 ? 'Paid' : 'Partial',
+            planFeatures: newPlanFeatures,
+            planHistory: [newPlanHistoryItem]
+          });
+
+          await assignPlan({ clientId, ...newPlanHistoryItem });
+
+          // Create Billing Record
+          await addDocument('Billing', {
+            clientId: clientId,
+            clientName: newClient.name,
+            clientEmail: newClient.email,
+            clientPhone: newClient.phone || '',
+            date: newClient.planStart,
+            planName: planNameFormatted,
+            originalAmount: originalAmt,
+            discountType: newClient.discountType,
+            discountValue: discountVal,
+            discountAmount: discountAmt,
+            finalAmount: finalAmt,
+            amountPaid: paidAmt,
+            balance: balanceAmt,
+            paymentMethod: newClient.paymentMethod,
+            notes: newClient.notes || '',
+            status: balanceAmt <= 0 ? 'Paid' : 'Partial',
+            updatedAtStr: new Date().toISOString()
+          });
+        }
+      }
+
+      toast.success(`Client "${newClient.name}" created successfully!`);
       setIsAddModalOpen(false);
-      setNewClient({ name: '', email: '', phone: '', age: '', gender: 'Male', password: '' });
+      setNewClient(initialClientForm);
       await fetchClients();
     } catch (err) {
-      toast.error(err.message || 'Failed to add client');
+      toast.error(err?.message || (typeof err === 'string' ? err : 'Failed to create client'));
     } finally {
       setCreating(false);
     }
   };
 
-  // Helper for Membership Status
+  const handleDeleteClient = async (e, clientId, clientName) => {
+    e.stopPropagation();
+    if (!confirm(`Are you sure you want to delete client "${clientName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await deleteClient(clientId);
+      toast.success(`Client "${clientName}" deleted successfully`);
+      await fetchClients();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to delete client');
+    }
+  };
+
+  const handleClearSeedData = async () => {
+    if (!confirm('Are you sure you want to remove all seed test clients? Real registered clients will be preserved.')) {
+      return;
+    }
+
+    setClearingSeed(true);
+    try {
+      const removedCount = await clearSeedClients();
+      toast.success(`Removed ${removedCount} seed test clients!`);
+      await fetchClients();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to remove seed data');
+    } finally {
+      setClearingSeed(false);
+    }
+  };
+
   const getMembershipStatus = (client) => {
     if (client.status === 'inactive') return { label: 'Inactive', variant: 'warning' };
     if (!client.currentPlan) return { label: 'Active', variant: 'success' };
@@ -102,14 +360,32 @@ export default function ClientsPage() {
     return { label: 'Active Member', variant: 'success' };
   };
 
-  // Sort descending by registration / creation date
+  const planOptions = [{ label: '-- No Plan / Assign Later --', value: '' }];
+  allPlansList.forEach(plan => {
+    if (plan.pricing && plan.pricing.length > 0) {
+      plan.pricing.forEach((tier, index) => {
+        const val = tier.durationVal || 1;
+        const unit = tier.durationUnit || 'Months';
+        const price = tier.price || 0;
+        planOptions.push({
+          label: `${plan.plan_name || plan.name} - ${val} ${unit} (₹${price})`,
+          value: `${plan.id}||${index}`
+        });
+      });
+    } else {
+      planOptions.push({
+        label: `${plan.plan_name || plan.name} (₹${plan.price || 0})`,
+        value: `${plan.id}||0`
+      });
+    }
+  });
+
   const sortedClients = [...clients].sort((a, b) => {
     const tA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
     const tB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
     return tB - tA;
   });
 
-  // Filter clients
   const filteredClients = sortedClients.filter(c => {
     const matchesSearch = 
       (c.displayName || c.name)?.toLowerCase().includes(search.toLowerCase()) ||
@@ -120,7 +396,6 @@ export default function ClientsPage() {
     return matchesSearch && matchesStatus;
   });
 
-  // Paginated Clients slice
   const totalItems = filteredClients.length;
   const paginatedClients = filteredClients.slice(
     (currentPage - 1) * itemsPerPage,
@@ -134,17 +409,22 @@ export default function ClientsPage() {
         <div>
           <div style={styles.titleRow}>
             <div style={styles.titleIcon}>
-              <Users size={22} color="var(--accent, #E00008)" />
+              <Users size={18} color="var(--accent, #E00008)" />
             </div>
             <h1 style={styles.title}>Clients Directory</h1>
           </div>
           <p style={styles.subtitle}>
-            Manage member profiles, health metrics & fitness plan assignments
+            Manage member profiles, health metrics & fitness plan assignments in tabular format
           </p>
         </div>
-        <Button onClick={() => setIsAddModalOpen(true)} style={styles.addBtn}>
-          <UserPlus size={18} /> Add Client
-        </Button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <Button onClick={handleClearSeedData} variant="outline" size="sm" loading={clearingSeed} style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}>
+            <Trash2 size={14} /> Remove Seed Data
+          </Button>
+          <Button onClick={() => { setNewClient(initialClientForm); setIsAddModalOpen(true); }} size="sm">
+            <UserPlus size={14} /> Submit New Client
+          </Button>
+        </div>
       </header>
 
       {/* Filter & Search Bar */}
@@ -157,13 +437,13 @@ export default function ClientsPage() {
               setSearch(e.target.value);
               setCurrentPage(1);
             }}
-            icon={<Search size={18} />}
+            icon={<Search size={16} />}
           />
         </div>
 
         <div style={styles.filterWrapper}>
           <div style={styles.filterLabel}>
-            <Filter size={16} color="var(--text-secondary)" /> Status:
+            <Filter size={14} color="var(--text-secondary)" /> Status:
           </div>
           <select
             value={statusFilter}
@@ -180,151 +460,305 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      {/* Grid List */}
-      {loading ? (
-        <div style={styles.grid}>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <CardSkeleton key={i} />
-          ))}
-        </div>
-      ) : (
-        <>
-          <div style={styles.grid}>
-            {paginatedClients.map(client => {
-              const memStatus = getMembershipStatus(client);
-              return (
-                <Card 
-                  key={client.id} 
-                  style={styles.card}
-                  className="glass-card"
-                  onClick={() => router.push(`/admin/clients/${client.id}`)}
-                >
-                  <div style={styles.cardHeader}>
-                    <Avatar src={client.photoURL} name={client.displayName || client.name} size="lg" />
-                    <div style={styles.cardInfo}>
-                      <h3 style={styles.clientName}>{client.displayName || client.name || 'No Name'}</h3>
-                      <p style={styles.clientEmail}>{client.email}</p>
-                    </div>
-                    <ChevronRight size={18} color="var(--text-muted, #666666)" />
-                  </div>
+      {/* TABULAR CLIENTS FORMAT */}
+      <Card style={{ padding: '14px' }} className="glass-card">
+        {loading ? (
+          <TableSkeleton rows={5} />
+        ) : paginatedClients.length > 0 ? (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'var(--card-hover)' }}>
+                  <th style={{ padding: '12px 10px', textAlign: 'left', color: 'var(--text-secondary)' }}>Client Name</th>
+                  <th style={{ padding: '12px 10px', textAlign: 'left', color: 'var(--text-secondary)' }}>Contact Info</th>
+                  <th style={{ padding: '12px 10px', textAlign: 'left', color: 'var(--text-secondary)' }}>Plan & Expiry</th>
+                  <th style={{ padding: '12px 10px', textAlign: 'left', color: 'var(--text-secondary)' }}>Status</th>
+                  <th style={{ padding: '12px 10px', textAlign: 'right', color: 'var(--text-secondary)' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedClients.map((client) => {
+                  const memStatus = getMembershipStatus(client);
+                  const clientName = client.displayName || client.name || 'No Name';
 
-                  <div style={styles.cardDetails}>
-                    {client.phone && (
-                      <div style={styles.detailRow}>
-                        <span style={styles.detailLabel}><Phone size={14} /> Phone:</span>
-                        <span style={styles.detailValue}>{client.phone}</span>
-                      </div>
-                    )}
-                    {(client.age || client.gender) && (
-                      <div style={styles.detailRow}>
-                        <span style={styles.detailLabel}><UserIcon size={14} /> Demographics:</span>
-                        <span style={styles.detailValue}>
-                          {client.age ? `${client.age} yrs` : ''} {client.gender ? `(${client.gender})` : ''}
-                        </span>
-                      </div>
-                    )}
-                    <div style={styles.detailRow}>
-                      <span style={styles.detailLabel}><CreditCard size={14} /> Active Plan:</span>
-                      <span style={styles.detailValue}>{client.currentPlan || 'Not Assigned'}</span>
-                    </div>
-                    <div style={styles.detailRow}>
-                      <span style={styles.detailLabel}>Membership Status:</span>
-                      <Badge variant={memStatus.variant}>
-                        {memStatus.label}
-                      </Badge>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
+                  return (
+                    <tr 
+                      key={client.id} 
+                      style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+                      onClick={() => router.push(`/admin/clients/${client.id}`)}
+                      className="table-row-hover"
+                    >
+                      {/* Client Name & Avatar */}
+                      <td style={{ padding: '12px 10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <Avatar src={client.photoURL || client.profileImage} name={clientName} size="md" />
+                          <div>
+                            <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: '0.88rem' }}>{clientName}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                              Code: {client.clientCode || 'Member'} {client.age ? `• ${client.age} yrs` : ''} {client.gender ? `(${client.gender})` : ''}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Contact Info */}
+                      <td style={{ padding: '12px 10px' }}>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text)' }}>
+                          <Phone size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                          {client.phone || '--'}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                          {client.email || '--'}
+                        </div>
+                      </td>
+
+                      {/* Plan & Expiry */}
+                      <td style={{ padding: '12px 10px' }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text)' }}>
+                          {client.currentPlan || 'Not Assigned'}
+                        </div>
+                        {client.planExpiry && (
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                            📅 Expiry: {client.planExpiry}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Status */}
+                      <td style={{ padding: '12px 10px' }}>
+                        <Badge variant={memStatus.variant} size="sm">
+                          {memStatus.label}
+                        </Badge>
+                      </td>
+
+                      {/* Actions */}
+                      <td style={{ padding: '12px 10px', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', alignItems: 'center' }}>
+                          <Button size="sm" variant="outline" onClick={() => router.push(`/admin/clients/${client.id}`)}>
+                            View <ChevronRight size={14} />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            style={{ color: 'var(--danger)', padding: '6px' }}
+                            onClick={(e) => handleDeleteClient(e, client.id, clientName)}
+                            title="Delete Client"
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
+        ) : (
+          <div style={styles.emptyState}>
+            <Users size={36} color="var(--text-muted)" />
+            <h3 style={{ margin: '8px 0 2px', color: 'var(--text)' }}>No Clients Found</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+              Try adjusting your search query or click "Submit New Client" above.
+            </p>
+          </div>
+        )}
 
-          {filteredClients.length === 0 && (
-            <div style={styles.emptyState}>
-              <Users size={48} color="var(--text-muted, #666666)" />
-              <h3 style={{ margin: '12px 0 4px', color: '#FFFFFF' }}>No Clients Found</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                Try adjusting your search query or filter.
-              </p>
-            </div>
-          )}
+        {totalItems > 0 && (
+          <Pagination
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            currentPage={currentPage}
+            onPageChange={(page) => setCurrentPage(page)}
+            onItemsPerPageChange={(size) => {
+              setItemsPerPage(size);
+              setCurrentPage(1);
+            }}
+            itemsPerPageOptions={[10, 25, 50, 100]}
+          />
+        )}
+      </Card>
 
-          {/* Pagination */}
-          {totalItems > 0 && (
-            <Pagination
-              totalItems={totalItems}
-              itemsPerPage={itemsPerPage}
-              currentPage={currentPage}
-              onPageChange={(page) => setCurrentPage(page)}
-              onItemsPerPageChange={(size) => {
-                setItemsPerPage(size);
-                setCurrentPage(1);
-              }}
-              itemsPerPageOptions={[6, 12, 24, 48]}
-            />
-          )}
-        </>
-      )}
-
-      {/* Add Client Modal */}
+      {/* Add Client & Optional Plan/Billing Modal */}
       <Modal 
         isOpen={isAddModalOpen} 
         onClose={() => setIsAddModalOpen(false)}
-        title="Add New Client Account"
+        title="Submit New Client Account & Optional Plan Assignment"
+        size="lg"
       >
-        <form onSubmit={handleCreateClient} style={styles.form}>
-          <Input 
-            label="Full Name *" 
-            placeholder="e.g. John Doe" 
-            value={newClient.name}
-            onChange={(e) => setNewClient({...newClient, name: e.target.value})}
-            required 
-          />
-          <Input 
-            label="Email Address *" 
-            type="email" 
-            placeholder="john@example.com" 
-            value={newClient.email}
-            onChange={(e) => setNewClient({...newClient, email: e.target.value})}
-            required 
-          />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+        <form onSubmit={handleCreateClient} style={styles.modalForm}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <Input 
+              label="Full Name *" 
+              placeholder="e.g. Rahul Sharma"
+              value={newClient.name}
+              onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
+              required
+            />
+            <Input 
+              label="Email Address *" 
+              type="email"
+              placeholder="e.g. rahul@gmail.com"
+              value={newClient.email}
+              onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
+              required
+            />
+          </div>
+
+          <div style={styles.formRow}>
+            <Input 
+              label="Phone Number" 
+              placeholder="10-digit mobile number"
+              value={newClient.phone}
+              onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
+              phone={true}
+            />
             <Input 
               label="Age" 
-              type="number" 
-              placeholder="e.g. 25" 
+              placeholder="e.g. 25"
               value={newClient.age}
-              onChange={(e) => setNewClient({...newClient, age: e.target.value})}
+              onChange={(e) => setNewClient({ ...newClient, age: e.target.value })}
+              numeric={true}
+              maxDigits={3}
             />
+          </div>
+
+          <div style={styles.formRow}>
             <Select 
               label="Gender"
               value={newClient.gender}
-              onChange={(e) => setNewClient({...newClient, gender: e.target.value})}
+              onChange={(e) => setNewClient({ ...newClient, gender: e.target.value })}
               options={[
                 { label: 'Male', value: 'Male' },
                 { label: 'Female', value: 'Female' },
                 { label: 'Other', value: 'Other' }
               ]}
             />
+
+            <Input 
+              label="Password *" 
+              type="password"
+              placeholder="Set client password"
+              value={newClient.password}
+              onChange={(e) => setNewClient({ ...newClient, password: e.target.value })}
+              required
+            />
           </div>
-          <Input 
-            label="Phone Number" 
-            type="tel" 
-            placeholder="+1 555-0199" 
-            value={newClient.phone}
-            onChange={(e) => setNewClient({...newClient, phone: e.target.value})}
-          />
-          <Input 
-            label="Temporary Password *" 
-            type="password" 
-            placeholder="Password for client login" 
-            value={newClient.password}
-            onChange={(e) => setNewClient({...newClient, password: e.target.value})}
-            required 
-          />
-          <Button type="submit" fullWidth loading={creating} style={{ marginTop: '10px' }}>
-            Create Client Account
-          </Button>
+
+          {/* OPTIONAL MEMBERSHIP PLAN & BILLING ASSIGNMENT */}
+          <Card style={{ padding: '12px', backgroundColor: 'var(--card-hover)', border: '1px solid var(--border)', marginTop: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+              <CreditCard size={16} color="var(--accent)" />
+              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text)' }}>
+                Assign Membership Plan & Billing (Optional)
+              </span>
+            </div>
+
+            <SearchableSelect 
+              label="Select Membership Plan" 
+              placeholder="-- No Plan / Assign Later --"
+              searchPlaceholder="Search plans by name or duration..."
+              value={newClient.planIdCombo} 
+              onChange={handlePlanSelectChange}
+              options={planOptions}
+            />
+
+            {newClient.planIdCombo && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <Input 
+                    label="Plan Start Date *" 
+                    type="date"
+                    value={newClient.planStart} 
+                    onChange={(e) => setNewClient({ ...newClient, planStart: e.target.value })}
+                    required
+                  />
+                  <Input 
+                    label="Original Amount (₹) *" 
+                    placeholder="e.g. 1599"
+                    value={newClient.originalAmount}
+                    onChange={(e) => setNewClient({ ...newClient, originalAmount: e.target.value })}
+                    numeric={true}
+                    allowDecimal={true}
+                    required
+                  />
+                </div>
+
+                {/* Discount Section */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <Select 
+                    label="Discount Type"
+                    value={newClient.discountType}
+                    onChange={(e) => setNewClient({ ...newClient, discountType: e.target.value })}
+                    options={[
+                      { label: 'Percentage (%)', value: 'percentage' },
+                      { label: 'Flat Amount (₹)', value: 'amount' }
+                    ]}
+                  />
+                  <Input 
+                    label={newClient.discountType === 'percentage' ? 'Discount %' : 'Discount Amount (₹)'}
+                    placeholder={newClient.discountType === 'percentage' ? 'e.g. 10' : 'e.g. 200'}
+                    value={newClient.discountValue}
+                    onChange={(e) => setNewClient({ ...newClient, discountValue: e.target.value })}
+                    numeric={true}
+                    allowDecimal={true}
+                  />
+                </div>
+
+                {/* Price & Balance Live Summary */}
+                <div style={{ padding: '8px 10px', borderRadius: '6px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Final Payable Price: </span>
+                    <strong style={{ fontSize: '0.95rem', color: '#00c853' }}>₹{calculateFinalAmount().toLocaleString('en-IN')}</strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Pending Balance Due: </span>
+                    <strong style={{ fontSize: '0.95rem', color: calculateBalance() > 0 ? 'var(--danger)' : '#00c853' }}>₹{calculateBalance().toLocaleString('en-IN')}</strong>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <Input 
+                    label="Amount Paid Now (₹) *" 
+                    placeholder="e.g. 1599"
+                    value={newClient.amountPaid}
+                    onChange={(e) => setNewClient({ ...newClient, amountPaid: e.target.value })}
+                    numeric={true}
+                    allowDecimal={true}
+                    required
+                  />
+                  <Select 
+                    label="Payment Method"
+                    value={newClient.paymentMethod}
+                    onChange={(e) => setNewClient({ ...newClient, paymentMethod: e.target.value })}
+                    options={[
+                      { label: '💵 Cash', value: 'Cash' },
+                      { label: '📱 UPI / Google Pay', value: 'UPI' },
+                      { label: '💳 Card', value: 'Card' },
+                      { label: '🏦 Bank Transfer', value: 'Bank Transfer' },
+                      { label: '📝 Other', value: 'Other' }
+                    ]}
+                  />
+                </div>
+
+                <Input 
+                  label="Payment / Receipt Note"
+                  placeholder="e.g. Received via GPay Ref #9923"
+                  value={newClient.notes}
+                  onChange={(e) => setNewClient({ ...newClient, notes: e.target.value })}
+                />
+              </div>
+            )}
+          </Card>
+
+          <div style={styles.modalActions}>
+            <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={creating}>
+              <Send size={15} /> Submit Client
+            </Button>
+          </div>
         </form>
       </Modal>
     </div>
@@ -332,80 +766,95 @@ export default function ClientsPage() {
 }
 
 const styles = {
-  container: { display: 'flex', flexDirection: 'column', gap: '16px' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' },
-  titleRow: { display: 'flex', alignItems: 'center', gap: '10px' },
+  container: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '12px',
+  },
+  titleRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
   titleIcon: {
-    width: '36px',
-    height: '36px',
-    borderRadius: '10px',
-    backgroundColor: 'var(--accent-surface, rgba(224, 0, 8, 0.1))',
+    width: '32px',
+    height: '32px',
+    borderRadius: '8px',
+    backgroundColor: 'var(--accent-surface)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    border: '1px solid rgba(224, 0, 8, 0.2)',
   },
-  title: { fontSize: '1.25rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' },
-  subtitle: { color: 'var(--text-secondary, #AAAAAA)', margin: '4px 0 0 0', fontSize: '0.825rem' },
-  addBtn: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' },
+  title: {
+    margin: 0,
+    fontSize: '1.2rem',
+    fontWeight: 800,
+    color: 'var(--text)',
+  },
+  subtitle: {
+    margin: '2px 0 0',
+    color: 'var(--text-secondary)',
+    fontSize: '0.78rem',
+  },
   controlsBar: {
     display: 'flex',
-    justify: 'space-between',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: '10px',
+    gap: '12px',
     flexWrap: 'wrap',
   },
-  searchWrapper: { flex: 1, minWidth: '200px', maxWidth: '100%' },
-  filterWrapper: { display: 'flex', alignItems: 'center', gap: '8px' },
-  filterLabel: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)' },
+  searchWrapper: {
+    flex: 1,
+    minWidth: '220px',
+  },
+  filterWrapper: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  filterLabel: {
+    fontSize: '0.78rem',
+    color: 'var(--text-secondary)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    fontWeight: 600,
+  },
   filterSelect: {
-    backgroundColor: 'var(--card, #121214)',
-    border: '1px solid var(--border, #2a2a30)',
-    color: '#FFFFFF',
     padding: '8px 12px',
-    borderRadius: '10px',
+    borderRadius: 'var(--radius)',
+    backgroundColor: 'var(--card)',
+    color: 'var(--text)',
+    border: '1px solid var(--border)',
     fontSize: '0.8rem',
     outline: 'none',
     cursor: 'pointer',
   },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-    gap: '12px',
-  },
-  card: {
-    padding: '20px',
-    cursor: 'pointer',
-  },
-  cardHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '14px',
-    marginBottom: '16px',
-  },
-  cardInfo: { flex: 1, overflow: 'hidden' },
-  clientName: { margin: '0 0 2px 0', fontSize: '1.1rem', fontWeight: 700, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' },
-  clientEmail: { margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary, #AAAAAA)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' },
-  cardDetails: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-    paddingTop: '14px',
-    borderTop: '1px solid var(--border, #2a2a30)',
-  },
-  detailRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  detailLabel: { color: 'var(--text-secondary, #AAAAAA)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' },
-  detailValue: { fontSize: '0.875rem', fontWeight: 500 },
   emptyState: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '60px 20px',
-    backgroundColor: 'var(--card, #121214)',
-    borderRadius: 'var(--radius, 20px)',
-    border: '1px solid var(--border, #2a2a30)',
+    padding: '40px 16px',
     textAlign: 'center',
   },
-  form: { display: 'flex', flexDirection: 'column', gap: '16px' }
+  modalForm: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  formRow: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '10px',
+  },
+  modalActions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '8px',
+    marginTop: '8px',
+  },
 };
