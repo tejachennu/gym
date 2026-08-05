@@ -27,7 +27,8 @@ import {
   Sparkles,
   Calendar,
   Briefcase,
-  MapPin
+  MapPin,
+  Smartphone
 } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -475,6 +476,22 @@ export default function ProfilePage() {
                   Main Stress Sources: <span style={{ color: 'var(--text)' }}>{form.stressSources}</span>
                 </div>
               )}
+            </div>
+          </Card>
+
+          {/* PWA INSTALLATION BANNER */}
+          <Card style={{ padding: '12px 14px', borderRadius: '12px', background: 'linear-gradient(135deg, rgba(224, 0, 8, 0.12) 0%, var(--card) 100%)', border: '1px solid rgba(224, 0, 8, 0.3)' }} className="glass-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Smartphone size={20} color="var(--accent, #E00008)" />
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: 'var(--text)' }}>Install Mobile App (PWA)</h4>
+                  <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Add MRK Fitness App to your Android & iPhone Home Screen</p>
+                </div>
+              </div>
+              <Button size="sm" onClick={() => router.push('/install-pwa')} style={{ fontSize: '0.75rem', padding: '6px 12px' }}>
+                Install App 📲
+              </Button>
             </div>
           </Card>
 
