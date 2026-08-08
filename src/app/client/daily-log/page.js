@@ -73,6 +73,7 @@ export default function TrackingPage() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
@@ -82,10 +83,14 @@ export default function TrackingPage() {
   const [selectedMeasurementKey, setSelectedMeasurementKey] = useState('weight');
 
   // Date Range Filters for Analytics Graphs (Default 1 Month)
-  const defaultToDate = new Date().toISOString().split('T')[0];
-  const defaultFromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-  const [fromDate, setFromDate] = useState(defaultFromDate);
-  const [toDate, setToDate] = useState(defaultToDate);
+  const getDefaultFromDate = () => {
+    const d = new Date();
+    return new Date(d.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  };
+  const getDefaultToDate = () => new Date().toISOString().split('T')[0];
+
+  const [fromDate, setFromDate] = useState(getDefaultFromDate);
+  const [toDate, setToDate] = useState(getDefaultToDate);
 
   const [profile, setProfile] = useState(null);
   const [masterPlans, setMasterPlans] = useState([]);
@@ -99,7 +104,6 @@ export default function TrackingPage() {
     water: '',
     sleepHours: '',
     workoutWeight: '',
-    treadmillPhoto: '',
     sleepQuality: 'Good',
     energyLevel: 'Medium',
     mood: 'Good',
@@ -107,8 +111,9 @@ export default function TrackingPage() {
   });
 
   // Combined Posture Photos & Sizing Measurements State
-  const [posturePhotos, setPosturePhotos] = useState({ front: '', back: '', left: '', right: '', treadmillWheel: '' });
+  const [posturePhotos, setPosturePhotos] = useState({ front: '', back: '', left: '', right: '' });
   const [uploadingPhotos, setUploadingPhotos] = useState({});
+  const [viewingPhotoUrl, setViewingPhotoUrl] = useState(null);
 
   const [sizingForm, setSizingForm] = useState({
     weight: '', neck: '', shoulder: '', chest: '', waist: '', stomach: '', highHip: '',
@@ -116,12 +121,6 @@ export default function TrackingPage() {
   });
 
   const todayDateString = new Date().toISOString().split('T')[0];
-
-  useEffect(() => {
-    if (user?.uid) {
-      loadAllData();
-    }
-  }, [user]);
 
   const loadAllData = async () => {
     try {
@@ -146,7 +145,6 @@ export default function TrackingPage() {
           water: tLog.water !== undefined ? String(tLog.water) : '',
           sleepHours: tLog.sleepHours !== undefined ? String(tLog.sleepHours) : '',
           workoutWeight: tLog.workoutWeight !== undefined ? String(tLog.workoutWeight) : '',
-          treadmillPhoto: tLog.treadmillPhoto || '',
           sleepQuality: tLog.sleepQuality || 'Good',
           energyLevel: tLog.energyLevel || 'Medium',
           mood: tLog.mood || 'Good',
@@ -155,11 +153,19 @@ export default function TrackingPage() {
       }
     } catch (err) {
       console.error(err);
-      toast.error('Failed to load tracking data');
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (user?.uid) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadAllData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
 
   // Strict Feature Verification
   const hasPlan = profile?.currentPlan && profile?.currentPlan !== 'None' && profile?.currentPlan !== 'Not Assigned';
@@ -193,11 +199,7 @@ export default function TrackingPage() {
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64 = reader.result;
-        if (side === 'activityTreadmill') {
-          setActivityWellnessForm(prev => ({ ...prev, treadmillPhoto: base64 }));
-        } else {
-          setPosturePhotos(prev => ({ ...prev, [side]: base64 }));
-        }
+        setPosturePhotos(prev => ({ ...prev, [side]: base64 }));
         toast.success(`Photo selected!`);
         setUploadingPhotos(prev => ({ ...prev, [side]: false }));
       };
@@ -220,7 +222,6 @@ export default function TrackingPage() {
         water: activityWellnessForm.water ? Number(activityWellnessForm.water) : 0,
         sleepHours: activityWellnessForm.sleepHours ? Number(activityWellnessForm.sleepHours) : 0,
         workoutWeight: activityWellnessForm.workoutWeight ? Number(activityWellnessForm.workoutWeight) : 0,
-        treadmillPhoto: activityWellnessForm.treadmillPhoto || '',
         sleepQuality: activityWellnessForm.sleepQuality,
         energyLevel: activityWellnessForm.energyLevel,
         mood: activityWellnessForm.mood,
@@ -273,7 +274,7 @@ export default function TrackingPage() {
 
       toast.success('10-Day Body Posture & Sizing Check-in submitted successfully!');
       setShowInputPopup(false);
-      setPosturePhotos({ front: '', back: '', left: '', right: '', treadmillWheel: '' });
+      setPosturePhotos({ front: '', back: '', left: '', right: '' });
       setSizingForm({ weight: '', neck: '', shoulder: '', chest: '', waist: '', stomach: '', highHip: '', rBicep: '', lBicep: '', rForearm: '', lForearm: '', rThigh: '', lThigh: '', rCalf: '', lCalf: '' });
       await loadAllData();
     } catch (err) {
@@ -330,11 +331,29 @@ export default function TrackingPage() {
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
       <Spinner />
+      {/* FULL VIEW PHOTO LIGHTBOX MODAL */}
+      {viewingPhotoUrl && (
+        <Modal 
+          isOpen={!!viewingPhotoUrl} 
+          onClose={() => setViewingPhotoUrl(null)} 
+          title="Photo Full View" 
+          size="md"
+        >
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '10px' }}>
+            <img 
+              src={getDirectImageUrl(viewingPhotoUrl)} 
+              alt="Photo Full View" 
+              style={{ maxWidth: '100%', maxHeight: '72vh', borderRadius: '8px', objectFit: 'contain' }} 
+            />
+          </div>
+        </Modal>
+      )}
     </div>
   );
 
   return (
-    <div style={styles.container} className="animate-fade-up">
+    <>
+      <div style={styles.container} className="animate-fade-up">
       {/* Header */}
       <header style={styles.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -391,12 +410,11 @@ export default function TrackingPage() {
 
       </div>
 
+      </div>
+
       {/* OVERLAY SHEETS */}
-      {mounted && activeModal && createPortal(
-        <>
-          {/* SHEET 1: UNIFIED DAILY ACTIVITY & WELLNESS */}
-          {activeModal === 'activity_wellness' && (
-            <div style={styles.fullScreenOverlay} className="animate-fade-up">
+      {mounted && activeModal === 'activity_wellness' && createPortal((
+        <div style={styles.fullScreenOverlay} className="animate-fade-up">
               <header style={styles.sheetHeader}>
                 <button onClick={() => setActiveModal(null)} style={styles.sheetBackBtn}>
                   <ArrowLeft size={18} color="var(--text)" />
@@ -446,7 +464,7 @@ export default function TrackingPage() {
                   {isTodayActivityWellnessDone ? (
                     <>✓ Daily Activity & Wellness Submitted Today</>
                   ) : (
-                    <><PlusCircle size={16} /> Log Today's Activity & Wellness</>
+                    <><PlusCircle size={16} /> Log Today&apos;s Activity & Wellness</>
                   )}
                 </Button>
 
@@ -521,23 +539,6 @@ export default function TrackingPage() {
                       <Input label="Workout Weight Lifted (kg)" type="number" step="0.5" value={activityWellnessForm.workoutWeight} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, workoutWeight: e.target.value })} />
                     </div>
 
-                    {/* Treadmill Photo Upload */}
-                    <Card style={{ padding: '8px', backgroundColor: 'var(--card-hover)', border: '1px dashed var(--border)' }}>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 700, marginBottom: '4px', color: 'var(--text)' }}>
-                        📸 Treadmill Photo / Proof (Optional)
-                      </div>
-                      <input type="file" accept="image/*" id="treadmill-photo-upload" onChange={(e) => handlePhotoUpload(e, 'activityTreadmill')} style={{ display: 'none' }} />
-                      <label htmlFor="treadmill-photo-upload" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '6px', backgroundColor: 'var(--card)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem' }}>
-                        {uploadingPhotos['activityTreadmill'] ? <Spinner size={12} /> : <Upload size={14} color="var(--accent)" />}
-                        {activityWellnessForm.treadmillPhoto ? '✓ Photo Selected (Change)' : 'Choose Treadmill Photo'}
-                      </label>
-                      {activityWellnessForm.treadmillPhoto && (
-                        <div style={{ marginTop: '6px', textAlign: 'center' }}>
-                          <img src={getDirectImageUrl(activityWellnessForm.treadmillPhoto)} alt="Treadmill preview" style={{ height: '60px', borderRadius: '4px', objectFit: 'cover' }} />
-                        </div>
-                      )}
-                    </Card>
-
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
                       <Select label="Sleep Quality" value={activityWellnessForm.sleepQuality} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, sleepQuality: e.target.value })} options={[{ label: 'Good', value: 'Good' }, { label: 'Average', value: 'Average' }, { label: 'Poor', value: 'Poor' }]} />
                       <Select label="Energy Level" value={activityWellnessForm.energyLevel} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, energyLevel: e.target.value })} options={[{ label: 'High', value: 'High' }, { label: 'Medium', value: 'Medium' }, { label: 'Low', value: 'Low' }]} />
@@ -553,11 +554,11 @@ export default function TrackingPage() {
                 </Modal>
               )}
             </div>
-          )}
+        ), document.body)}
 
-          {/* SHEET 2: UNIFIED 10-DAY BODY POSTURE & SIZING */}
-          {hasPostureCheckin && activeModal === 'posture_sizing' && (
-            <div style={styles.fullScreenOverlay} className="animate-fade-up">
+      {/* SHEET 2: UNIFIED 10-DAY BODY POSTURE & SIZING */}
+      {mounted && hasPostureCheckin && activeModal === 'posture_sizing' && createPortal((
+        <div style={styles.fullScreenOverlay} className="animate-fade-up">
               <header style={styles.sheetHeader}>
                 <button onClick={() => setActiveModal(null)} style={styles.sheetBackBtn}>
                   <ArrowLeft size={18} color="var(--text)" />
@@ -657,7 +658,13 @@ export default function TrackingPage() {
                               {posturePhotos[side] ? '✓ Uploaded' : 'Upload'}
                             </label>
                             {posturePhotos[side] && (
-                              <img src={getDirectImageUrl(posturePhotos[side])} alt={`${side} preview`} style={{ width: '100%', height: '50px', objectFit: 'cover', borderRadius: '4px', marginTop: '4px' }} />
+                              <img 
+                                src={getDirectImageUrl(posturePhotos[side])} 
+                                alt={`${side} preview`} 
+                                style={{ width: '100%', height: '50px', objectFit: 'cover', borderRadius: '4px', marginTop: '4px', cursor: 'pointer' }} 
+                                onClick={() => setViewingPhotoUrl(posturePhotos[side])}
+                                title="Click to view full photo"
+                              />
                             )}
                           </div>
                         ))}
@@ -690,11 +697,8 @@ export default function TrackingPage() {
                 </Modal>
               )}
             </div>
-          )}
-        </>
-      , document.body)}
-
-    </div>
+        ), document.body)}
+    </>
   );
 }
 

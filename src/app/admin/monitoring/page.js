@@ -16,6 +16,8 @@ import EmptyState from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/Toast';
 import Modal from '@/components/ui/Modal';
 import Pagination from '@/components/ui/Pagination';
+import StatsCard from '@/components/ui/StatsCard';
+import Avatar from '@/components/ui/Avatar';
 import { 
   Activity, 
   Search, 
@@ -26,7 +28,11 @@ import {
   Square,
   MessageSquare,
   Filter,
-  Send
+  Send,
+  Users,
+  Clock,
+  CheckCircle2,
+  Calendar
 } from 'lucide-react';
 
 function getDirectImageUrl(url) {
@@ -66,13 +72,20 @@ export default function MonitoringPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   
   // Date Filters (Default 1 Month)
-  const defaultToDate = new Date().toISOString().split('T')[0];
-  const defaultFromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-  const [fromDate, setFromDate] = useState(defaultFromDate);
-  const [toDate, setToDate] = useState(defaultToDate);
+  const getDefaultFromDate = () => {
+    const d = new Date();
+    return new Date(d.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  };
+  const getDefaultToDate = () => new Date().toISOString().split('T')[0];
+
+  const [fromDate, setFromDate] = useState(getDefaultFromDate);
+  const [toDate, setToDate] = useState(getDefaultToDate);
 
   const [loading, setLoading] = useState(true);
   const [masterCards, setMasterCards] = useState([]);
+  const [clientsRawList, setClientsRawList] = useState([]);
+  const [totalClientsCount, setTotalClientsCount] = useState(0);
+  const [selectedProfileClient, setSelectedProfileClient] = useState(null);
   const [remarksMap, setRemarksMap] = useState({});
   const [reviewingMap, setReviewingMap] = useState({});
   const [viewingPhotoUrl, setViewingPhotoUrl] = useState(null);
@@ -80,18 +93,17 @@ export default function MonitoringPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
 
-  useEffect(() => {
-    fetchMasterDailyFeed();
-  }, []);
-
-  const fetchMasterDailyFeed = async () => {
+  const fetchMasterDailyFeed = async (showLoading = false) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       const [clientsList, dailyLogsList, checkinsList] = await Promise.all([
         getAllClients(),
         getDocuments('DailyLogs'),
         getDocuments('BodyCheckins')
       ]);
+
+      setTotalClientsCount(clientsList.length);
+      setClientsRawList(clientsList || []);
 
       const clientMap = {};
       const workoutPlanMap = {};
@@ -193,6 +205,12 @@ export default function MonitoringPage() {
     }
   };
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchMasterDailyFeed();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleReviewCard = async (card) => {
     setReviewingMap(prev => ({ ...prev, [card.id]: true }));
     try {
@@ -216,7 +234,7 @@ export default function MonitoringPage() {
 
       await Promise.all(promises);
       toast.success(`Daily log for ${card.clientName} submitted review!`);
-      await fetchMasterDailyFeed();
+      await fetchMasterDailyFeed(true);
     } catch (err) {
       console.error(err);
       toast.error(err);
@@ -241,6 +259,24 @@ export default function MonitoringPage() {
 
     return true;
   });
+
+  // Calculate Today's Stats
+  const getTodayDateStr = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const todayStr = getTodayDateStr();
+  const todayCards = masterCards.filter(c => c.date === todayStr);
+  const todayUniqueClientsCount = new Set(todayCards.map(c => c.clientId)).size;
+  const todayPendingCount = todayCards.filter(c => !c.reviewed).length;
+  const todayReviewedCount = todayCards.filter(c => c.reviewed).length;
+  const submissionPercentage = totalClientsCount > 0 
+    ? Math.round((todayUniqueClientsCount / totalClientsCount) * 100) 
+    : 0;
 
   const totalItems = filteredCards.length;
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -279,6 +315,73 @@ export default function MonitoringPage() {
         </div>
       </header>
 
+      {/* Today's Submission Stats Grid */}
+      <div style={styles.statsGrid}>
+        <StatsCard 
+          title="SUBMITTED TODAY" 
+          value={`${todayUniqueClientsCount} Members`} 
+          description={`${submissionPercentage}% of ${totalClientsCount} total active clients`}
+          icon={Users} 
+          color="#00c853" 
+          loading={loading}
+          onClick={() => {
+            setFromDate(todayStr);
+            setToDate(todayStr);
+            setStatusFilter('all');
+            setCurrentPage(1);
+          }}
+          isActive={fromDate === todayStr && toDate === todayStr && statusFilter === 'all'}
+        />
+
+        <StatsCard 
+          title="PENDING TODAY" 
+          value={`${todayPendingCount} Logs`} 
+          description="Awaiting trainer review today"
+          icon={Clock} 
+          color="#ffd600" 
+          loading={loading}
+          onClick={() => {
+            setFromDate(todayStr);
+            setToDate(todayStr);
+            setStatusFilter('pending');
+            setCurrentPage(1);
+          }}
+          isActive={fromDate === todayStr && toDate === todayStr && statusFilter === 'pending'}
+        />
+
+        <StatsCard 
+          title="REVIEWED TODAY" 
+          value={`${todayReviewedCount} Logs`} 
+          description="Reviewed & feedback sent today"
+          icon={CheckCircle2} 
+          color="#29b6f6" 
+          loading={loading}
+          onClick={() => {
+            setFromDate(todayStr);
+            setToDate(todayStr);
+            setStatusFilter('reviewed');
+            setCurrentPage(1);
+          }}
+          isActive={fromDate === todayStr && toDate === todayStr && statusFilter === 'reviewed'}
+        />
+
+        <StatsCard 
+          title="FILTERED LOGS" 
+          value={`${filteredCards.length} Logs`} 
+          description="Logs matching current search & date filter"
+          icon={Calendar} 
+          color="var(--accent, #E00008)" 
+          loading={loading}
+          onClick={() => {
+            setFromDate(getDefaultFromDate());
+            setToDate(getDefaultToDate());
+            setStatusFilter('all');
+            setSearch('');
+            setCurrentPage(1);
+          }}
+        />
+      </div>
+
       {/* Date Filter Bar */}
       <Card style={{ padding: '8px 12px' }} className="glass-card">
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -310,7 +413,7 @@ export default function MonitoringPage() {
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={() => { setFromDate(defaultFromDate); setToDate(defaultToDate); setSearch(''); setCurrentPage(1); }}
+              onClick={() => { setFromDate(getDefaultFromDate()); setToDate(getDefaultToDate()); setSearch(''); setCurrentPage(1); }}
               style={{ alignSelf: 'flex-end' }}
             >
               Reset
@@ -334,6 +437,7 @@ export default function MonitoringPage() {
         <div style={styles.cardList}>
           {paginatedCards.map(card => {
             const { dailyLog, checkin, workoutPlan, reviewed, clientName, date: cardDate, id: cardId } = card;
+            const clientObj = clientsRawList.find(c => c.id === card.clientId) || { id: card.clientId, name: card.clientName };
 
             const completedExerciseIndices = dailyLog?.completedExercises || [];
             const workoutPlanTitle = workoutPlan?.title || workoutPlan?.planName || dailyLog?.workoutPlanTitle || 'Workout Plan';
@@ -348,10 +452,25 @@ export default function MonitoringPage() {
               <div key={cardId} style={styles.masterCard} className="glass-card">
                 
                 <div style={styles.cardHeader}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
-                    <div style={styles.avatarCircle}>
-                      {clientName.charAt(0).toUpperCase()}
-                    </div>
+                  <div 
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0, cursor: 'pointer' }}
+                    onClick={() => {
+                      setSelectedProfileClient(clientObj);
+                    }}
+                    title="Click to view client profile"
+                  >
+                    <Avatar 
+                      src={clientObj.photoURL || clientObj.profileImage || clientObj.photo || clientObj.avatar || card.photoURL || card.clientPhoto} 
+                      name={clientName} 
+                      size="sm" 
+                      onClick={(e) => {
+                        const p = clientObj.photoURL || clientObj.profileImage || clientObj.photo || clientObj.avatar || card.photoURL || card.clientPhoto;
+                        if (p) {
+                          e.stopPropagation();
+                          setViewingPhotoUrl(p);
+                        }
+                      }}
+                    />
 
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -494,24 +613,50 @@ export default function MonitoringPage() {
                 </div>
 
                 {/* Trainer Action Footer */}
-                <div style={styles.actionRow}>
-                  <Input 
-                    placeholder="Trainer review remarks..." 
-                    value={remarksMap[cardId] || ''} 
-                    onChange={(e) => setRemarksMap({ ...remarksMap, [cardId]: e.target.value })}
-                  />
-                  <Button 
-                    onClick={() => handleReviewCard(card)}
-                    loading={reviewingMap[cardId]}
-                    size="sm"
-                    style={{
-                      backgroundColor: reviewed ? 'rgba(0, 200, 83, 0.15)' : 'var(--accent, #E00008)',
-                      color: reviewed ? '#00c853' : '#FFFFFF',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    <Send size={14} /> {reviewed ? 'Submitted' : 'Submit Review'}
-                  </Button>
+                <div style={{
+                  padding: '10px 12px',
+                  backgroundColor: reviewed ? 'rgba(0, 200, 83, 0.05)' : 'rgba(224, 0, 8, 0.05)',
+                  border: `1px solid ${reviewed ? 'rgba(0, 200, 83, 0.2)' : 'rgba(224, 0, 8, 0.2)'}`,
+                  borderRadius: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', fontWeight: 700, color: reviewed ? '#00c853' : 'var(--accent, #E00008)' }}>
+                      <MessageSquare size={14} />
+                      <span>{reviewed ? 'Trainer Review Completed' : 'Write Trainer Review & Feedback'}</span>
+                    </div>
+
+                    <span style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      {reviewed ? '✓ Synced to Client Dashboard' : 'Pending Trainer Feedback'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <Input 
+                        placeholder="Type trainer feedback for client profile..." 
+                        value={remarksMap[cardId] || ''} 
+                        onChange={(e) => setRemarksMap({ ...remarksMap, [cardId]: e.target.value })}
+                        style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)', border: '1px solid var(--border)' }}
+                      />
+                    </div>
+                    <Button 
+                      onClick={() => handleReviewCard(card)}
+                      loading={reviewingMap[cardId]}
+                      size="sm"
+                      style={{
+                        backgroundColor: reviewed ? '#00c853' : 'var(--accent, #E00008)',
+                        color: '#FFFFFF',
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap',
+                        boxShadow: reviewed ? '0 0 12px rgba(0,200,83,0.3)' : '0 0 12px rgba(224,0,8,0.3)'
+                      }}
+                    >
+                      <Send size={14} /> {reviewed ? 'Update Review' : 'Submit Review'}
+                    </Button>
+                  </div>
                 </div>
 
               </div>
@@ -542,6 +687,123 @@ export default function MonitoringPage() {
           </div>
         </Modal>
       )}
+
+      {/* CLIENT PROFILE POPUP MODAL */}
+      {selectedProfileClient && (
+        <Modal
+          isOpen={!!selectedProfileClient}
+          onClose={() => setSelectedProfileClient(null)}
+          title={`Client Profile: ${selectedProfileClient.displayName || selectedProfileClient.name || 'Member'}`}
+          size="lg"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {/* Header Info */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', backgroundColor: 'var(--card-hover)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+              <Avatar 
+                src={selectedProfileClient.photoURL || selectedProfileClient.profileImage || selectedProfileClient.photo || selectedProfileClient.avatar} 
+                name={selectedProfileClient.displayName || selectedProfileClient.name} 
+                size="lg" 
+                onClick={() => {
+                  const p = selectedProfileClient.photoURL || selectedProfileClient.profileImage || selectedProfileClient.photo || selectedProfileClient.avatar;
+                  if (p) setViewingPhotoUrl(p);
+                }}
+              />
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text)' }}>
+                    {selectedProfileClient.displayName || selectedProfileClient.name}
+                  </h3>
+                  <span style={{
+                    padding: '2px 6px',
+                    borderRadius: '8px',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    backgroundColor: selectedProfileClient.status === 'active' ? 'rgba(0, 200, 83, 0.15)' : 'rgba(255, 214, 0, 0.15)',
+                    color: selectedProfileClient.status === 'active' ? '#00c853' : '#ffd600',
+                    border: `1px solid ${selectedProfileClient.status === 'active' ? 'rgba(0, 200, 83, 0.3)' : 'rgba(255, 214, 0, 0.3)'}`
+                  }}>
+                    {(selectedProfileClient.status || 'ACTIVE').toUpperCase()}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <span>📧 {selectedProfileClient.email || '--'}</span>
+                  <span>📞 {selectedProfileClient.phone || '--'}</span>
+                  <span>🆔 Code: {selectedProfileClient.clientCode || '100'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Plan Info Card */}
+            <div style={{ padding: '12px', backgroundColor: 'rgba(224, 0, 8, 0.06)', borderRadius: '12px', border: '1px solid rgba(224, 0, 8, 0.2)' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                Assigned Membership Plan
+              </div>
+              <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text)' }}>
+                {selectedProfileClient.currentPlan || 'No Plan Assigned'}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '8px', fontSize: '0.75rem' }}>
+                <div>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Start Date</span>
+                  <strong style={{ color: 'var(--text)' }}>{selectedProfileClient.planStart || '--'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Expiry Date</span>
+                  <strong style={{ color: 'var(--text)' }}>{selectedProfileClient.planExpiry || '--'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Location / City</span>
+                  <strong style={{ color: 'var(--text)' }}>{selectedProfileClient.location || '--'}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Physical Stats & Goal Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', padding: '10px', backgroundColor: 'var(--card-hover)', borderRadius: '10px', border: '1px solid var(--border)', textAlign: 'center' }}>
+              <div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>GENDER / AGE</span>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text)' }}>
+                  {selectedProfileClient.gender || 'Male'} ({selectedProfileClient.age || '--'} yrs)
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>HEIGHT / WEIGHT</span>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text)' }}>
+                  {selectedProfileClient.height ? `${selectedProfileClient.height} cm` : '--'} / {selectedProfileClient.weight ? `${selectedProfileClient.weight} kg` : '--'}
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>PRIMARY GOAL</span>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#00c853' }}>
+                  {selectedProfileClient.goal || 'Fat Loss'}
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>DIET TYPE</span>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ff9100' }}>
+                  {selectedProfileClient.diet || 'VEG'}
+                </div>
+              </div>
+            </div>
+
+            {/* Health & Injuries Section */}
+            {(selectedProfileClient.hasInjuries === 'YES' || selectedProfileClient.hasHealthIssues === 'YES' || selectedProfileClient.injuriesDetails || selectedProfileClient.healthIssuesDetails) && (
+              <div style={{ padding: '10px 12px', backgroundColor: 'rgba(255, 145, 0, 0.08)', borderRadius: '10px', border: '1px solid rgba(255, 145, 0, 0.25)', fontSize: '0.78rem' }}>
+                <strong style={{ color: '#ff9100', display: 'block', marginBottom: '2px' }}>⚠️ Health & Injury Alerts:</strong>
+                {selectedProfileClient.injuriesDetails && <div>• <strong>Injuries:</strong> {selectedProfileClient.injuriesDetails}</div>}
+                {selectedProfileClient.healthIssuesDetails && <div>• <strong>Health Concerns:</strong> {selectedProfileClient.healthIssuesDetails}</div>}
+                {selectedProfileClient.medications && <div>• <strong>Medications:</strong> {selectedProfileClient.medications}</div>}
+              </div>
+            )}
+
+            {/* Action Bar */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
+              <Button variant="outline" size="sm" onClick={() => setSelectedProfileClient(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -549,6 +811,11 @@ export default function MonitoringPage() {
 const styles = {
   container: { display: 'flex', flexDirection: 'column', gap: '10px', paddingBottom: '30px' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' },
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: '8px'
+  },
   title: { fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--text)', letterSpacing: '-0.2px' },
   statusPillsRow: { display: 'flex', gap: '4px' },
   pillBtn: {

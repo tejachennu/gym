@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { addEnquiry } from '@/lib/firestore';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { Input, Textarea, Select } from '@/components/ui/Input';
@@ -35,18 +36,31 @@ export default function ContactPage() {
     message: ''
   });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name || !form.email || !form.message) {
       return toast.error('Please fill in Name, Email, and Message');
     }
 
     setSubmitting(true);
-    setTimeout(() => {
+    try {
+      await addEnquiry({
+        name: form.name,
+        email: form.email,
+        phone: form.phone || '',
+        category: form.category || 'Membership Plan Query',
+        message: form.message,
+        source: 'website',
+        status: 'new',
+        createdAt: new Date().toISOString()
+      });
       setSubmitting(false);
       setSubmitted(true);
       toast.success('Message sent! Our fitness team will contact you within 2 hours.');
-    }, 1000);
+    } catch (err) {
+      setSubmitting(false);
+      toast.error('Failed to submit message. Please try again.');
+    }
   };
 
   return (
@@ -91,29 +105,7 @@ export default function ContactPage() {
               </div>
               <div>
                 <h4 style={styles.infoCardTitle}>Gym Address & Headquarters</h4>
-                <p style={styles.infoCardText}>MRK FITNESS Center, Main Gym Complex, Film Nagar, Hyderabad, Telangana 500096</p>
-              </div>
-            </Card>
-
-            <Card style={styles.infoCard} className="glass-card">
-              <div style={styles.infoIconBox}>
-                <Phone size={20} color="#00c853" />
-              </div>
-              <div>
-                <h4 style={styles.infoCardTitle}>Phone & WhatsApp Direct</h4>
-                <p style={styles.infoCardText}>+91 6303012453 / +91 9014045689</p>
-                <span style={styles.infoSubText}>Mon-Sat: 06:00 AM - 10:00 PM</span>
-              </div>
-            </Card>
-
-            <Card style={styles.infoCard} className="glass-card">
-              <div style={styles.infoIconBox}>
-                <Mail size={20} color="#ff9100" />
-              </div>
-              <div>
-                <h4 style={styles.infoCardTitle}>Support Email</h4>
-                <p style={styles.infoCardText}>tejachennu223@gmail.com / support@mrkfitness.com</p>
-                <span style={styles.infoSubText}>Average response time: 2 hours</span>
+                <p style={styles.infoCardText}>MRK FITNESS COACH Center, Main Gym Complex, Film Nagar, Hyderabad, Telangana 500096</p>
               </div>
             </Card>
 

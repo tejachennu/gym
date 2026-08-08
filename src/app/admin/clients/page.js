@@ -49,6 +49,8 @@ export default function ClientsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [selectedProfileClient, setSelectedProfileClient] = useState(null);
+  const [viewingPhotoUrl, setViewingPhotoUrl] = useState(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -89,11 +91,6 @@ export default function ClientsPage() {
 
   const [newClient, setNewClient] = useState(initialClientForm);
 
-  useEffect(() => {
-    fetchClients();
-    fetchPlans();
-  }, []);
-
   const fetchClients = async () => {
     try {
       setLoading(true);
@@ -115,6 +112,13 @@ export default function ClientsPage() {
       console.error(err);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchClients();
+    fetchPlans();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handlePlanSelectChange = (e) => {
     const combo = e.target.value;
@@ -485,7 +489,7 @@ export default function ClientsPage() {
                     <tr 
                       key={client.id} 
                       style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
-                      onClick={() => router.push(`/admin/clients/${client.id}`)}
+                      onClick={() => setSelectedProfileClient(client)}
                       className="table-row-hover"
                     >
                       {/* Client Name & Avatar */}
@@ -534,8 +538,8 @@ export default function ClientsPage() {
                       {/* Actions */}
                       <td style={{ padding: '12px 10px', textAlign: 'right' }}>
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', alignItems: 'center' }}>
-                          <Button size="sm" variant="outline" onClick={() => router.push(`/admin/clients/${client.id}`)}>
-                            View <ChevronRight size={14} />
+                          <Button size="sm" variant="outline" onClick={() => setSelectedProfileClient(client)}>
+                            View Profile <ChevronRight size={14} />
                           </Button>
                           <Button 
                             size="sm" 
@@ -559,7 +563,7 @@ export default function ClientsPage() {
             <Users size={36} color="var(--text-muted)" />
             <h3 style={{ margin: '8px 0 2px', color: 'var(--text)' }}>No Clients Found</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-              Try adjusting your search query or click "Submit New Client" above.
+              Try adjusting your search query or click &quot;Submit New Client&quot; above.
             </p>
           </div>
         )}
@@ -761,6 +765,130 @@ export default function ClientsPage() {
           </div>
         </form>
       </Modal>
+
+      {/* CLIENT PROFILE POPUP MODAL */}
+      {selectedProfileClient && (
+        <Modal
+          isOpen={!!selectedProfileClient}
+          onClose={() => setSelectedProfileClient(null)}
+          title={`Client Profile: ${selectedProfileClient.displayName || selectedProfileClient.name || 'Member'}`}
+          size="lg"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {/* Header Info */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', backgroundColor: 'var(--card-hover)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+              <Avatar 
+                src={selectedProfileClient.photoURL || selectedProfileClient.profileImage || selectedProfileClient.photo || selectedProfileClient.avatar} 
+                name={selectedProfileClient.displayName || selectedProfileClient.name} 
+                size="lg" 
+                onClick={() => {
+                  const p = selectedProfileClient.photoURL || selectedProfileClient.profileImage || selectedProfileClient.photo || selectedProfileClient.avatar;
+                  if (p) setViewingPhotoUrl(p);
+                }}
+              />
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text)' }}>
+                    {selectedProfileClient.displayName || selectedProfileClient.name}
+                  </h3>
+                  <Badge variant={selectedProfileClient.status === 'active' ? 'success' : 'secondary'} size="sm">
+                    {(selectedProfileClient.status || 'ACTIVE').toUpperCase()}
+                  </Badge>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <span>📧 {selectedProfileClient.email || '--'}</span>
+                  <span>📞 {selectedProfileClient.phone || '--'}</span>
+                  <span>🆔 Code: {selectedProfileClient.clientCode || '100'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Plan Info Card */}
+            <div style={{ padding: '12px', backgroundColor: 'rgba(224, 0, 8, 0.06)', borderRadius: '12px', border: '1px solid rgba(224, 0, 8, 0.2)' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                Assigned Membership Plan
+              </div>
+              <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text)' }}>
+                {selectedProfileClient.currentPlan || 'No Plan Assigned'}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '8px', fontSize: '0.75rem' }}>
+                <div>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Start Date</span>
+                  <strong style={{ color: 'var(--text)' }}>{selectedProfileClient.planStart || '--'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Expiry Date</span>
+                  <strong style={{ color: 'var(--text)' }}>{selectedProfileClient.planExpiry || '--'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Location / City</span>
+                  <strong style={{ color: 'var(--text)' }}>{selectedProfileClient.location || '--'}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Physical Stats & Goal Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', padding: '10px', backgroundColor: 'var(--card-hover)', borderRadius: '10px', border: '1px solid var(--border)', textAlign: 'center' }}>
+              <div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>GENDER / AGE</span>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text)' }}>
+                  {selectedProfileClient.gender || 'Male'} ({selectedProfileClient.age || '--'} yrs)
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>HEIGHT / WEIGHT</span>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text)' }}>
+                  {selectedProfileClient.height ? `${selectedProfileClient.height} cm` : '--'} / {selectedProfileClient.weight ? `${selectedProfileClient.weight} kg` : '--'}
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>PRIMARY GOAL</span>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#00c853' }}>
+                  {selectedProfileClient.goal || 'Fat Loss'}
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>DIET TYPE</span>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ff9100' }}>
+                  {selectedProfileClient.diet || 'VEG'}
+                </div>
+              </div>
+            </div>
+
+            {/* Health & Injuries Section */}
+            {(selectedProfileClient.hasInjuries === 'YES' || selectedProfileClient.hasHealthIssues === 'YES' || selectedProfileClient.injuriesDetails || selectedProfileClient.healthIssuesDetails) && (
+              <div style={{ padding: '10px 12px', backgroundColor: 'rgba(255, 145, 0, 0.08)', borderRadius: '10px', border: '1px solid rgba(255, 145, 0, 0.25)', fontSize: '0.78rem' }}>
+                <strong style={{ color: '#ff9100', display: 'block', marginBottom: '2px' }}>⚠️ Health & Injury Alerts:</strong>
+                {selectedProfileClient.injuriesDetails && <div>• <strong>Injuries:</strong> {selectedProfileClient.injuriesDetails}</div>}
+                {selectedProfileClient.healthIssuesDetails && <div>• <strong>Health Concerns:</strong> {selectedProfileClient.healthIssuesDetails}</div>}
+                {selectedProfileClient.medications && <div>• <strong>Medications:</strong> {selectedProfileClient.medications}</div>}
+              </div>
+            )}
+
+            {/* Action Bar */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
+              <Button variant="outline" size="sm" onClick={() => setSelectedProfileClient(null)}>
+                Close
+              </Button>
+              <Button size="sm" onClick={() => { setSelectedProfileClient(null); router.push(`/admin/clients/${selectedProfileClient.id}`); }}>
+                Full Management Profile <ChevronRight size={14} />
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {/* PHOTO FULL VIEW MODAL */}
+      {viewingPhotoUrl && (
+        <Modal isOpen={!!viewingPhotoUrl} onClose={() => setViewingPhotoUrl(null)} title="Photo Full View" size="md">
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '10px' }}>
+            <img 
+              src={viewingPhotoUrl} 
+              alt="Photo Full Preview" 
+              style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: '8px', objectFit: 'contain' }} 
+            />
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

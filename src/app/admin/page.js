@@ -98,10 +98,6 @@ export default function AdminDashboard() {
   const datesWindow = generate11DaysWindow();
   const last5PastDays = datesWindow.slice(1, 6);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -200,6 +196,12 @@ export default function AdminDashboard() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchDashboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCardClick = (cardKey) => {
     setSelectedCard(cardKey);
@@ -580,7 +582,7 @@ export default function AdminDashboard() {
                         ) : (
                           (() => {
                             const cLogs = logsMap[clientId] ? Object.values(logsMap[clientId]) : [];
-                            const postureLogs = cLogs.filter(l => l.type === 'checkin' || l.photos || l.frontPhoto || l.backPhoto || l.sidePhoto || l.treadmillPhoto);
+                            const postureLogs = cLogs.filter(l => l.type === 'checkin' || l.photos || l.frontPhoto || l.backPhoto || l.sidePhoto);
                             postureLogs.sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
 
                             if (selectedCard === 'upcomingCheckins' || postureLogs.length > 0) {
@@ -668,9 +670,9 @@ export default function AdminDashboard() {
             <div>
               <h4 style={{ margin: '0 0 8px 0', fontSize: '0.88rem', color: 'var(--text)' }}>Submitted Posture Photos</h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
-                {['frontPhoto', 'backPhoto', 'sidePhoto', 'treadmillPhoto'].map((photoKey, idx) => {
+                {['frontPhoto', 'backPhoto', 'sidePhoto'].map((photoKey, idx) => {
                   const photoUrl = selectedSubmission[photoKey] || (selectedSubmission.photos ? selectedSubmission.photos[photoKey] : null);
-                  const labels = ['Front View', 'Back View', 'Side View', 'Treadmill / Active'];
+                  const labels = ['Front View', 'Back View', 'Side View'];
                   return (
                     <div key={idx} style={{ textAlign: 'center', backgroundColor: 'var(--card)', padding: '6px', borderRadius: '8px', border: '1px solid var(--border)' }}>
                       <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>{labels[idx]}</span>

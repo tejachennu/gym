@@ -55,11 +55,14 @@ export default function ClientHistoryPage() {
   const [loading, setLoading] = useState(true);
   
   // Date filters defaulting to 1 month (30 days up to today)
-  const todayStr = new Date().toISOString().split('T')[0];
-  const defaultFromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const getDefaultFromDate = () => {
+    const d = new Date();
+    return new Date(d.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  };
+  const getDefaultToDate = () => new Date().toISOString().split('T')[0];
 
-  const [fromDate, setFromDate] = useState(defaultFromDate);
-  const [toDate, setToDate] = useState(todayStr);
+  const [fromDate, setFromDate] = useState(getDefaultFromDate);
+  const [toDate, setToDate] = useState(getDefaultToDate);
 
   const [clientPlansHistory, setClientPlansHistory] = useState([]);
   const [selectedPlanIndex, setSelectedPlanIndex] = useState('all');
@@ -67,20 +70,11 @@ export default function ClientHistoryPage() {
   const [allSubmissions, setAllSubmissions] = useState([]);
   const [filteredSubmissions, setFilteredSubmissions] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [viewingPhotoUrl, setViewingPhotoUrl] = useState(null);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-
-  useEffect(() => {
-    if (user?.uid) {
-      loadHistory();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    filterData();
-  }, [fromDate, toDate, allSubmissions]);
 
   const loadHistory = async () => {
     try {
@@ -98,23 +92,17 @@ export default function ClientHistoryPage() {
         getClientPlans(user.uid)
       ]);
 
-      // Deduplicate Logs
-      const rawLogs = [...logsByUid, ...logsByEmail];
-      const uniqueLogsMap = new Map();
-      rawLogs.forEach(l => uniqueLogsMap.set(l.id || l.date, l));
-      const logs = Array.from(uniqueLogsMap.values());
+      const logMap = {};
+      [...logsByUid, ...logsByEmail].forEach(item => { logMap[item.id] = item; });
+      const uniqueLogs = Object.values(logMap);
 
-      // Deduplicate Checkins
-      const rawChk = [...chkByUid, ...chkByEmail];
-      const uniqueChkMap = new Map();
-      rawChk.forEach(c => uniqueChkMap.set(c.id || (c.date + '_' + (c.createdAt?.seconds || '')), c));
-      const checkins = Array.from(uniqueChkMap.values());
+      const chkMap = {};
+      [...chkByUid, ...chkByEmail].forEach(item => { chkMap[item.id] = item; });
+      const uniqueChk = Object.values(chkMap);
 
-      // Deduplicate Blood Reports
-      const rawBlood = [...bloodByUid, ...bloodByEmail];
-      const uniqueBloodMap = new Map();
-      rawBlood.forEach(b => uniqueBloodMap.set(b.id, b));
-      const bloodReports = Array.from(uniqueBloodMap.values());
+      const bloodMap = {};
+      [...bloodByUid, ...bloodByEmail].forEach(item => { bloodMap[item.id] = item; });
+      const uniqueBlood = Object.values(bloodMap);
 
       let combinedPlans = profileData?.planHistory || [];
       if (combinedPlans.length === 0 && cPlans?.length > 0) {
@@ -130,68 +118,44 @@ export default function ClientHistoryPage() {
       }
       setClientPlansHistory(combinedPlans);
 
-      const items = [];
-
-      logs.forEach(item => {
-        items.push({
-          id: item.id || `log-${item.date}`,
-          category: 'Daily Tracking',
-          icon: Activity,
-          color: '#29b6f6',
-          date: item.date || item.createdAt?.toDate?.()?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
-          title: `Daily Activity Log (${item.date || 'Entry'})`,
-          details: item
-        });
-      });
-
-      checkins.forEach(item => {
-        const itemDate = item.date || (item.createdAt?.toDate ? item.createdAt.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
-        items.push({
-          id: item.id || `chk-${itemDate}`,
+      const items = [
+        ...uniqueLogs.map(l => ({
+          id: `log_${l.id}`,
+          category: 'Daily Activity & Wellness Log',
+          date: l.date || (l.createdAt?.seconds ? new Date(l.createdAt.seconds * 1000).toISOString().split('T')[0] : 'Log'),
+          timestamp: l.createdAt?.seconds ? l.createdAt.seconds * 1000 : (l.date ? new Date(l.date).getTime() : Date.now()),
+          title: `Daily Log - ${l.steps || 0} Steps, ${l.water || 0}L Water, ${l.sleepHours || 0}h Sleep`,
+          details: l,
+          icon: Activity
+        })),
+        ...uniqueChk.map(c => ({
+          id: `chk_${c.id}`,
           category: '10-Day Check-in',
-          icon: Camera,
-          color: 'var(--accent, #E00008)',
-          date: itemDate,
-          title: `10-Day Posture & Sizing Check-in`,
-          details: item
-        });
-      });
+          date: c.date || (c.createdAt?.seconds ? new Date(c.createdAt.seconds * 1000).toISOString().split('T')[0] : 'Check-in'),
+          timestamp: c.createdAt?.seconds ? c.createdAt.seconds * 1000 : (c.date ? new Date(c.date).getTime() : Date.now()),
+          title: `Body Sizing & Posture Photos Check-in`,
+          details: c,
+          icon: Camera
+        })),
+        ...uniqueBlood.map(b => ({
+          id: `blood_${b.id}`,
+          category: 'Blood Report PDF',
+          date: b.date || (b.createdAt?.seconds ? new Date(b.createdAt.seconds * 1000).toISOString().split('T')[0] : 'Report'),
+          timestamp: b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.date ? new Date(b.date).getTime() : Date.now()),
+          title: b.title || 'Blood Report Document',
+          details: b,
+          icon: FileText
+        }))
+      ];
 
-      bloodReports.forEach(item => {
-        const itemDate = item.date || (item.createdAt?.toDate ? item.createdAt.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
-        items.push({
-          id: item.id || `blood-${itemDate}`,
-          category: 'Blood Report',
-          icon: Droplets,
-          color: '#ff1744',
-          date: itemDate,
-          title: `Blood Test Report (${item.reportName || 'Report'})`,
-          details: item
-        });
-      });
+      items.sort((a, b) => b.timestamp - a.timestamp);
 
-      items.sort((a, b) => new Date(b.date) - new Date(a.date));
       setAllSubmissions(items);
+      setFilteredSubmissions(items);
     } catch (err) {
-      console.error('Error loading client history:', err);
+      console.error(err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handlePlanSelectChange = (val) => {
-    setSelectedPlanIndex(val);
-    setCurrentPage(1);
-    if (val === 'all') {
-      setFromDate(defaultFromDate);
-      setToDate(todayStr);
-    } else {
-      const idx = Number(val);
-      const planItem = clientPlansHistory[idx];
-      if (planItem && planItem.planStart && planItem.planExpiry) {
-        setFromDate(planItem.planStart);
-        setToDate(planItem.planExpiry);
-      }
     }
   };
 
@@ -211,10 +175,40 @@ export default function ClientHistoryPage() {
     setFilteredSubmissions(filtered);
   };
 
+  useEffect(() => {
+    if (user?.uid) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadHistory();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    filterData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromDate, toDate, allSubmissions]);
+
+  const handlePlanSelectChange = (val) => {
+    setSelectedPlanIndex(val);
+    setCurrentPage(1);
+    if (val === 'all') {
+      setFromDate(getDefaultFromDate());
+      setToDate(getDefaultToDate());
+    } else {
+      const idx = Number(val);
+      const planItem = clientPlansHistory[idx];
+      if (planItem && planItem.planStart && planItem.planExpiry) {
+        setFromDate(planItem.planStart);
+        setToDate(planItem.planExpiry);
+      }
+    }
+  };
+
   const handleResetFilter = () => {
     setSelectedPlanIndex('all');
-    setFromDate(defaultFromDate);
-    setToDate(todayStr);
+    setFromDate(getDefaultFromDate());
+    setToDate(getDefaultToDate());
     setCurrentPage(1);
   };
 
@@ -298,20 +292,6 @@ export default function ClientHistoryPage() {
               </div>
             </Card>
           )}
-
-          {/* Treadmill Photo */}
-          {d.treadmillPhoto && (
-            <Card style={{ padding: '10px', backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: '10px' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#FFFFFF', marginBottom: '8px' }}>
-                📸 Treadmill / Proof Photo:
-              </div>
-              <img 
-                src={getDirectImageUrl(d.treadmillPhoto)} 
-                alt="Treadmill proof" 
-                style={{ width: '100%', maxHeight: '240px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border)' }} 
-              />
-            </Card>
-          )}
         </div>
       );
     }
@@ -319,7 +299,7 @@ export default function ClientHistoryPage() {
     if (item.category === '10-Day Check-in' || item.category === 'Weekly Check-in') {
       const photos = d.photos || {};
       const m = d.measurements || {};
-      const hasPhotos = photos.front || photos.back || photos.left || photos.right || photos.treadmillWheel;
+      const hasPhotos = photos.front || photos.back || photos.left || photos.right;
 
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -330,7 +310,7 @@ export default function ClientHistoryPage() {
                 📸 10-Day Body Posture Photos:
               </h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                {['front', 'back', 'left', 'right', 'treadmillWheel'].map(side => {
+                {['front', 'back', 'left', 'right'].map(side => {
                   const pUrl = photos[side];
                   if (!pUrl) return null;
                   return (
@@ -341,7 +321,9 @@ export default function ClientHistoryPage() {
                       <img 
                         src={getDirectImageUrl(pUrl)} 
                         alt={`${side} posture`} 
-                        style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border)' }} 
+                        style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border)', cursor: 'pointer' }} 
+                        onClick={() => setViewingPhotoUrl(pUrl)}
+                        title="Click for full view"
                       />
                     </Card>
                   );
@@ -636,6 +618,23 @@ export default function ClientHistoryPage() {
             </div>
 
             {renderItemDetails(selectedItem)}
+          </div>
+        </Modal>
+      )}
+      {/* FULL VIEW PHOTO LIGHTBOX MODAL */}
+      {viewingPhotoUrl && (
+        <Modal 
+          isOpen={!!viewingPhotoUrl} 
+          onClose={() => setViewingPhotoUrl(null)} 
+          title="Photo Full View" 
+          size="md"
+        >
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '10px' }}>
+            <img 
+              src={getDirectImageUrl(viewingPhotoUrl)} 
+              alt="Photo Full View" 
+              style={{ maxWidth: '100%', maxHeight: '72vh', borderRadius: '8px', objectFit: 'contain' }} 
+            />
           </div>
         </Modal>
       )}

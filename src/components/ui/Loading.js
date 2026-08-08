@@ -29,7 +29,7 @@ export const Skeleton = ({ width = '100%', height = '20px', rounded = '8px', sty
   );
 };
 
-export const PageLoader = ({ message = 'Loading MRK FITNESS...' }) => {
+export const PageLoader = ({ message = 'Loading MRK FITNESS COACH...' }) => {
   const style = {
     position: 'fixed',
     top: 0,
@@ -50,7 +50,7 @@ export const PageLoader = ({ message = 'Loading MRK FITNESS...' }) => {
         <Spinner size={56} thickness={4} />
       </div>
       <h2 style={{ marginTop: '24px', fontSize: '1.25rem', fontWeight: 600, color: '#FFFFFF', letterSpacing: '-0.02em' }}>
-        <span style={{ color: '#E00008' }}>Power</span>House
+        <span style={{ color: '#E00008' }}>MRK</span> FITNESS COACH
       </h2>
       <div style={{ marginTop: '8px', color: '#AAAAAA', fontSize: '0.875rem' }}>{message}</div>
     </div>

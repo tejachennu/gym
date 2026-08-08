@@ -212,6 +212,26 @@ export const getClientById = (clientId) => getDocument("Users", clientId);
 export const updateClientProfile = (clientId, profileData) => updateDocument("Users", clientId, profileData);
 export const deleteClient = (clientId) => deleteDocument("Users", clientId);
 
+// Enquiries (Web Submissions & Walk-ins)
+export const addEnquiry = (data) => addDocument("Enquiries", {
+  status: 'new',
+  source: 'walkin',
+  createdAt: new Date().toISOString(),
+  ...data
+});
+
+export const getEnquiries = async () => {
+  const list = await getDocuments("Enquiries");
+  return (list || []).sort((a, b) => {
+    const timeA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+    const timeB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+    return timeB - timeA;
+  });
+};
+
+export const updateEnquiry = (id, data) => updateDocument("Enquiries", id, data);
+export const deleteEnquiry = (id) => deleteDocument("Enquiries", id);
+
 export const clearSeedClients = async () => {
   const seedEmails = [
     'teja@powerhouse.com',

@@ -10,6 +10,8 @@ import { Menu, X, LogOut, ShieldCheck, Sun, Moon } from 'lucide-react';
 const NAV_ITEMS = [
   { name: 'Dashboard', path: '/admin', icon: '📊' },
   { name: 'Clients', path: '/admin/clients', icon: '🏋️' },
+  { name: 'Enquiries', path: '/admin/enquiries', icon: '📩' },
+  { name: 'Transformations', path: '/admin/transformations', icon: '📸' },
   { name: 'Plans', path: '/admin/plans', icon: '📋' },
   { name: 'Billing', path: '/admin/billing', icon: '💰' },
   { name: 'Diet Plans', path: '/admin/diet-plans', icon: '🥗' },
@@ -75,13 +77,9 @@ export default function AdminLayout({ children }) {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <ShieldCheck size={18} color="var(--accent, #E00008)" />
-          <h1 style={styles.logo}>MRK FITNESS</h1>
+          <h1 style={styles.logo}>MRK FITNESS COACH</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button onClick={toggleTheme} style={styles.themeButton} aria-label="Toggle theme mode">
-            {theme === 'dark' ? <Sun size={15} color="#ffd600" /> : <Moon size={15} color="#0f172a" />}
-            <span style={{ fontSize: '0.7rem', fontWeight: 700 }}>{theme === 'dark' ? 'Light' : 'Dark'}</span>
-          </button>
           <button onClick={toggleMenu} style={styles.menuButton} aria-label="Toggle navigation menu">
             {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -97,11 +95,7 @@ export default function AdminLayout({ children }) {
       }}>
         <div style={styles.sidebarHeader}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: '30px', width: 'auto', objectFit: 'contain' }} />
-            <button onClick={toggleTheme} style={styles.themeButton} aria-label="Toggle theme mode">
-              {theme === 'dark' ? <Sun size={15} color="#ffd600" /> : <Moon size={15} color="#475569" />}
-              <span style={{ fontSize: '0.7rem', fontWeight: 700 }}>{theme === 'dark' ? 'Light' : 'Dark'}</span>
-            </button>
+            <img src="/mrk-logo.png" alt="MRK FITNESS COACH" style={{ height: '30px', width: 'auto', objectFit: 'contain' }} />
           </div>
           <p style={styles.adminName}>Management Portal</p>
         </div>

@@ -31,7 +31,10 @@ import {
   Sparkles,
   Award,
   BookOpen,
-  Send
+  Send,
+  Layers,
+  Check,
+  ChevronRight
 } from 'lucide-react';
 
 function formatDateNice(dateStr) {
@@ -45,6 +48,33 @@ function formatDateNice(dateStr) {
   }
 }
 
+// Normalize any plan/template format to structured days
+function normalizeWorkoutDays(item) {
+  if (item?.days && Array.isArray(item.days) && item.days.length > 0) {
+    return {
+      planType: item.planType || (item.days.length > 1 ? 'multi' : 'single'),
+      days: item.days.map((d, idx) => ({
+        dayTitle: d.dayTitle || `Day ${idx + 1} Routine`,
+        exercises: Array.isArray(d.exercises) ? d.exercises : []
+      }))
+    };
+  }
+  
+  // Legacy single list format
+  const legacyEx = Array.isArray(item?.exercises) ? item.exercises : [];
+  return {
+    planType: 'single',
+    days: [
+      {
+        dayTitle: 'Day 1 Routine',
+        exercises: legacyEx.length > 0 ? legacyEx : [
+          { name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }
+        ]
+      }
+    ]
+  };
+}
+
 export default function WorkoutPlansPage() {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState('client-workouts'); // 'client-workouts' | 'templates'
@@ -55,7 +85,7 @@ export default function WorkoutPlansPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Workout Builder Modal Popup state
+  // Workout Builder Modal Popup state for Client Assigned Plans
   const [isWorkoutModalOpen, setIsWorkoutModalOpen] = useState(false);
   const [editingPlanId, setEditingPlanId] = useState(null);
   const [planTitle, setPlanTitle] = useState('Custom Workout Plan');
@@ -65,25 +95,33 @@ export default function WorkoutPlansPage() {
     d.setDate(d.getDate() + 30);
     return d.toISOString().split('T')[0];
   });
-  const [exercisesState, setExercisesState] = useState([
-    { name: 'Barbell Bench Press', sets: 4, reps: '8-10', weight: '60 kg', rest: '90s', notes: 'Keep elbows tucked' }
+  
+  // Day-by-Day State for Client Plan Builder
+  const [planType, setPlanType] = useState('single'); // 'single' | 'multi'
+  const [planDays, setPlanDays] = useState([
+    {
+      dayTitle: 'Day 1 Routine',
+      exercises: [{ name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }]
+    }
   ]);
+  const [activeDayIndex, setActiveDayIndex] = useState(0);
   const [statusBanner, setStatusBanner] = useState(null);
 
-  // Template Modal State (Admin CRUD for master templates)
+  // Master Template Modal State
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState(null);
   const [templateForm, setTemplateForm] = useState({
     templateName: '',
     description: '',
-    exercises: [
-      { name: 'Barbell Squat', sets: 4, reps: '8-10', weight: '80 kg', rest: '120s', notes: 'Go below parallel' }
+    planType: 'single',
+    days: [
+      {
+        dayTitle: 'Day 1 Routine',
+        exercises: [{ name: 'Barbell Squat', sets: 4, reps: '8-10', weight: '80 kg', rest: '120s', notes: 'Go below parallel' }]
+      }
     ]
   });
-
-  useEffect(() => {
-    fetchInitialData();
-  }, []);
+  const [tmplActiveDayIndex, setTmplActiveDayIndex] = useState(0);
 
   const fetchInitialData = async () => {
     try {
@@ -102,14 +140,6 @@ export default function WorkoutPlansPage() {
     }
   };
 
-  useEffect(() => {
-    if (selectedClient) {
-      loadClientWorkoutHistory(selectedClient);
-    } else {
-      setClientPlans([]);
-    }
-  }, [selectedClient]);
-
   const loadClientWorkoutHistory = async (clientId) => {
     try {
       setLoading(true);
@@ -122,7 +152,21 @@ export default function WorkoutPlansPage() {
     }
   };
 
-  // Open Modal to Add New Workout Plan
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchInitialData();
+  }, []);
+
+  useEffect(() => {
+    if (selectedClient) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadClientWorkoutHistory(selectedClient);
+    } else {
+      setClientPlans([]);
+    }
+  }, [selectedClient]);
+
+  // Open Modal to Add New Workout Plan for Client
   const handleOpenAddModal = () => {
     if (!selectedClient) {
       return toast.warning('Please select a client from the dropdown first.');
@@ -133,9 +177,14 @@ export default function WorkoutPlansPage() {
     const d = new Date();
     d.setDate(d.getDate() + 30);
     setToDate(d.toISOString().split('T')[0]);
-    setExercisesState([
-      { name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }
+    setPlanType('single');
+    setPlanDays([
+      {
+        dayTitle: 'Day 1 Routine',
+        exercises: [{ name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }]
+      }
     ]);
+    setActiveDayIndex(0);
     setStatusBanner(null);
     setIsWorkoutModalOpen(true);
   };
@@ -146,40 +195,92 @@ export default function WorkoutPlansPage() {
     setPlanTitle(plan.planTitle || 'Custom Workout Plan');
     setFromDate(plan.fromDate || new Date().toISOString().split('T')[0]);
     setToDate(plan.toDate || new Date().toISOString().split('T')[0]);
-    if (plan.exercises) setExercisesState(plan.exercises);
-    else setExercisesState([{ name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }]);
+    
+    const normalized = normalizeWorkoutDays(plan);
+    setPlanType(normalized.planType);
+    setPlanDays(normalized.days);
+    setActiveDayIndex(0);
+
     setStatusBanner(null);
     setIsWorkoutModalOpen(true);
   };
 
-  // Map Template into Modal Builder
+  // Map Master Template into Modal Builder
   const handleApplyTemplate = (templateId) => {
     const tmpl = templates.find(t => t.id === templateId);
     if (!tmpl) return;
     setPlanTitle(tmpl.templateName);
-    if (tmpl.exercises) setExercisesState(tmpl.exercises);
+    const normalized = normalizeWorkoutDays(tmpl);
+    setPlanType(normalized.planType);
+    setPlanDays(normalized.days);
+    setActiveDayIndex(0);
     toast.success(`Loaded "${tmpl.templateName}" template into builder!`);
   };
 
-  // Exercise row handlers
-  const handleAddExercise = () => {
-    setExercisesState([
-      ...exercisesState,
-      { name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }
-    ]);
+  // --- CLIENT PLAN DAY & EXERCISE HANDLERS ---
+  const handleAddPlanDay = () => {
+    const nextDayNum = planDays.length + 1;
+    const newDay = {
+      dayTitle: `Day ${nextDayNum} Routine`,
+      exercises: [{ name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }]
+    };
+    setPlanDays([...planDays, newDay]);
+    setActiveDayIndex(planDays.length);
   };
 
-  const handleRemoveExercise = (idx) => {
-    setExercisesState(exercisesState.filter((_, i) => i !== idx));
+  const handleRemovePlanDay = (dayIdx) => {
+    if (planDays.length <= 1) {
+      return toast.warning('Workout plan must have at least 1 day routine.');
+    }
+    const updated = planDays.filter((_, i) => i !== dayIdx);
+    setPlanDays(updated);
+    setActiveDayIndex(prev => Math.min(prev, updated.length - 1));
   };
 
-  const handleExerciseChange = (idx, field, value) => {
-    const updated = [...exercisesState];
-    updated[idx] = {
-      ...updated[idx],
+  const handlePlanDayTitleChange = (dayIdx, title) => {
+    const updated = [...planDays];
+    updated[dayIdx] = { ...updated[dayIdx], dayTitle: title };
+    setPlanDays(updated);
+  };
+
+  const handleAddPlanExerciseRow = () => {
+    const updated = [...planDays];
+    const currentDay = updated[activeDayIndex] || { dayTitle: 'Day Routine', exercises: [] };
+    updated[activeDayIndex] = {
+      ...currentDay,
+      exercises: [
+        ...currentDay.exercises,
+        { name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }
+      ]
+    };
+    setPlanDays(updated);
+  };
+
+  const handleRemovePlanExerciseRow = (exIdx) => {
+    const updated = [...planDays];
+    const currentDay = updated[activeDayIndex];
+    if (!currentDay) return;
+    updated[activeDayIndex] = {
+      ...currentDay,
+      exercises: currentDay.exercises.filter((_, i) => i !== exIdx)
+    };
+    setPlanDays(updated);
+  };
+
+  const handlePlanExerciseChange = (exIdx, field, value) => {
+    const updated = [...planDays];
+    const currentDay = updated[activeDayIndex];
+    if (!currentDay) return;
+    const curExercises = [...currentDay.exercises];
+    curExercises[exIdx] = {
+      ...curExercises[exIdx],
       [field]: field === 'sets' ? Number(value) || 0 : value
     };
-    setExercisesState(updated);
+    updated[activeDayIndex] = {
+      ...currentDay,
+      exercises: curExercises
+    };
+    setPlanDays(updated);
   };
 
   // Save Workout Plan for Client
@@ -212,7 +313,8 @@ export default function WorkoutPlansPage() {
       return;
     }
 
-    const hasAtLeastOneExercise = exercisesState.some(ex => ex.name && ex.name.trim().length > 0);
+    const allFlatExercises = planDays.flatMap(d => d.exercises || []);
+    const hasAtLeastOneExercise = allFlatExercises.some(ex => ex.name && ex.name.trim().length > 0);
     if (!hasAtLeastOneExercise) {
       const msg = 'Mandatory Field Missing: Please add at least 1 exercise with a name.';
       toast.warning(msg);
@@ -235,7 +337,20 @@ export default function WorkoutPlansPage() {
         fromDate,
         toDate,
         status,
-        exercises: exercisesState.map(ex => ({
+        planType,
+        days: planDays.map(d => ({
+          dayTitle: d.dayTitle || 'Day Routine',
+          exercises: (d.exercises || []).map(ex => ({
+            name: ex.name || '',
+            sets: Number(ex.sets) || 0,
+            reps: ex.reps || '',
+            weight: ex.weight || '',
+            rest: ex.rest || '',
+            notes: ex.notes || ''
+          }))
+        })),
+        // Flat array for complete backward compatibility
+        exercises: allFlatExercises.map(ex => ({
           name: ex.name || '',
           sets: Number(ex.sets) || 0,
           reps: ex.reps || '',
@@ -290,20 +405,153 @@ export default function WorkoutPlansPage() {
     }
   };
 
-  // Save Template Modal handler
+  // --- MASTER TEMPLATE MODAL HANDLERS ---
+  const handleOpenCreateTemplateModal = () => {
+    setEditingTemplateId(null);
+    setTemplateForm({
+      templateName: '',
+      description: '',
+      planType: 'single',
+      days: [
+        {
+          dayTitle: 'Day 1 Routine',
+          exercises: [{ name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }]
+        }
+      ]
+    });
+    setTmplActiveDayIndex(0);
+    setIsTemplateModalOpen(true);
+  };
+
+  const handleOpenEditTemplateModal = (tmpl) => {
+    setEditingTemplateId(tmpl.id);
+    const normalized = normalizeWorkoutDays(tmpl);
+    setTemplateForm({
+      templateName: tmpl.templateName || '',
+      description: tmpl.description || '',
+      planType: normalized.planType,
+      days: normalized.days
+    });
+    setTmplActiveDayIndex(0);
+    setIsTemplateModalOpen(true);
+  };
+
+  const handleAddTmplDay = () => {
+    const nextDayNum = templateForm.days.length + 1;
+    const newDay = {
+      dayTitle: `Day ${nextDayNum} Routine`,
+      exercises: [{ name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }]
+    };
+    setTemplateForm({
+      ...templateForm,
+      days: [...templateForm.days, newDay]
+    });
+    setTmplActiveDayIndex(templateForm.days.length);
+  };
+
+  const handleRemoveTmplDay = (dayIdx) => {
+    if (templateForm.days.length <= 1) {
+      return toast.warning('Template must have at least 1 day routine.');
+    }
+    const updated = templateForm.days.filter((_, i) => i !== dayIdx);
+    setTemplateForm({
+      ...templateForm,
+      days: updated
+    });
+    setTmplActiveDayIndex(prev => Math.min(prev, updated.length - 1));
+  };
+
+  const handleTmplDayTitleChange = (dayIdx, title) => {
+    const updated = [...templateForm.days];
+    updated[dayIdx] = { ...updated[dayIdx], dayTitle: title };
+    setTemplateForm({
+      ...templateForm,
+      days: updated
+    });
+  };
+
+  const handleAddTmplExerciseRow = () => {
+    const updated = [...templateForm.days];
+    const curDay = updated[tmplActiveDayIndex] || { dayTitle: 'Day Routine', exercises: [] };
+    updated[tmplActiveDayIndex] = {
+      ...curDay,
+      exercises: [...curDay.exercises, { name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }]
+    };
+    setTemplateForm({
+      ...templateForm,
+      days: updated
+    });
+  };
+
+  const handleRemoveTmplExerciseRow = (exIdx) => {
+    const updated = [...templateForm.days];
+    const curDay = updated[tmplActiveDayIndex];
+    if (!curDay) return;
+    updated[tmplActiveDayIndex] = {
+      ...curDay,
+      exercises: curDay.exercises.filter((_, i) => i !== exIdx)
+    };
+    setTemplateForm({
+      ...templateForm,
+      days: updated
+    });
+  };
+
+  const handleTmplExerciseChange = (exIdx, field, value) => {
+    const updated = [...templateForm.days];
+    const curDay = updated[tmplActiveDayIndex];
+    if (!curDay) return;
+    const curEx = [...curDay.exercises];
+    curEx[exIdx] = {
+      ...curEx[exIdx],
+      [field]: field === 'sets' ? Number(value) || 0 : value
+    };
+    updated[tmplActiveDayIndex] = {
+      ...curDay,
+      exercises: curEx
+    };
+    setTemplateForm({
+      ...templateForm,
+      days: updated
+    });
+  };
+
   const handleSaveTemplateModal = async (e) => {
-    e.preventDefault();
-    if (!templateForm.templateName) return toast.warning('Template name is required');
+    if (e) e.preventDefault();
+    if (!templateForm.templateName.trim()) return toast.warning('Template name is required');
     
-    const hasAtLeastOneExercise = templateForm.exercises.some(ex => ex.name && ex.name.trim().length > 0);
-    if (!hasAtLeastOneExercise) return toast.warning('Please add at least 1 exercise to the template');
+    const allFlat = templateForm.days.flatMap(d => d.exercises || []);
+    const hasAtLeastOne = allFlat.some(ex => ex.name && ex.name.trim().length > 0);
+    if (!hasAtLeastOne) return toast.warning('Please add at least 1 exercise to the template');
 
     setSaving(true);
     try {
-      const data = { 
-        ...templateForm, 
+      const data = {
+        templateName: templateForm.templateName.trim(),
+        description: templateForm.description.trim(),
+        planType: templateForm.planType,
+        days: templateForm.days.map(d => ({
+          dayTitle: d.dayTitle || 'Day Routine',
+          exercises: (d.exercises || []).map(ex => ({
+            name: ex.name || '',
+            sets: Number(ex.sets) || 0,
+            reps: ex.reps || '',
+            weight: ex.weight || '',
+            rest: ex.rest || '',
+            notes: ex.notes || ''
+          }))
+        })),
+        exercises: allFlat.map(ex => ({
+          name: ex.name || '',
+          sets: Number(ex.sets) || 0,
+          reps: ex.reps || '',
+          weight: ex.weight || '',
+          rest: ex.rest || '',
+          notes: ex.notes || ''
+        })),
         updatedAtStr: new Date().toISOString() 
       };
+
       if (editingTemplateId) {
         await updateWorkoutTemplate(editingTemplateId, data);
         toast.success(`Template "${templateForm.templateName}" updated!`);
@@ -333,33 +581,6 @@ export default function WorkoutPlansPage() {
 
   const selectedClientObj = clients.find(c => c.id === selectedClient);
 
-  // Template Form Exercise handlers
-  const handleTmplAddExercise = () => {
-    setTemplateForm({
-      ...templateForm,
-      exercises: [...templateForm.exercises, { name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }]
-    });
-  };
-
-  const handleTmplRemoveExercise = (idx) => {
-    setTemplateForm({
-      ...templateForm,
-      exercises: templateForm.exercises.filter((_, i) => i !== idx)
-    });
-  };
-
-  const handleTmplExerciseChange = (idx, field, value) => {
-    const updated = [...templateForm.exercises];
-    updated[idx] = {
-      ...updated[idx],
-      [field]: field === 'sets' ? Number(value) || 0 : value
-    };
-    setTemplateForm({
-      ...templateForm,
-      exercises: updated
-    });
-  };
-
   return (
     <div style={styles.container} className="animate-fade-up">
       {/* Header */}
@@ -372,7 +593,7 @@ export default function WorkoutPlansPage() {
             <h1 style={styles.title}>Workout Plans Management</h1>
           </div>
           <p style={{ color: 'var(--text-secondary, #AAAAAA)', margin: '4px 0 0 0', fontSize: '0.9rem' }}>
-            Assign date-bound workout routines to clients or build master templates
+            Build 1-Day or Multi-Day Split routines for clients or save master workout templates.
           </p>
         </div>
 
@@ -442,15 +663,24 @@ export default function WorkoutPlansPage() {
               ) : clientPlans.length > 0 ? (
                 <div style={styles.grid}>
                   {clientPlans.map((plan) => {
-                    const totalEx = plan.exercises?.length || 0;
+                    const normalized = normalizeWorkoutDays(plan);
+                    const isMulti = normalized.planType === 'multi' || normalized.days.length > 1;
+                    const totalEx = plan.exercises?.length || normalized.days.flatMap(d => d.exercises).length;
+
                     return (
                       <Card key={plan.id} style={styles.planCard} className="glass-card">
                         {/* Header Row */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '10px' }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <h3 style={{ margin: '0 0 4px', fontSize: '1.05rem', color: '#FFFFFF', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {plan.planTitle || 'Workout Plan'}
-                            </h3>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                              <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#FFFFFF', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {plan.planTitle || 'Workout Plan'}
+                              </h3>
+                              <span style={styles.typeBadge}>
+                                {isMulti ? `📅 ${normalized.days.length}-Day Split` : '🏋️ 1-Day Workout'}
+                              </span>
+                            </div>
+
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.65)', backgroundColor: 'rgba(255, 255, 255, 0.03)', padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
                               <Calendar size={12} color="var(--accent, #E00008)" />
                               <span style={{ whiteSpace: 'nowrap' }}>{formatDateNice(plan.fromDate)}</span>
@@ -468,27 +698,34 @@ export default function WorkoutPlansPage() {
                         <div style={styles.exerciseSummaryBar}>
                           <Dumbbell size={15} color="var(--accent, #E00008)" />
                           <span style={{ fontWeight: 700, color: '#FFFFFF', fontSize: '0.85rem' }}>
-                            {totalEx} {totalEx === 1 ? 'Exercise' : 'Exercises'} Assigned
+                            {normalized.days.length} Day(s) • {totalEx} Total Exercise{totalEx !== 1 ? 's' : ''}
                           </span>
                         </div>
 
-                        {/* Summary Exercises List */}
+                        {/* Summary Days & Exercises List */}
                         <div style={styles.summaryExercisesList}>
-                          {(plan.exercises || []).slice(0, 3).map((ex, idx) => (
-                            <div key={idx} style={styles.summarySlotRow}>
-                              <span style={{ fontSize: '0.78rem', color: 'rgba(255, 255, 255, 0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                                • {ex.name}
-                              </span>
-                              <span style={{ color: 'var(--accent, #E00008)', fontWeight: 700, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
-                                {ex.sets} × {ex.reps}
-                              </span>
+                          {normalized.days.map((day, dIdx) => (
+                            <div key={dIdx} style={{ marginBottom: dIdx < normalized.days.length - 1 ? '8px' : 0 }}>
+                              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--accent, #E00008)', marginBottom: '3px' }}>
+                                {day.dayTitle} ({day.exercises.length} ex)
+                              </div>
+                              {day.exercises.slice(0, 2).map((ex, idx) => (
+                                <div key={idx} style={styles.summarySlotRow}>
+                                  <span style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                    • {ex.name}
+                                  </span>
+                                  <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontWeight: 600, fontSize: '0.72rem', whiteSpace: 'nowrap' }}>
+                                    {ex.sets} × {ex.reps}
+                                  </span>
+                                </div>
+                              ))}
+                              {day.exercises.length > 2 && (
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                                  + {day.exercises.length - 2} more
+                                </div>
+                              )}
                             </div>
                           ))}
-                          {totalEx > 3 && (
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary, #AAAAAA)', fontStyle: 'italic', marginTop: '2px' }}>
-                              + {totalEx - 3} more exercises
-                            </div>
-                          )}
                         </div>
 
                         {/* Action Buttons */}
@@ -519,7 +756,7 @@ export default function WorkoutPlansPage() {
                   <Dumbbell size={48} color="var(--text-muted, #666666)" />
                   <h3 style={{ margin: '16px 0 6px', color: '#FFFFFF' }}>No Workout Plans Found</h3>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '20px' }}>
-                    Click <strong>"+ Add Workout Plan"</strong> above to assign a customized workout schedule to {selectedClientObj?.displayName || 'this client'}.
+                    Click <strong>&quot;+ Add Workout Plan&quot;</strong> above to assign a customized workout schedule to {selectedClientObj?.displayName || 'this client'}.
                   </p>
                   <Button onClick={handleOpenAddModal}>+ Add Workout Plan Now</Button>
                 </div>
@@ -542,64 +779,77 @@ export default function WorkoutPlansPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
             <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem' }}>
-              Create reusable workout routine templates for 1-click client assignment mapping.
+              Create reusable 1-Day or Multi-Day Workout Split templates for 1-click client assignment mapping.
             </p>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <Button onClick={() => {
-                setEditingTemplateId(null);
-                setTemplateForm({ templateName: '', description: '', exercises: [{ name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }] });
-                setIsTemplateModalOpen(true);
-              }}>
+              <Button onClick={handleOpenCreateTemplateModal}>
                 <Plus size={16} /> Create Master Template
               </Button>
             </div>
           </div>
 
           <div style={styles.templateGrid}>
-            {templates.map((tmpl) => (
-              <Card key={tmpl.id} style={styles.templateCard} className="glass-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#FFFFFF' }}>{tmpl.templateName}</h3>
-                  <div style={styles.tmplBadge}>{tmpl.exercises?.length || 0} Ex</div>
-                </div>
+            {templates.map((tmpl) => {
+              const normalized = normalizeWorkoutDays(tmpl);
+              const isMulti = normalized.planType === 'multi' || normalized.days.length > 1;
+              const totalEx = tmpl.exercises?.length || normalized.days.flatMap(d => d.exercises).length;
 
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '8px 0 16px', lineHeight: 1.4 }}>
-                  {tmpl.description || 'Master workout routine template.'}
-                </p>
+              return (
+                <Card key={tmpl.id} style={styles.templateCard} className="glass-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                    <div>
+                      <h3 style={{ margin: '0 0 4px', fontSize: '1.15rem', color: '#FFFFFF' }}>{tmpl.templateName}</h3>
+                      <span style={styles.typeBadge}>
+                        {isMulti ? `📅 ${normalized.days.length}-Day Split` : '🏋️ 1-Day Routine'}
+                      </span>
+                    </div>
+                    <div style={styles.tmplBadge}>{totalEx} Ex</div>
+                  </div>
 
-                <div style={{ display: 'flex', gap: '10px', marginTop: 'auto' }}>
-                  <Button 
-                    variant="outline" 
-                    fullWidth 
-                    onClick={() => {
-                      setEditingTemplateId(tmpl.id);
-                      setTemplateForm({
-                        templateName: tmpl.templateName,
-                        description: tmpl.description || '',
-                        exercises: tmpl.exercises || [{ name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }]
-                      });
-                      setIsTemplateModalOpen(true);
-                    }}
-                  >
-                    <Edit size={14} /> Edit Template
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    onClick={() => handleDeleteTemplate(tmpl.id)}
-                    style={{ color: '#ff1744' }}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
-              </Card>
-            ))}
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: '10px 0 12px', lineHeight: 1.4 }}>
+                    {tmpl.description || 'Master workout routine template.'}
+                  </p>
+
+                  {/* Summary of Days */}
+                  <div style={{ marginBottom: '14px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px' }}>
+                    {normalized.days.slice(0, 3).map((day, dIdx) => (
+                      <div key={dIdx} style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.85)', marginBottom: '4px' }}>
+                        <strong style={{ color: 'var(--accent)' }}>{day.dayTitle}:</strong> {day.exercises.length} exercise(s)
+                      </div>
+                    ))}
+                    {normalized.days.length > 3 && (
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                        + {normalized.days.length - 3} more days
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px', marginTop: 'auto' }}>
+                    <Button 
+                      variant="outline" 
+                      fullWidth 
+                      onClick={() => handleOpenEditTemplateModal(tmpl)}
+                    >
+                      <Edit size={14} /> Edit Template
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => handleDeleteTemplate(tmpl.id)}
+                      style={{ color: '#ff1744' }}
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })}
 
             {templates.length === 0 && (
               <div style={styles.emptyState}>
                 <Sparkles size={48} color="var(--text-muted, #666666)" />
                 <h3 style={{ margin: '16px 0 6px', color: '#FFFFFF' }}>No Workout Templates Found</h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
-                  Click "Seed Templates" above to generate pre-built workout templates.
+                  Click &quot;Seed Templates&quot; above to generate pre-built workout templates.
                 </p>
                 <Button onClick={handleSeedTemplates}>Seed Templates Now</Button>
               </div>
@@ -608,7 +858,7 @@ export default function WorkoutPlansPage() {
         </div>
       )}
 
-      {/* POPUP MODAL 1: WORKOUT PLAN BUILDER */}
+      {/* POPUP MODAL 1: WORKOUT PLAN BUILDER FOR CLIENT */}
       <Modal
         isOpen={isWorkoutModalOpen}
         onClose={() => setIsWorkoutModalOpen(false)}
@@ -642,7 +892,7 @@ export default function WorkoutPlansPage() {
           <div style={styles.modalConfigGrid}>
             <Input 
               label="Workout Plan / Phase Title *" 
-              placeholder="e.g. Hypertrophy Phase 1 - Push Day" 
+              placeholder="e.g. Hypertrophy Phase 1 - Push/Pull Split" 
               value={planTitle}
               onChange={(e) => setPlanTitle(e.target.value)}
             />
@@ -674,22 +924,121 @@ export default function WorkoutPlansPage() {
             />
           </div>
 
-          {/* Exercises Builder List */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* ROUTINE DURATION / SPLIT SELECTOR */}
+          <div style={styles.routineTypeBox}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+              <Layers size={14} color="var(--accent, #E00008)" />
+              <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text)', margin: 0 }}>
+                Workout Plan Structure
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setPlanType('single')}
+                style={{
+                  ...styles.routineTypeBtn,
+                  ...(planType === 'single' ? styles.routineTypeBtnActive : {})
+                }}
+              >
+                🏋️ 1-Day Workout Routine
+              </button>
+              <button
+                type="button"
+                onClick={() => setPlanType('multi')}
+                style={{
+                  ...styles.routineTypeBtn,
+                  ...(planType === 'multi' ? styles.routineTypeBtnActive : {})
+                }}
+              >
+                📅 Multi-Day Split Routine (e.g. Day 1, Day 2, Day 3...)
+              </button>
+            </div>
+          </div>
+
+          {/* DAY TABS BAR (For Multi-Day or Single-Day) */}
+          <div style={styles.dayTabsContainer}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', paddingBottom: '6px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {planDays.map((day, dIdx) => {
+                const isActive = activeDayIndex === dIdx;
+                const exCount = (day.exercises || []).length;
+                return (
+                  <button
+                    key={dIdx}
+                    type="button"
+                    onClick={() => setActiveDayIndex(dIdx)}
+                    style={{
+                      ...styles.dayTabBtn,
+                      ...(isActive ? styles.dayTabBtnActive : {})
+                    }}
+                  >
+                    <span>{day.dayTitle || `Day ${dIdx + 1}`}</span>
+                    <span style={{
+                      ...styles.dayCountBadge,
+                      ...(isActive ? styles.dayCountBadgeActive : {})
+                    }}>
+                      {exCount}
+                    </span>
+                  </button>
+                );
+              })}
+
+              {planType === 'multi' && (
+                <button
+                  type="button"
+                  onClick={handleAddPlanDay}
+                  style={styles.addDayBtn}
+                >
+                  <Plus size={14} /> Add Day
+                </button>
+              )}
+            </div>
+
+            {/* Active Day Title & Delete Row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '14px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <Input
+                label={`Day ${activeDayIndex + 1} Title / Split Name`}
+                placeholder="e.g. Day 1 - Push (Chest, Shoulders & Triceps)"
+                value={planDays[activeDayIndex]?.dayTitle || ''}
+                onChange={(e) => handlePlanDayTitleChange(activeDayIndex, e.target.value)}
+                containerStyle={{ flex: 1, margin: 0 }}
+              />
+
+              {planDays.length > 1 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleRemovePlanDay(activeDayIndex)}
+                  style={{ color: '#ff1744', marginTop: '22px', border: '1px solid rgba(255,23,68,0.2)', backgroundColor: 'rgba(255,23,68,0.08)' }}
+                >
+                  <Trash2 size={14} /> Remove Day
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Exercises Builder List for Active Day */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#FFFFFF' }}>Exercises List</h3>
-              <Button variant="outline" size="sm" onClick={handleAddExercise}>
-                + Add Exercise Row
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Dumbbell size={16} color="var(--accent, #E00008)" />
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#FFFFFF' }}>
+                  Exercises for {planDays[activeDayIndex]?.dayTitle || 'Active Day'}
+                </h3>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={handleAddPlanExerciseRow}>
+                <Plus size={14} /> Add Exercise Row
               </Button>
             </div>
 
-            {exercisesState.map((ex, idx) => (
+            {(planDays[activeDayIndex]?.exercises || []).map((ex, idx) => (
               <div key={idx} style={styles.exerciseBuilderCard}>
                 <div style={styles.exerciseCardHeader}>
                   <span style={styles.exerciseNumLabel}>Exercise #{idx + 1}</span>
                   <button 
                     type="button" 
-                    onClick={() => handleRemoveExercise(idx)} 
+                    onClick={() => handleRemovePlanExerciseRow(idx)} 
                     style={styles.removeExRowBtn}
                   >
                     Remove
@@ -701,35 +1050,35 @@ export default function WorkoutPlansPage() {
                     <Input 
                       placeholder="Exercise Name (e.g. Barbell Squat)" 
                       value={ex.name || ''} 
-                      onChange={(e) => handleExerciseChange(idx, 'name', e.target.value)}
+                      onChange={(e) => handlePlanExerciseChange(idx, 'name', e.target.value)}
                     />
                   </div>
                   <Input 
                     type="number" 
                     placeholder="Sets" 
                     value={ex.sets || ''} 
-                    onChange={(e) => handleExerciseChange(idx, 'sets', e.target.value)}
+                    onChange={(e) => handlePlanExerciseChange(idx, 'sets', e.target.value)}
                   />
                   <Input 
                     placeholder="Reps (e.g. 8-10 / Fail)" 
                     value={ex.reps || ''} 
-                    onChange={(e) => handleExerciseChange(idx, 'reps', e.target.value)}
+                    onChange={(e) => handlePlanExerciseChange(idx, 'reps', e.target.value)}
                   />
                   <Input 
                     placeholder="Weight (e.g. 60 kg)" 
                     value={ex.weight || ''} 
-                    onChange={(e) => handleExerciseChange(idx, 'weight', e.target.value)}
+                    onChange={(e) => handlePlanExerciseChange(idx, 'weight', e.target.value)}
                   />
                   <Input 
                     placeholder="Rest (e.g. 90s)" 
                     value={ex.rest || ''} 
-                    onChange={(e) => handleExerciseChange(idx, 'rest', e.target.value)}
+                    onChange={(e) => handlePlanExerciseChange(idx, 'rest', e.target.value)}
                   />
                   <div style={{ gridColumn: 'span 6' }}>
                     <Textarea 
                       placeholder="Trainer notes, form cues, or target RPE..." 
                       value={ex.notes || ''} 
-                      onChange={(e) => handleExerciseChange(idx, 'notes', e.target.value)}
+                      onChange={(e) => handlePlanExerciseChange(idx, 'notes', e.target.value)}
                       rows={2}
                     />
                   </div>
@@ -750,7 +1099,7 @@ export default function WorkoutPlansPage() {
         </div>
       </Modal>
 
-      {/* POPUP MODAL 2: CREATE / EDIT WORKOUT TEMPLATE */}
+      {/* POPUP MODAL 2: CREATE / EDIT MASTER WORKOUT TEMPLATE */}
       <Modal
         isOpen={isTemplateModalOpen}
         onClose={() => setIsTemplateModalOpen(false)}
@@ -760,7 +1109,7 @@ export default function WorkoutPlansPage() {
         <form onSubmit={handleSaveTemplateModal} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <Input 
             label="Template Name *" 
-            placeholder="e.g. Push Day Strength Routine" 
+            placeholder="e.g. Push Day Strength Routine or 3-Day Split" 
             value={templateForm.templateName}
             onChange={(e) => setTemplateForm({ ...templateForm, templateName: e.target.value })}
             required
@@ -773,15 +1122,112 @@ export default function WorkoutPlansPage() {
             onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
           />
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
-            <h4 style={{ margin: 0, color: '#FFFFFF' }}>Exercises</h4>
-            <Button type="button" variant="outline" size="sm" onClick={handleTmplAddExercise}>
+          {/* ROUTINE DURATION / SPLIT SELECTOR */}
+          <div style={styles.routineTypeBox}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+              <Layers size={14} color="var(--accent, #E00008)" />
+              <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text)', margin: 0 }}>
+                Template Workout Structure
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setTemplateForm({ ...templateForm, planType: 'single' })}
+                style={{
+                  ...styles.routineTypeBtn,
+                  ...(templateForm.planType === 'single' ? styles.routineTypeBtnActive : {})
+                }}
+              >
+                🏋️ 1-Day Workout Routine
+              </button>
+              <button
+                type="button"
+                onClick={() => setTemplateForm({ ...templateForm, planType: 'multi' })}
+                style={{
+                  ...styles.routineTypeBtn,
+                  ...(templateForm.planType === 'multi' ? styles.routineTypeBtnActive : {})
+                }}
+              >
+                📅 Multi-Day Split Routine (e.g. Day 1, Day 2, Day 3...)
+              </button>
+            </div>
+          </div>
+
+          {/* DAY TABS BAR FOR TEMPLATE */}
+          <div style={styles.dayTabsContainer}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', paddingBottom: '6px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {templateForm.days.map((day, dIdx) => {
+                const isActive = tmplActiveDayIndex === dIdx;
+                const exCount = (day.exercises || []).length;
+                return (
+                  <button
+                    key={dIdx}
+                    type="button"
+                    onClick={() => setTmplActiveDayIndex(dIdx)}
+                    style={{
+                      ...styles.dayTabBtn,
+                      ...(isActive ? styles.dayTabBtnActive : {})
+                    }}
+                  >
+                    <span>{day.dayTitle || `Day ${dIdx + 1}`}</span>
+                    <span style={{
+                      ...styles.dayCountBadge,
+                      ...(isActive ? styles.dayCountBadgeActive : {})
+                    }}>
+                      {exCount}
+                    </span>
+                  </button>
+                );
+              })}
+
+              {templateForm.planType === 'multi' && (
+                <button
+                  type="button"
+                  onClick={handleAddTmplDay}
+                  style={styles.addDayBtn}
+                >
+                  <Plus size={14} /> Add Day
+                </button>
+              )}
+            </div>
+
+            {/* Active Day Title & Remove Row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '14px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <Input
+                label={`Day ${tmplActiveDayIndex + 1} Title / Split Name`}
+                placeholder="e.g. Day 1 - Push Day"
+                value={templateForm.days[tmplActiveDayIndex]?.dayTitle || ''}
+                onChange={(e) => handleTmplDayTitleChange(tmplActiveDayIndex, e.target.value)}
+                containerStyle={{ flex: 1, margin: 0 }}
+              />
+
+              {templateForm.days.length > 1 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleRemoveTmplDay(tmplActiveDayIndex)}
+                  style={{ color: '#ff1744', marginTop: '22px', border: '1px solid rgba(255,23,68,0.2)', backgroundColor: 'rgba(255,23,68,0.08)' }}
+                >
+                  <Trash2 size={14} /> Remove Day
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* EXERCISES FOR ACTIVE DAY */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+            <h4 style={{ margin: 0, color: '#FFFFFF', fontSize: '0.92rem' }}>
+              Exercises for {templateForm.days[tmplActiveDayIndex]?.dayTitle || 'Active Day'}
+            </h4>
+            <Button type="button" variant="outline" size="sm" onClick={handleAddTmplExerciseRow}>
               + Add Exercise Row
             </Button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
-            {templateForm.exercises.map((ex, idx) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '280px', overflowY: 'auto', paddingRight: '4px' }}>
+            {(templateForm.days[tmplActiveDayIndex]?.exercises || []).map((ex, idx) => (
               <div key={idx} style={styles.exerciseTmplRow}>
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', gap: '8px', alignItems: 'center' }}>
                   <Input 
@@ -807,8 +1253,8 @@ export default function WorkoutPlansPage() {
                   />
                   <button 
                     type="button" 
-                    onClick={() => handleTmplRemoveExercise(idx)} 
-                    style={{ background: 'none', border: 'none', color: '#ff1744', cursor: 'pointer' }}
+                    onClick={() => handleTmplRemoveExerciseRow(idx)} 
+                    style={{ background: 'none', border: 'none', color: '#ff1744', cursor: 'pointer', padding: '4px' }}
                   >
                     ✕
                   </button>
@@ -858,97 +1304,203 @@ const styles = {
   tabBtnActive: {
     backgroundColor: 'var(--accent, #E00008)',
     color: '#FFFFFF',
-    fontWeight: 600,
+    fontWeight: 700,
   },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-    gap: '20px',
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' },
+  templateGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' },
+  planCard: { padding: '16px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '12px' },
+  templateCard: { padding: '18px', borderRadius: '14px', display: 'flex', flexDirection: 'column' },
+  tmplBadge: {
+    padding: '3px 8px',
+    borderRadius: '12px',
+    backgroundColor: 'rgba(224, 0, 8, 0.15)',
+    color: 'var(--accent, #E00008)',
+    fontSize: '0.72rem',
+    fontWeight: 700,
+    border: '1px solid rgba(224, 0, 8, 0.3)'
   },
-  planCard: {
-    padding: '20px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '14px',
+  typeBadge: {
+    fontSize: '0.7rem',
+    fontWeight: 700,
+    padding: '2px 7px',
+    borderRadius: '10px',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    color: 'var(--text-secondary)',
+    border: '1px solid var(--border)'
   },
   exerciseSummaryBar: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    padding: '10px 14px',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    borderRadius: '10px',
-    border: '1px solid var(--border, #2a2a30)',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    padding: '8px 12px',
+    borderRadius: '8px',
+    border: '1px solid rgba(255, 255, 255, 0.04)'
   },
   summaryExercisesList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '6px',
+    gap: '4px',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
     padding: '10px',
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
     borderRadius: '8px',
-    fontSize: '0.825rem',
+    border: '1px solid rgba(255, 255, 255, 0.03)'
   },
   summarySlotRow: {
     display: 'flex',
-    justifyContent: 'space-between',
-    color: 'var(--text-secondary)',
+    justify: 'space-between',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '2px 0'
   },
   cardActions: {
     display: 'flex',
-    gap: '10px',
+    gap: '8px',
     marginTop: 'auto',
-    paddingTop: '10px',
-    borderTop: '1px solid var(--border, #2a2a30)',
+    paddingTop: '8px',
+    borderTop: '1px solid rgba(255, 255, 255, 0.06)'
   },
-  modalConfigGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '12px',
-  },
-  exerciseBuilderCard: {
-    padding: '16px',
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-    borderRadius: '14px',
+  emptyState: {
+    padding: '40px 20px',
+    textAlign: 'center',
+    backgroundColor: 'var(--card, #121214)',
+    borderRadius: '16px',
     border: '1px solid var(--border, #2a2a30)',
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    alignItems: 'center'
   },
-  exerciseCardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border, #2a2a30)', paddingBottom: '10px' },
-  exerciseNumLabel: { fontSize: '0.95rem', fontWeight: 700, color: '#FFFFFF' },
-  removeExRowBtn: { background: 'none', border: 'none', color: '#ff1744', fontSize: '0.8rem', cursor: 'pointer' },
+  modalConfigGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '12px',
+    padding: '16px',
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderRadius: '12px',
+    border: '1px solid var(--border, #2a2a30)'
+  },
+
+  // ROUTINE TYPE & DAY TABS STYLES
+  routineTypeBox: {
+    padding: '14px',
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderRadius: '14px',
+    border: '1px solid var(--border, #2a2a30)'
+  },
+  routineTypeBtn: {
+    padding: '8px 16px',
+    borderRadius: '20px',
+    border: '1px solid var(--border, #2a2a30)',
+    backgroundColor: 'var(--card, #121214)',
+    color: 'var(--text-secondary)',
+    fontSize: '0.8rem',
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    fontFamily: 'inherit'
+  },
+  routineTypeBtnActive: {
+    backgroundColor: 'var(--accent, #E00008)',
+    color: '#FFFFFF',
+    borderColor: 'var(--accent, #E00008)',
+    boxShadow: '0 4px 14px rgba(224, 0, 8, 0.35)',
+    fontWeight: 800
+  },
+  dayTabsContainer: {
+    padding: '16px',
+    backgroundColor: 'rgba(20, 20, 25, 0.85)',
+    borderRadius: '16px',
+    border: '1px solid var(--border, rgba(255, 255, 255, 0.08))',
+    boxShadow: '0 6px 20px rgba(0, 0, 0, 0.25)'
+  },
+  dayTabBtn: {
+    padding: '8px 16px',
+    borderRadius: '12px',
+    border: '1px solid rgba(255, 255, 255, 0.07)',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    color: 'var(--text-secondary, #AAAAAA)',
+    fontSize: '0.82rem',
+    fontWeight: 600,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    whiteSpace: 'nowrap',
+    transition: 'all 0.2s ease',
+    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)'
+  },
+  dayTabBtnActive: {
+    background: 'linear-gradient(135deg, var(--accent, #E00008) 0%, #ff1744 100%)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    color: '#FFFFFF',
+    fontWeight: 800,
+    boxShadow: '0 4px 16px rgba(224, 0, 8, 0.45)'
+  },
+  dayCountBadge: {
+    fontSize: '0.68rem',
+    fontWeight: 800,
+    padding: '2px 7px',
+    borderRadius: '10px',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    color: 'var(--text-secondary)'
+  },
+  dayCountBadgeActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    color: '#FFFFFF'
+  },
+  addDayBtn: {
+    padding: '8px 16px',
+    borderRadius: '12px',
+    border: '1px dashed var(--accent, #E00008)',
+    backgroundColor: 'rgba(224, 0, 8, 0.12)',
+    color: 'var(--accent, #E00008)',
+    fontSize: '0.8rem',
+    fontWeight: 800,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    transition: 'all 0.2s ease',
+    boxShadow: '0 2px 8px rgba(224, 0, 8, 0.15)'
+  },
+
+  exerciseBuilderCard: {
+    padding: '14px',
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderRadius: '12px',
+    border: '1px solid var(--border, #2a2a30)'
+  },
+  exerciseCardHeader: {
+    display: 'flex',
+    justify: 'space-between',
+    alignItems: 'center',
+    marginBottom: '10px'
+  },
+  exerciseNumLabel: {
+    fontSize: '0.78rem',
+    fontWeight: 700,
+    color: 'var(--accent, #E00008)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em'
+  },
+  removeExRowBtn: {
+    fontSize: '0.75rem',
+    color: '#ff1744',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 600
+  },
   exerciseFormGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))',
-    gap: '8px',
+    gridTemplateColumns: 'repeat(6, 1fr)',
+    gap: '10px'
   },
   exerciseTmplRow: {
     padding: '10px',
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
     borderRadius: '8px',
-    border: '1px solid var(--border, #2a2a30)',
-  },
-  templateGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-    gap: '12px',
-  },
-  templateCard: { padding: '20px', display: 'flex', flexDirection: 'column', minHeight: '180px' },
-  tmplBadge: {
-    backgroundColor: 'rgba(224, 0, 8, 0.15)',
-    color: 'var(--accent, #E00008)',
-    fontWeight: 700,
-    fontSize: '0.8rem',
-    padding: '4px 10px',
-    borderRadius: '12px',
-  },
-  emptyState: {
-    padding: '60px 20px',
-    textAlign: 'center',
-    backgroundColor: 'var(--card, #121214)',
-    borderRadius: 'var(--radius, 20px)',
-    border: '1px solid var(--border, #2a2a30)',
-    width: '100%',
-  },
+    border: '1px solid var(--border, #2a2a30)'
+  }
 };

@@ -79,38 +79,6 @@ export default function ClientLayout({ children }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Light / Dark Mode Toggle Pill */}
-          <button 
-            onClick={toggleTheme} 
-            style={{
-              background: 'var(--card-hover)',
-              border: '1px solid var(--border)',
-              borderRadius: '20px',
-              color: 'var(--text)',
-              padding: '4px 10px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontSize: '0.72rem',
-              fontWeight: 700,
-              boxShadow: 'var(--shadow-card)'
-            }} 
-            aria-label="Toggle theme mode"
-          >
-            {theme === 'dark' ? (
-              <>
-                <Sun size={14} color="#ffd600" />
-                <span>Light Mode</span>
-              </>
-            ) : (
-              <>
-                <Moon size={14} color="#0f172a" />
-                <span>Dark Mode</span>
-              </>
-            )}
-          </button>
-
           {/* Notifications Bell Button & Popup Menu */}
           <div style={{ position: 'relative' }}>
             <button 

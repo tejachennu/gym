@@ -16,7 +16,8 @@ import {
   Menu, 
   X,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  HelpCircle
 } from 'lucide-react';
 import { logoutUser } from '@/lib/auth';
 import { useToast } from './Toast';
@@ -24,6 +25,8 @@ import { useToast } from './Toast';
 const NAV_ITEMS = [
   { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
   { name: 'Clients', path: '/admin/clients', icon: Users },
+  { name: 'Enquiries', path: '/admin/enquiries', icon: HelpCircle },
+  { name: 'Transformations', path: '/admin/transformations', icon: Camera },
   { name: 'Plans', path: '/admin/plans', icon: CreditCard },
   { name: 'Diet Plans', path: '/admin/diet-plans', icon: Utensils },
   { name: 'Workout Plans', path: '/admin/workout-plans', icon: Dumbbell },
@@ -71,7 +74,7 @@ export default function Sidebar({ userProfile }) {
         {/* Brand Header */}
         <div style={styles.brandHeader}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: '42px', width: 'auto', maxWidth: '200px', objectFit: 'contain' }} />
+            <img src="/mrk-logo.png" alt="MRK FITNESS COACH" style={{ height: '42px', width: 'auto', maxWidth: '200px', objectFit: 'contain' }} />
             <div style={styles.portalTag}>
               <ShieldCheck size={12} color="var(--accent, #E00008)" /> Management Portal
             </div>

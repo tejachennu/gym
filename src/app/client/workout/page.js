@@ -15,6 +15,7 @@ export default function WorkoutPlanPage() {
   const [completedExercises, setCompletedExercises] = useState([]);
   const [saving, setSaving] = useState(false);
   const [isSubmittedToday, setIsSubmittedToday] = useState(false);
+  const [activeDayIndex, setActiveDayIndex] = useState(0);
   const toast = useToast();
 
   const todayDateString = new Date().toISOString().split('T')[0];
@@ -105,7 +106,7 @@ export default function WorkoutPlanPage() {
       <div style={{ textAlign: 'center', padding: '12px', background: 'var(--card)', borderRadius: '10px', border: '1px solid var(--border)' }}>
         <Dumbbell size={32} color="var(--text-secondary)" style={{ marginBottom: '10px', opacity: 0.5 }} />
         <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem' }}>No Workout Plan</h3>
-        <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.8rem' }}>You don't have an active workout plan right now.</p>
+        <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.8rem' }}>You don&apos;t have an active workout plan right now.</p>
       </div>
     );
   }
@@ -131,9 +132,38 @@ export default function WorkoutPlanPage() {
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
 
+  const hasDays = workoutPlan?.days && Array.isArray(workoutPlan.days) && workoutPlan.days.length > 1;
+  const currentDayObj = hasDays ? workoutPlan.days[activeDayIndex] : null;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '80px' }}>
       
+      {/* Multi-day tab switcher */}
+      {hasDays && (
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+          {workoutPlan.days.map((day, dIdx) => (
+            <button
+              key={dIdx}
+              type="button"
+              onClick={() => setActiveDayIndex(dIdx)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '20px',
+                border: activeDayIndex === dIdx ? '1px solid var(--accent)' : '1px solid var(--border)',
+                backgroundColor: activeDayIndex === dIdx ? 'rgba(224, 0, 8, 0.15)' : 'var(--card)',
+                color: activeDayIndex === dIdx ? '#fff' : 'var(--text-secondary)',
+                fontSize: '0.78rem',
+                fontWeight: activeDayIndex === dIdx ? 800 : 500,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {day.dayTitle || `Day ${dIdx + 1}`}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Workout Header */}
       <Card style={{ 
         padding: '12px', 
@@ -147,7 +177,7 @@ export default function WorkoutPlanPage() {
       }}>
         <div style={{ flex: 1 }}>
           <h1 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', fontWeight: 'bold' }}>
-            {workoutPlan.name || workoutPlan.title || 'Today\'s Workout'}
+            {currentDayObj ? currentDayObj.dayTitle : (workoutPlan.name || workoutPlan.planTitle || workoutPlan.title || 'Today\'s Workout')}
           </h1>
           <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
             {completedCount} of {totalExercises} completed

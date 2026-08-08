@@ -8,20 +8,20 @@ import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Loading';
-import { 
-  Dumbbell, 
-  Utensils, 
-  Activity, 
-  ShieldCheck, 
-  Sparkles, 
-  TrendingUp, 
-  Users, 
-  Award, 
-  ArrowRight, 
-  CheckCircle2, 
-  Phone, 
-  Mail, 
-  MapPin, 
+import {
+  Dumbbell,
+  Utensils,
+  Activity,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
+  Users,
+  Award,
+  ArrowRight,
+  CheckCircle2,
+  Phone,
+  Mail,
+  MapPin,
   ChevronRight,
   Flame,
   Star,
@@ -43,9 +43,9 @@ import {
 function InstagramIcon({ size = 18, color = "#e1306c" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect width="20" height="20" x="2" y="2" rx="5" ry="5"/>
-      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
-      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/>
+      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
     </svg>
   );
 }
@@ -54,7 +54,7 @@ const DEFAULT_PLANS = [
   {
     id: 'default-1',
     plan_name: "Cardio + Strength",
-    category: "MRK FITNESS",
+    category: "MRK FITNESS COACH",
     badge: "Most Popular 🔥",
     description: "The ultimate combination for fat loss, endurance, and body transformation.",
     pricing: [
@@ -67,7 +67,7 @@ const DEFAULT_PLANS = [
   {
     id: 'default-2',
     plan_name: "Personal Training",
-    category: "MRK FITNESS",
+    category: "MRK FITNESS COACH",
     badge: "VIP 1-on-1 Coaching 👑",
     description: "One-on-one dedicated coaching with Radha Krishna Maram.",
     pricing: [
@@ -80,7 +80,7 @@ const DEFAULT_PLANS = [
   {
     id: 'default-3',
     plan_name: "15 Days Pass",
-    category: "MRK FITNESS",
+    category: "MRK FITNESS COACH",
     description: "A flexible short-term membership for rapid body reset.",
     pricing: [
       { duration: "15 Days", price: 999 }
@@ -90,7 +90,7 @@ const DEFAULT_PLANS = [
   {
     id: 'default-4',
     plan_name: "Daily Access Pass",
-    category: "MRK FITNESS",
+    category: "MRK FITNESS COACH",
     description: "Single day drop-in pass for workout enthusiasts.",
     pricing: [
       { duration: "1 Day", price: 99 }
@@ -101,20 +101,20 @@ const DEFAULT_PLANS = [
 
 const FAQS = [
   {
-    q: "How does the MRK FITNESS online & in-gym coaching work?",
-    a: "Every member gets a personalized dashboard. Head Coach Radha Krishna Maram designs your custom workout split and macro-balanced diet plan based on your intake assessment (goals, injuries, medical conditions). You submit daily activity logs and 10-day posture photos for continuous progress tracking."
+    q: "How does the MRK FITNESS COACH online & in-gym coaching work?",
+    a: "Every member gets a personalized dashboard. Head Fitness Coach Radha Krishna Maram designs your custom workout split and macro-balanced diet plan based on your intake assessment (goals, injuries, medical conditions). You submit daily activity logs and 10-day posture photos for continuous progress tracking."
   },
   {
     q: "What is included in the 10-Day Body Posture & Sizing Check-in?",
-    a: "Every 10 days, you upload 4-side posture photos (Front, Back, Left, Right) along with 14-point body measurements (weight, waist, chest, arms, legs). Coach Radha Krishna reviews your photos and measurements to tweak your diet and workout routines for non-stop results."
+    a: "Every 10 days, you upload 4-side posture photos (Front, Back, Left, Right) along with 14-point body measurements (weight, waist, chest, arms, legs). Fitness Coach Radha Krishna reviews your photos and measurements to tweak your diet and workout routines for non-stop results."
   },
   {
     q: "Do I get a customized diet plan according to my dietary preferences?",
     a: "Yes! Diet plans are 100% customized for VEG, NON-VEG, EGGETARIAN, and VEGAN preferences. Meal slots (Breakfast, Pre-Workout, Post-Workout, Lunch, Dinner) list exact quantities and macro totals tailored to your target calories."
   },
   {
-    q: "Can beginners join Personal Training with Head Coach Radha Krishna Maram?",
-    a: "Absolutely! Whether you are a beginner taking your first steps or an advanced lifter aiming for peak performance, Coach Radha Krishna provides step-by-step guidance, form correction, and custom training splits."
+    q: "Can beginners join Personal Training with Head Fitness Coach Radha Krishna Maram?",
+    a: "Absolutely! Whether you are a beginner taking your first steps or an advanced lifter aiming for peak performance, Fitness Coach Radha Krishna provides step-by-step guidance, form correction, and custom training splits."
   }
 ];
 
@@ -200,6 +200,7 @@ export default function HomePage() {
           {!isMobile && (
             <nav style={styles.navLinks}>
               <a href="#about" style={styles.link}>Who is MRK?</a>
+              <a href="#reviews" style={styles.link}>Video Reviews</a>
               <a href="#specializations" style={styles.link}>Specializations</a>
               <a href="#offerings" style={styles.link}>Features</a>
               <a href="#calculator" style={styles.link}>Calorie Calculator</a>
@@ -231,8 +232,8 @@ export default function HomePage() {
             )}
 
             {isMobile && (
-              <button 
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 style={styles.hamburgerBtn}
                 aria-label="Toggle Menu"
               >
@@ -246,6 +247,7 @@ export default function HomePage() {
         {isMobile && isMobileMenuOpen && (
           <div style={styles.mobileDrawer} className="animate-fade-up">
             <a href="#about" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>Who is MRK?</a>
+            <a href="#reviews" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>Video Reviews</a>
             <a href="#specializations" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>Specializations</a>
             <a href="#offerings" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>Features</a>
             <a href="#calculator" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>Calorie Calculator</a>
@@ -277,7 +279,7 @@ export default function HomePage() {
         <div style={styles.heroContainer}>
           <div style={styles.heroBadge}>
             <Sparkles size={14} color="var(--accent, #E00008)" />
-            <span>TRANSFORM YOUR BODY WITH MRK FITNESS</span>
+            <span>TRANSFORM YOUR BODY WITH MRK FITNESS COACH</span>
           </div>
 
           <h1 style={{ ...styles.heroTitle, fontSize: isMobile ? '2.1rem' : '3.2rem' }}>
@@ -286,27 +288,27 @@ export default function HomePage() {
           </h1>
 
           <p style={{ ...styles.heroSubtitle, fontSize: isMobile ? '0.9rem' : '1.05rem' }}>
-            Personalized strength training routines, scientific fat-loss diets, 10-day posture reviews, and 24/7 direct coaching by Head Coach <strong>Radha Krishna Maram</strong>.
+            Personalized strength training routines, scientific fat-loss diets, 10-day posture reviews, and 24/7 direct coaching by Head Fitness Coach <strong>Radha Krishna Maram</strong>.
           </p>
 
           <div style={{ ...styles.heroBtnGroup, flexDirection: isMobile ? 'column' : 'row' }}>
             <Button onClick={handlePortalRedirect} style={{ ...styles.mainCtaBtn, width: isMobile ? '100%' : 'auto', justifyContent: 'center' }} className="pulse-glow">
               Start Your Transformation <ChevronRight size={18} />
             </Button>
-            <a 
-              href="https://instagram.com/__MRK.FITNESS.__" 
-              target="_blank" 
+            <a
+              href="https://instagram.com/__MRK.FITNESS.__"
+              target="_blank"
               rel="noopener noreferrer"
               style={{ ...styles.instaBtn, justifyContent: 'center', width: isMobile ? '100%' : 'auto' }}
             >
-              <InstagramIcon size={18} color="#e1306c" /> DM Head Coach on Instagram
+              <InstagramIcon size={18} color="#e1306c" /> DM Head Fitness Coach on Instagram
             </a>
           </div>
 
           {/* Key Program Highlights Bar */}
           <div style={{ ...styles.heroStatsRow, padding: isMobile ? '14px 16px' : '18px 32px', gap: isMobile ? '14px' : '32px' }}>
             <div style={styles.statBox}>
-              <div style={{ ...styles.statNumber, fontSize: isMobile ? '1.2rem' : '1.5rem' }}>2+ Years</div>
+              <div style={{ ...styles.statNumber, fontSize: isMobile ? '1.2rem' : '1.5rem' }}>4+ Years</div>
               <div style={styles.statLabel}>Specialized Coaching</div>
             </div>
             <div style={styles.statDivider} />
@@ -335,20 +337,20 @@ export default function HomePage() {
             {/* Coach Circle Avatar */}
             <div style={styles.aboutPhotoCol}>
               <div style={{ ...styles.coachAvatarCircle, width: isMobile ? '100px' : '130px', height: isMobile ? '100px' : '130px' }}>
-                <img 
-                  src="/images/mrk_coach_avatar.jpg" 
-                  alt="Radha Krishna Maram" 
-                  style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
+                <img
+                  src="/images/mrk_coach_avatar.jpg"
+                  alt="Radha Krishna Maram"
+                  style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
                   onError={(e) => { e.target.onerror = null; e.target.src = "/mrk-logo.png"; }}
                 />
               </div>
               <h3 style={{ ...styles.coachName, fontSize: isMobile ? '1.2rem' : '1.4rem' }}>Radha Krishna Maram</h3>
-              <p style={styles.coachTitle}>Head Personal Fitness Trainer & Strength Specialist</p>
-              
-              <a 
-                href="https://instagram.com/__MRK.FITNESS.__" 
-                target="_blank" 
-                rel="noreferrer" 
+              <p style={styles.coachTitle}>Head Fitness Coach & Strength Specialist</p>
+
+              <a
+                href="https://instagram.com/__MRK.FITNESS.__"
+                target="_blank"
+                rel="noreferrer"
                 style={styles.socialPill}
               >
                 <InstagramIcon size={16} color="#e1306c" />
@@ -358,11 +360,11 @@ export default function HomePage() {
 
             {/* Coach Bio Text */}
             <div style={styles.aboutTextCol}>
-              <div style={styles.sectionBadge}>MEET YOUR HEAD COACH</div>
+              <div style={styles.sectionBadge}>MEET YOUR HEAD FITNESS COACH</div>
               <h2 style={{ ...styles.aboutHeadline, fontSize: isMobile ? '1.4rem' : '1.8rem' }}>WHO IS <span style={{ color: 'var(--accent, #E00008)' }}>MRK?</span></h2>
 
               <p style={styles.bioParagraph}>
-                <strong>Radha Krishna Maram</strong> is a dedicated Personal Fitness Trainer and Strength & Weight-Loss Specialist with over two years of hands-on experience helping individuals transform their bodies and lifestyles.
+                <strong>Radha Krishna Maram</strong> is a dedicated Fitness Coach and Strength & Weight-Loss Specialist with over four years of hands-on experience helping individuals transform their bodies and lifestyles.
               </p>
 
               <p style={styles.bioParagraph}>
@@ -377,8 +379,63 @@ export default function HomePage() {
         </Card>
       </section>
 
+      {/* 3.5 CLIENT VIDEO REVIEWS & TRANSFORMATIONS SECTION */}
+      <section id="reviews" style={{ ...styles.section, background: 'rgba(18, 18, 20, 0.4)', padding: isMobile ? '35px 16px' : '65px 16px' }}>
+        <div style={styles.sectionHeader}>
+          <span style={styles.sectionBadge}>REAL MEMBER RESULTS</span>
+          <h2 style={{ ...styles.sectionTitle, fontSize: isMobile ? '1.4rem' : '1.8rem' }}>CLIENT VIDEO REVIEWS & TRANSFORMATIONS</h2>
+          <p style={styles.sectionSub}>Watch real video reviews and body transformation testimonials from MRK FITNESS COACH clients.</p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '22px', maxWidth: '960px', margin: '0 auto' }}>
+          <Card style={{ padding: '14px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px', overflow: 'hidden', boxShadow: 'var(--shadow-card)' }} className="glass-card">
+            <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#000' }}>
+              <video 
+                controls 
+                playsInline 
+                preload="metadata"
+                style={{ width: '100%', maxHeight: '480px', borderRadius: '12px', objectFit: 'contain', display: 'block' }}
+              >
+                <source src="/WhatsApp Video 2026-08-06 at 10.40.29 PM.mp4" type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
+            </div>
+            <div style={{ padding: '12px 6px 4px 6px', textAlign: 'center' }}>
+              <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                🎬 Member Transformation Review
+              </h4>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                Client Video Testimonial • MRK FITNESS COACH Program
+              </p>
+            </div>
+          </Card>
+
+          <Card style={{ padding: '14px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px', overflow: 'hidden', boxShadow: 'var(--shadow-card)' }} className="glass-card">
+            <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#000' }}>
+              <video 
+                controls 
+                playsInline 
+                preload="metadata"
+                style={{ width: '100%', maxHeight: '480px', borderRadius: '12px', objectFit: 'contain', display: 'block' }}
+              >
+                <source src="/WhatsApp Video 2026-08-06 at 6.46.50 AM (1).mp4" type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
+            </div>
+            <div style={{ padding: '12px 6px 4px 6px', textAlign: 'center' }}>
+              <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                🎥 Client Weight Loss Journey Review
+              </h4>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                Real Client Video Review • 1-on-1 Fitness Coaching
+              </p>
+            </div>
+          </Card>
+        </div>
+      </section>
+
       {/* 4. SPECIALIZATIONS SECTION */}
-      <section id="specializations" style={{ ...styles.section, background: 'rgba(18, 18, 20, 0.4)', padding: isMobile ? '35px 16px' : '65px 16px' }}>
+      <section id="specializations" style={{ ...styles.section, padding: isMobile ? '35px 16px' : '65px 16px' }}>
         <div style={styles.sectionHeader}>
           <span style={styles.sectionBadge}>EXPERT CORE CAPABILITIES</span>
           <h2 style={{ ...styles.sectionTitle, fontSize: isMobile ? '1.4rem' : '1.8rem' }}>PROGRAM SPECIALIZATIONS</h2>
@@ -468,11 +525,11 @@ export default function HomePage() {
             <div style={styles.calcInputsCol}>
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Your Weight (kg): <strong style={{ color: '#FFFFFF' }}>{calcWeight} kg</strong></label>
-                <input 
-                  type="range" 
-                  min="40" 
-                  max="140" 
-                  value={calcWeight} 
+                <input
+                  type="range"
+                  min="40"
+                  max="140"
+                  value={calcWeight}
                   onChange={(e) => setCalcWeight(Number(e.target.value))}
                   style={styles.slider}
                 />
@@ -480,11 +537,11 @@ export default function HomePage() {
 
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Your Height (cm): <strong style={{ color: '#FFFFFF' }}>{calcHeight} cm</strong></label>
-                <input 
-                  type="range" 
-                  min="140" 
-                  max="210" 
-                  value={calcHeight} 
+                <input
+                  type="range"
+                  min="140"
+                  max="210"
+                  value={calcHeight}
                   onChange={(e) => setCalcHeight(Number(e.target.value))}
                   style={styles.slider}
                 />
@@ -492,11 +549,11 @@ export default function HomePage() {
 
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Age (years): <strong style={{ color: '#FFFFFF' }}>{calcAge} yrs</strong></label>
-                <input 
-                  type="range" 
-                  min="16" 
-                  max="70" 
-                  value={calcAge} 
+                <input
+                  type="range"
+                  min="16"
+                  max="70"
+                  value={calcAge}
                   onChange={(e) => setCalcAge(Number(e.target.value))}
                   style={styles.slider}
                 />
@@ -505,21 +562,21 @@ export default function HomePage() {
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Transformation Goal:</label>
                 <div style={styles.goalBtnRow}>
-                  <button 
+                  <button
                     onClick={() => setCalcGoal('fatloss')}
                     style={{ ...styles.goalBtn, ...(calcGoal === 'fatloss' ? styles.goalBtnActive : {}) }}
                   >
                     🔥 Fat Loss
                   </button>
 
-                  <button 
+                  <button
                     onClick={() => setCalcGoal('muscle')}
                     style={{ ...styles.goalBtn, ...(calcGoal === 'muscle' ? styles.goalBtnActive : {}) }}
                   >
                     💪 Muscle Gain
                   </button>
 
-                  <button 
+                  <button
                     onClick={() => setCalcGoal('maintenance')}
                     style={{ ...styles.goalBtn, ...(calcGoal === 'maintenance' ? styles.goalBtnActive : {}) }}
                   >
@@ -629,10 +686,10 @@ export default function HomePage() {
           {FAQS.map((faq, idx) => {
             const isOpen = openFaq === idx;
             return (
-              <Card 
-                key={idx} 
+              <Card
+                key={idx}
                 onClick={() => setOpenFaq(isOpen ? null : idx)}
-                style={{ padding: '16px 20px', cursor: 'pointer', border: isOpen ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)' }} 
+                style={{ padding: '16px 20px', cursor: 'pointer', border: isOpen ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)' }}
                 className="glass-card"
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
@@ -657,15 +714,15 @@ export default function HomePage() {
         <div style={styles.footerContainer}>
           <div style={styles.footerBrand}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: '38px', width: 'auto', objectFit: 'contain' }} />
+              <img src="/mrk-logo.png" alt="MRK FITNESS COACH" style={{ height: '38px', width: 'auto', objectFit: 'contain' }} />
             </div>
             <p style={{ margin: '10px 0 0', color: 'var(--text-secondary, #AAAAAA)', fontSize: '0.85rem', maxWidth: '360px', lineHeight: 1.5 }}>
-              Guided by Head Coach Radha Krishna Maram. Personalized fitness coaching, strength training, scientific macro diets, and sustainable weight-loss planning.
+              Guided by Head Fitness Coach Radha Krishna Maram. Personalized fitness coaching, strength training, scientific macro diets, and sustainable weight-loss planning.
             </p>
             <div style={{ marginTop: '14px' }}>
-              <a 
-                href="https://instagram.com/__MRK.FITNESS.__" 
-                target="_blank" 
+              <a
+                href="https://instagram.com/__MRK.FITNESS.__"
+                target="_blank"
                 rel="noopener noreferrer"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#e1306c', fontSize: '0.85rem', fontWeight: 700, textDecoration: 'none' }}
               >
@@ -712,28 +769,28 @@ const styles = {
   portalBtn: { fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' },
   ctaHeaderBtn: { fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' },
   hamburgerBtn: { width: '38px', height: '38px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
-  mobileDrawer: { 
+  mobileDrawer: {
     position: 'absolute',
     top: '100%',
     left: 0,
     right: 0,
     zIndex: 9999,
-    padding: '20px 16px 24px 16px', 
-    backgroundColor: 'rgba(10, 10, 12, 0.98)', 
+    padding: '20px 16px 24px 16px',
+    backgroundColor: 'rgba(10, 10, 12, 0.98)',
     backdropFilter: 'blur(24px)',
     WebkitBackdropFilter: 'blur(24px)',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.12)', 
+    borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
     boxShadow: '0 16px 40px rgba(0, 0, 0, 0.9)',
-    display: 'flex', 
-    flexDirection: 'column', 
-    gap: '8px' 
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px'
   },
-  mobileLink: { 
-    color: '#FFFFFF', 
-    textDecoration: 'none', 
-    fontSize: '0.9rem', 
-    fontWeight: 700, 
-    padding: '10px 14px', 
+  mobileLink: {
+    color: '#FFFFFF',
+    textDecoration: 'none',
+    fontSize: '0.9rem',
+    fontWeight: 700,
+    padding: '10px 14px',
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
     border: '1px solid rgba(255, 255, 255, 0.06)',
     borderRadius: '10px'

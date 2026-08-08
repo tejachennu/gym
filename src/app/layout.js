@@ -4,13 +4,13 @@ import { ThemeProvider } from '@/context/ThemeContext';
 import { ToastProvider } from '@/components/ui/Toast';
 
 export const metadata = {
-  title: 'MRK FITNESS - Radha Krishna Maram | Personal Fitness & Weight-Loss Specialist',
-  description: 'Transform your body with MRK FITNESS. Personalized workout plans, custom diet plans, weekly check-ins, and 24/7 trainer support by Radha Krishna Maram.',
+  title: 'MRK FITNESS COACH - Radha Krishna Maram | Personal Weight-Loss & Fitness Specialist',
+  description: 'Transform your body with MRK FITNESS COACH. Personalized workout plans, custom diet plans, weekly check-ins, and 24/7 support by Radha Krishna Maram.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'MRK FITNESS',
+    title: 'MRK FITNESS COACH',
   },
 };
 

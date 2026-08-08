@@ -40,6 +40,17 @@ import {
   Bell
 } from 'lucide-react';
 
+function formatDateNice(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch (e) {
+    return dateStr;
+  }
+}
+
 export default function ClientDashboard() {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
@@ -49,6 +60,7 @@ export default function ClientDashboard() {
   const [clientPlansHistory, setClientPlansHistory] = useState([]);
   const [selectedPlanIndex, setSelectedPlanIndex] = useState(0);
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  const [allUserLogs, setAllUserLogs] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -62,12 +74,16 @@ export default function ClientDashboard() {
         getClientCheckins(user.uid),
         getPlans(),
         getClientPlans(user.uid),
-        getDocuments('Notifications')
-      ]).then(([profileData, logData, checkinsData, plansData, cPlansData, notifsData]) => {
+        getDocuments('Notifications'),
+        getDocuments('DailyLogs')
+      ]).then(([profileData, logData, checkinsData, plansData, cPlansData, notifsData, allLogsData]) => {
         setProfile(profileData);
         setTodayLog(logData);
         setCheckins(checkinsData || []);
         setMasterPlans(plansData || []);
+        
+        const myLogs = (allLogsData || []).filter(l => l.clientId === user.uid);
+        setAllUserLogs(myLogs);
 
         const clientNotifs = (notifsData || []).filter(n => n.recipient === 'all' || n.recipient === user.uid);
         clientNotifs.sort((a, b) => new Date(b.sentAt || b.createdAt) - new Date(a.sentAt || a.createdAt));
@@ -259,6 +275,23 @@ export default function ClientDashboard() {
 
   const clientFirstName = (profile?.displayName || profile?.name || 'Member').split(' ')[0];
 
+  // Latest Trainer Review Candidate
+  const latestTrainerReview = (() => {
+    const candidateList = [
+      ...(todayLog ? [todayLog] : []),
+      ...(checkins || []),
+      ...(allUserLogs || [])
+    ]
+    .filter(item => item && (item.reviewed || (item.remarks && item.remarks.trim() !== '')))
+    .sort((a, b) => {
+      const dateA = a.reviewedAt || a.date || (a.createdAt?.seconds ? new Date(a.createdAt.seconds * 1000).toISOString() : '');
+      const dateB = b.reviewedAt || b.date || (b.createdAt?.seconds ? new Date(b.createdAt.seconds * 1000).toISOString() : '');
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    });
+
+    return candidateList[0] || null;
+  })();
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '80px' }} className="animate-fade-up">
       
@@ -295,7 +328,7 @@ export default function ClientDashboard() {
               Welcome back, {clientFirstName}! 🔥
             </h1>
             <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary, #AAAAAA)' }}>
-              Let's crush your daily nutrition, workout split, and activity goals today.
+              Let&apos;s crush your daily nutrition, workout split, and activity goals today.
             </p>
           </div>
 
@@ -310,6 +343,85 @@ export default function ClientDashboard() {
               <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#00c853' }}>{profile?.goal || 'Fat Loss'}</div>
             </div>
           </div>
+        </div>
+      </Card>
+
+      {/* 2. TRAINER REVIEW & FEEDBACK CARD */}
+      <Card style={{ 
+        padding: '18px', 
+        background: 'linear-gradient(135deg, rgba(0, 200, 83, 0.12) 0%, rgba(18, 18, 20, 0.95) 100%)',
+        border: '1px solid rgba(0, 200, 83, 0.35)',
+        borderRadius: '16px',
+        boxShadow: '0 8px 24px rgba(0, 200, 83, 0.12)'
+      }} className="glass-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ 
+              width: '40px', 
+              height: '40px', 
+              borderRadius: '50%', 
+              backgroundColor: 'rgba(0, 200, 83, 0.2)', 
+              border: '1px solid rgba(0, 200, 83, 0.4)', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              fontSize: '1.1rem', 
+              fontWeight: 900, 
+              color: '#00c853',
+              boxShadow: '0 0 12px rgba(0, 200, 83, 0.25)'
+            }}>
+              💬
+            </div>
+            <div>
+              <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                Head Coach / Trainer Feedback
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                {latestTrainerReview?.date || latestTrainerReview?.reviewedAt 
+                  ? `Reviewed for ${formatDateNice(latestTrainerReview.date || latestTrainerReview.reviewedAt)}` 
+                  : 'Daily Monitoring & Feedback'}
+              </div>
+            </div>
+          </div>
+
+          <Badge variant={latestTrainerReview?.remarks ? 'success' : 'secondary'} style={{ padding: '4px 10px', fontSize: '0.7rem', fontWeight: 800 }}>
+            {latestTrainerReview?.remarks ? '✓ Trainer Reviewed' : '⏳ Log Pending'}
+          </Badge>
+        </div>
+
+        <div style={{ 
+          backgroundColor: 'rgba(0, 0, 0, 0.4)', 
+          border: '1px solid rgba(0, 200, 83, 0.25)', 
+          borderRadius: '12px', 
+          padding: '14px',
+          position: 'relative'
+        }}>
+          {latestTrainerReview?.remarks ? (
+            <>
+              <div style={{ fontSize: '0.88rem', color: '#E0E0E0', lineHeight: '1.5', fontStyle: 'italic' }}>
+                &ldquo;{latestTrainerReview.remarks}&rdquo;
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                  Reviewed by Head Coach
+                </span>
+                <span style={{ fontSize: '0.75rem', color: '#00c853', fontWeight: 800 }}>
+                  — Radha Krishna Maram
+                </span>
+              </div>
+            </>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '6px 0' }}>
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                No trainer remarks logged yet for today. Submit your daily log to receive direct trainer feedback!
+              </div>
+              <Link href="/client/daily-log" style={{ textDecoration: 'none' }}>
+                <Button size="sm" style={{ backgroundColor: 'var(--accent)', color: '#FFF', fontWeight: 700 }}>
+                  Submit Today&apos;s Log 📱
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -396,7 +508,7 @@ export default function ClientDashboard() {
         <section style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ fontSize: '0.98rem', fontWeight: 800, margin: 0, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              Today's Program Checklist
+              Today&apos;s Program Checklist
             </h3>
             <span style={{ fontSize: '0.8rem', fontWeight: 800, color: tasksPercent === 100 ? '#00c853' : 'var(--accent)' }}>
               {tasksPercent}% Completed
