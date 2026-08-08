@@ -8,7 +8,9 @@ import BottomNav from '@/components/ui/BottomNav';
 import Badge from '@/components/ui/Badge';
 import Avatar from '@/components/ui/Avatar';
 import { getClientNotifications, markAsRead, deleteNotification } from '@/lib/firestore';
-import { Sun, Moon, Bell, Trash2, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
+import Card from '@/components/ui/Card';
+import { logoutUser } from '@/lib/auth';
+import { Sun, Moon, Bell, Trash2, CheckCircle2, AlertTriangle, Info, MessageCircle, LogOut } from 'lucide-react';
 
 export default function ClientLayout({ children }) {
   const { user, userData, loading } = useAuth();
@@ -48,7 +50,150 @@ export default function ClientLayout({ children }) {
     }
   };
 
+  const handleLogout = async () => {
+    if (confirm('Are you sure you want to log out?')) {
+      try {
+        await logoutUser();
+        router.push('/login');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
   if (loading || !user || userData?.role !== 'client') return <PageLoader />;
+
+  // IF CLIENT MEMBERSHIP IS DEACTIVATED / INACTIVE
+  if (userData?.status === 'inactive') {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--background)' }}>
+        <header style={{ 
+          padding: '12px 20px', 
+          borderBottom: '1px solid var(--border)', 
+          display: 'flex', 
+          justify: 'space-between', 
+          alignItems: 'center',
+          backgroundColor: 'var(--card)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Avatar src={userData?.photoURL || userData?.profileImage} name={userData?.displayName || userData?.name || 'Client'} size="sm" />
+            <div>
+              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)', display: 'block' }}>
+                {userData?.displayName || userData?.name || 'Client'}
+              </span>
+              <small style={{ fontSize: '0.68rem', color: '#ff1744', fontWeight: 800 }}>
+                MEMBERSHIP DEACTIVATED
+              </small>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <a
+              href="https://www.instagram.com/_.mrk.fitness._?igsh=MTg2MnU3YjhzN2xrcg=="
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                backgroundColor: 'var(--accent, #E00008)',
+                color: '#FFFFFF',
+                padding: '6px 12px',
+                borderRadius: '20px',
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <MessageCircle size={14} color="#FFFFFF" /> Contact Coach
+            </a>
+
+            <button
+              onClick={handleLogout}
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid var(--border)',
+                borderRadius: '20px',
+                padding: '6px 12px',
+                color: 'var(--text)',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              title="Log Out"
+            >
+              <LogOut size={14} /> Logout
+            </button>
+          </div>
+        </header>
+
+        <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <Card style={{ 
+            maxWidth: '480px', 
+            width: '100%', 
+            padding: '32px 24px', 
+            textAlign: 'center',
+            backgroundColor: 'var(--card)',
+            border: '1px solid rgba(224, 0, 8, 0.4)',
+            borderRadius: '24px',
+            boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6)'
+          }} className="glass-card">
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(224, 0, 8, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 18px',
+              border: '1px solid rgba(224, 0, 8, 0.3)'
+            }}>
+              <MessageCircle size={32} color="var(--accent, #E00008)" />
+            </div>
+
+            <Badge variant="danger" size="md" style={{ marginBottom: '14px' }}>
+              🚫 MEMBERSHIP PLAN DEACTIVATED
+            </Badge>
+
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#FFFFFF', margin: '0 0 8px 0' }}>
+              Your Membership Plan is Inactive
+            </h2>
+
+            <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '24px' }}>
+              Your membership has been disabled by the admin. To view your custom diet, workout split, and progress tracking, please contact Head Fitness Coach <strong>Radha Krishna Maram</strong>.
+            </p>
+
+            <a
+              href="https://www.instagram.com/_.mrk.fitness._?igsh=MTg2MnU3YjhzN2xrcg=="
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                backgroundColor: 'var(--accent, #E00008)',
+                color: '#FFFFFF',
+                padding: '14px 24px',
+                borderRadius: '14px',
+                fontSize: '0.95rem',
+                fontWeight: 800,
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                width: '100%',
+                boxShadow: '0 6px 20px rgba(224, 0, 8, 0.4)'
+              }}
+            >
+              <MessageCircle size={20} color="#FFFFFF" /> Contact Fitness Coach @_.mrk.fitness._
+            </a>
+          </Card>
+        </main>
+      </div>
+    );
+  }
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -79,6 +224,49 @@ export default function ClientLayout({ children }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Contact Fitness Coach Button */}
+          <a
+            href="https://www.instagram.com/_.mrk.fitness._?igsh=MTg2MnU3YjhzN2xrcg=="
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              backgroundColor: 'rgba(224, 0, 8, 0.15)',
+              border: '1px solid rgba(224, 0, 8, 0.4)',
+              borderRadius: '20px',
+              padding: '5px 10px',
+              color: 'var(--accent, #E00008)',
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              textDecoration: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}
+            title="Contact Head Fitness Coach"
+          >
+            <MessageCircle size={14} color="var(--accent, #E00008)" /> Contact Coach
+          </a>
+
+          {/* Logout Button */}
+          <button 
+            onClick={handleLogout}
+            style={{
+              background: 'rgba(224, 0, 8, 0.12)',
+              border: '1px solid rgba(224, 0, 8, 0.3)',
+              borderRadius: '20px',
+              padding: '5px 10px',
+              color: 'var(--accent, #E00008)',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}
+            title="Log Out of Account"
+          >
+            <LogOut size={14} /> Logout
+          </button>
           {/* Notifications Bell Button & Popup Menu */}
           <div style={{ position: 'relative' }}>
             <button 

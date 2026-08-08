@@ -76,12 +76,17 @@ export default function WorkoutPlanPage() {
         }
       });
 
-      await submitDailyLog(user.uid, todayDateString, {
+      const payload = {
         completedExercises: completedExercises,
         workoutCompleted: allCompleted,
         workoutSubmitted: true,
-        workoutWeight: totalWeightVolume > 0 ? totalWeightVolume : undefined
-      });
+      };
+      
+      if (totalWeightVolume > 0) {
+        payload.workoutWeight = totalWeightVolume;
+      }
+
+      await submitDailyLog(user.uid, todayDateString, payload);
 
       setIsSubmittedToday(true);
       toast.success('Workout progress submitted successfully!');
@@ -279,6 +284,19 @@ export default function WorkoutPlanPage() {
                   {ex.notes && (
                     <div style={{ marginTop: '8px', padding: '8px 10px', background: 'var(--accent-surface)', borderLeft: '3px solid var(--accent)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text)' }}>
                       <strong>Note:</strong> {ex.notes}
+                    </div>
+                  )}
+                  
+                  {ex.url && (
+                    <div style={{ marginTop: '8px' }}>
+                      <a 
+                        href={ex.url} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)', textDecoration: 'none', background: 'var(--card)', border: '1px solid var(--accent)', padding: '4px 10px', borderRadius: '6px' }}
+                      >
+                        🎥 Watch Tutorial
+                      </a>
                     </div>
                   )}
                 </div>

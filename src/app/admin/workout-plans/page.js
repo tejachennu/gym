@@ -346,6 +346,7 @@ export default function WorkoutPlansPage() {
             reps: ex.reps || '',
             weight: ex.weight || '',
             rest: ex.rest || '',
+            url: ex.url || '',
             notes: ex.notes || ''
           }))
         })),
@@ -356,6 +357,7 @@ export default function WorkoutPlansPage() {
           reps: ex.reps || '',
           weight: ex.weight || '',
           rest: ex.rest || '',
+          url: ex.url || '',
           notes: ex.notes || ''
         })),
         updatedAtStr: new Date().toISOString()
@@ -538,6 +540,7 @@ export default function WorkoutPlansPage() {
             reps: ex.reps || '',
             weight: ex.weight || '',
             rest: ex.rest || '',
+            url: ex.url || '',
             notes: ex.notes || ''
           }))
         })),
@@ -547,6 +550,7 @@ export default function WorkoutPlansPage() {
           reps: ex.reps || '',
           weight: ex.weight || '',
           rest: ex.rest || '',
+          url: ex.url || '',
           notes: ex.notes || ''
         })),
         updatedAtStr: new Date().toISOString() 
@@ -1074,12 +1078,19 @@ export default function WorkoutPlansPage() {
                     value={ex.rest || ''} 
                     onChange={(e) => handlePlanExerciseChange(idx, 'rest', e.target.value)}
                   />
-                  <div style={{ gridColumn: 'span 6' }}>
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <Input 
+                      placeholder="Video URL (optional)" 
+                      value={ex.url || ''} 
+                      onChange={(e) => handlePlanExerciseChange(idx, 'url', e.target.value)}
+                    />
+                  </div>
+                  <div style={{ gridColumn: 'span 8' }}>
                     <Textarea 
                       placeholder="Trainer notes, form cues, or target RPE..." 
                       value={ex.notes || ''} 
                       onChange={(e) => handlePlanExerciseChange(idx, 'notes', e.target.value)}
-                      rows={2}
+                      style={{ minHeight: '60px' }}
                     />
                   </div>
                 </div>
@@ -1229,7 +1240,7 @@ export default function WorkoutPlansPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '280px', overflowY: 'auto', paddingRight: '4px' }}>
             {(templateForm.days[tmplActiveDayIndex]?.exercises || []).map((ex, idx) => (
               <div key={idx} style={styles.exerciseTmplRow}>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', gap: '8px', alignItems: 'center' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1.5fr auto', gap: '8px', alignItems: 'center' }}>
                   <Input 
                     placeholder="Exercise Name" 
                     value={ex.name || ''} 
@@ -1250,6 +1261,11 @@ export default function WorkoutPlansPage() {
                     placeholder="Rest" 
                     value={ex.rest || ''} 
                     onChange={(e) => handleTmplExerciseChange(idx, 'rest', e.target.value)}
+                  />
+                  <Input 
+                    placeholder="Video URL" 
+                    value={ex.url || ''} 
+                    onChange={(e) => handleTmplExerciseChange(idx, 'url', e.target.value)}
                   />
                   <button 
                     type="button" 
@@ -1494,7 +1510,7 @@ const styles = {
   },
   exerciseFormGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(6, 1fr)',
+    gridTemplateColumns: 'repeat(8, 1fr)',
     gap: '10px'
   },
   exerciseTmplRow: {

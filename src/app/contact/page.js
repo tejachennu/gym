@@ -10,7 +10,6 @@ import { useToast } from '@/components/ui/Toast';
 import { 
   Phone, 
   Mail, 
-  MapPin, 
   Clock, 
   Send, 
   Dumbbell, 
@@ -33,6 +32,8 @@ export default function ContactPage() {
     email: '',
     phone: '',
     category: 'Membership Plan Query',
+    preferredDate: new Date().toISOString().split('T')[0],
+    preferredTime: 'Morning (9 AM - 12 PM)',
     message: ''
   });
 
@@ -49,6 +50,8 @@ export default function ContactPage() {
         email: form.email,
         phone: form.phone || '',
         category: form.category || 'Membership Plan Query',
+        preferredDate: form.preferredDate || '',
+        preferredTime: form.preferredTime || '',
         message: form.message,
         source: 'website',
         status: 'new',
@@ -99,16 +102,6 @@ export default function ContactPage() {
           
           {/* Left Column: Contact Cards */}
           <div style={styles.infoCol}>
-            <Card style={styles.infoCard} className="glass-card">
-              <div style={styles.infoIconBox}>
-                <MapPin size={20} color="var(--accent, #E00008)" />
-              </div>
-              <div>
-                <h4 style={styles.infoCardTitle}>Gym Address & Headquarters</h4>
-                <p style={styles.infoCardText}>MRK FITNESS COACH Center, Main Gym Complex, Film Nagar, Hyderabad, Telangana 500096</p>
-              </div>
-            </Card>
-
             <Card style={styles.infoCard} className="glass-card">
               <div style={styles.infoIconBox}>
                 <Clock size={20} color="#ab47bc" />
@@ -177,6 +170,28 @@ export default function ContactPage() {
                       { label: 'Technical / Portal Support', value: 'Technical Support' }
                     ]}
                   />
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
+                    <Input
+                      label="Preferred Contact Date"
+                      type="date"
+                      value={form.preferredDate}
+                      onChange={(e) => setForm({ ...form, preferredDate: e.target.value })}
+                    />
+
+                    <Select
+                      label="Preferred Time Slot"
+                      value={form.preferredTime}
+                      onChange={(e) => setForm({ ...form, preferredTime: e.target.value })}
+                      options={[
+                        { label: 'Morning (9 AM - 12 PM)', value: 'Morning (9 AM - 12 PM)' },
+                        { label: 'Afternoon (12 PM - 4 PM)', value: 'Afternoon (12 PM - 4 PM)' },
+                        { label: 'Evening (4 PM - 8 PM)', value: 'Evening (4 PM - 8 PM)' },
+                        { label: 'Night (8 PM - 10 PM)', value: 'Night (8 PM - 10 PM)' },
+                        { label: 'Anytime', value: 'Anytime' }
+                      ]}
+                    />
+                  </div>
 
                   <Textarea 
                     label="Message / Query Details *"

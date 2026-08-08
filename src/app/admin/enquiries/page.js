@@ -276,13 +276,22 @@ export default function EnquiriesPage() {
     }
   };
 
-  const formatNiceDate = (dateStr) => {
-    if (!dateStr) return 'Recently';
+  const formatNiceDate = (dateVal) => {
+    if (!dateVal) return 'Recently';
     try {
-      const d = new Date(dateStr);
+      let d;
+      if (typeof dateVal === 'object' && dateVal?.seconds) {
+        d = new Date(dateVal.seconds * 1000);
+      } else if (typeof dateVal === 'object' && typeof dateVal?.toDate === 'function') {
+        d = dateVal.toDate();
+      } else {
+        d = new Date(dateVal);
+      }
+
+      if (!d || isNaN(d.getTime())) return 'Recently';
       return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     } catch (e) {
-      return dateStr;
+      return 'Recently';
     }
   };
 
@@ -502,8 +511,13 @@ export default function EnquiriesPage() {
                       {/* Date & Source */}
                       <td style={{ padding: '12px 14px' }}>
                         <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text)' }}>
-                          {formatNiceDate(item.createdAt || item.date)}
+                          {formatNiceDate(item.createdAt || item.date || item.preferredDate)}
                         </div>
+                        {(item.preferredDate || item.preferredTime) && (
+                          <div style={{ fontSize: '0.7rem', color: 'var(--accent, #E00008)', fontWeight: 800, marginTop: '2px' }}>
+                            📅 Pref: {item.preferredDate || '--'} {item.preferredTime ? `(${item.preferredTime})` : ''}
+                          </div>
+                        )}
                         {item.followupDate && (
                           <div style={{ fontSize: '0.7rem', color: '#ff9100', fontWeight: 700, marginTop: '2px' }}>
                             ⏰ Followup: {item.followupDate}

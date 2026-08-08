@@ -7,6 +7,7 @@ import { getPlans } from '@/lib/firestore';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
+import PlanCard from '@/components/ui/PlanCard';
 import { Spinner } from '@/components/ui/Loading';
 import {
   Dumbbell,
@@ -37,10 +38,12 @@ import {
   HelpCircle,
   ChevronDown,
   MessageCircle,
-  CheckSquare
+  CheckSquare,
+  Heart,
+  ShieldAlert
 } from 'lucide-react';
 
-function InstagramIcon({ size = 18, color = "#e1306c" }) {
+function InstagramIcon({ size = 18, color = "var(--accent, #E00008)" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
@@ -136,6 +139,52 @@ export default function HomePage() {
   const [calcAge, setCalcAge] = useState(28);
   const [calcGoal, setCalcGoal] = useState('fatloss');
 
+  // Selected pricing tier map per plan
+  const [selectedPricingMap, setSelectedPricingMap] = useState({});
+
+  // Homepage Contact / Enquiry Form State
+  const [homeContactForm, setHomeContactForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    category: 'Fat Loss',
+    preferredDate: new Date().toISOString().split('T')[0],
+    preferredTime: 'Morning (9 AM - 12 PM)',
+    message: ''
+  });
+  const [homeContactSubmitting, setHomeContactSubmitting] = useState(false);
+  const [homeContactSubmitted, setHomeContactSubmitted] = useState(false);
+
+  const handleHomeContactSubmit = async (e) => {
+    e.preventDefault();
+    if (!homeContactForm.name || !homeContactForm.email || !homeContactForm.message) {
+      return alert('Please fill in Name, Email, and Message');
+    }
+
+    setHomeContactSubmitting(true);
+    try {
+      const { addEnquiry } = await import('@/lib/firestore');
+      await addEnquiry({
+        name: homeContactForm.name,
+        email: homeContactForm.email,
+        phone: homeContactForm.phone || '',
+        category: homeContactForm.category || 'Fat Loss',
+        preferredDate: homeContactForm.preferredDate || '',
+        preferredTime: homeContactForm.preferredTime || '',
+        message: homeContactForm.message,
+        source: 'homepage_contact_form',
+        status: 'new',
+        createdAt: new Date().toISOString()
+      });
+      setHomeContactSubmitted(true);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to submit enquiry. Please try again.');
+    } finally {
+      setHomeContactSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -149,8 +198,9 @@ export default function HomePage() {
     async function loadPlans() {
       try {
         const plansData = await getPlans();
-        if (plansData && plansData.length > 0) {
-          setPlans(plansData);
+        const activeOnly = (plansData || []).filter(p => p.status !== 'inactive');
+        if (activeOnly && activeOnly.length > 0) {
+          setPlans(activeOnly);
         } else {
           setPlans(DEFAULT_PLANS);
         }
@@ -201,6 +251,7 @@ export default function HomePage() {
             <nav style={styles.navLinks}>
               <a href="#about" style={styles.link}>Who is MRK?</a>
               <a href="#reviews" style={styles.link}>Video Reviews</a>
+              <a href="#special-populations" style={styles.link}>Special Populations</a>
               <a href="#specializations" style={styles.link}>Specializations</a>
               <a href="#offerings" style={styles.link}>Features</a>
               <a href="#calculator" style={styles.link}>Calorie Calculator</a>
@@ -248,6 +299,7 @@ export default function HomePage() {
           <div style={styles.mobileDrawer} className="animate-fade-up">
             <a href="#about" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>Who is MRK?</a>
             <a href="#reviews" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>Video Reviews</a>
+            <a href="#special-populations" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>Special Populations</a>
             <a href="#specializations" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>Specializations</a>
             <a href="#offerings" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>Features</a>
             <a href="#calculator" onClick={() => setIsMobileMenuOpen(false)} style={styles.mobileLink}>Calorie Calculator</a>
@@ -292,23 +344,23 @@ export default function HomePage() {
           </p>
 
           <div style={{ ...styles.heroBtnGroup, flexDirection: isMobile ? 'column' : 'row' }}>
-            <Button onClick={handlePortalRedirect} style={{ ...styles.mainCtaBtn, width: isMobile ? '100%' : 'auto', justifyContent: 'center' }} className="pulse-glow">
+            <Button onClick={() => router.push('/contact')} style={{ ...styles.mainCtaBtn, width: isMobile ? '100%' : 'auto', justifyContent: 'center' }} className="pulse-glow">
               Start Your Transformation <ChevronRight size={18} />
             </Button>
             <a
-              href="https://instagram.com/__MRK.FITNESS.__"
+              href="https://www.instagram.com/_.mrk.fitness._?igsh=MTg2MnU3YjhzN2xrcg=="
               target="_blank"
               rel="noopener noreferrer"
               style={{ ...styles.instaBtn, justifyContent: 'center', width: isMobile ? '100%' : 'auto' }}
             >
-              <InstagramIcon size={18} color="#e1306c" /> DM Head Fitness Coach on Instagram
+              <InstagramIcon size={18} color="var(--accent, #E00008)" /> DM Head Fitness Coach on Instagram
             </a>
           </div>
 
           {/* Key Program Highlights Bar */}
           <div style={{ ...styles.heroStatsRow, padding: isMobile ? '14px 16px' : '18px 32px', gap: isMobile ? '14px' : '32px' }}>
             <div style={styles.statBox}>
-              <div style={{ ...styles.statNumber, fontSize: isMobile ? '1.2rem' : '1.5rem' }}>4+ Years</div>
+              <div style={{ ...styles.statNumber, fontSize: isMobile ? '1.2rem' : '1.5rem' }}>5 Years</div>
               <div style={styles.statLabel}>Specialized Coaching</div>
             </div>
             <div style={styles.statDivider} />
@@ -348,13 +400,13 @@ export default function HomePage() {
               <p style={styles.coachTitle}>Head Fitness Coach & Strength Specialist</p>
 
               <a
-                href="https://instagram.com/__MRK.FITNESS.__"
+                href="https://www.instagram.com/_.mrk.fitness._?igsh=MTg2MnU3YjhzN2xrcg=="
                 target="_blank"
                 rel="noreferrer"
                 style={styles.socialPill}
               >
-                <InstagramIcon size={16} color="#e1306c" />
-                <span style={{ color: '#FFFFFF', fontWeight: 700 }}>@__MRK.FITNESS.__</span>
+                <InstagramIcon size={16} color="var(--accent, #E00008)" />
+                <span style={{ color: '#FFFFFF', fontWeight: 700 }}>@_.mrk.fitness._</span>
               </a>
             </div>
 
@@ -364,7 +416,7 @@ export default function HomePage() {
               <h2 style={{ ...styles.aboutHeadline, fontSize: isMobile ? '1.4rem' : '1.8rem' }}>WHO IS <span style={{ color: 'var(--accent, #E00008)' }}>MRK?</span></h2>
 
               <p style={styles.bioParagraph}>
-                <strong>Radha Krishna Maram</strong> is a dedicated Fitness Coach and Strength & Weight-Loss Specialist with over four years of hands-on experience helping individuals transform their bodies and lifestyles.
+                <strong>Radha Krishna Maram</strong> is a dedicated Fitness Coach and Strength & Weight-Loss Specialist with 5 years of hands-on experience helping individuals transform their bodies and lifestyles.
               </p>
 
               <p style={styles.bioParagraph}>
@@ -434,8 +486,112 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* 3.6 SPECIAL POPULATION MONITORING SECTION */}
+      <section id="special-populations" style={{ ...styles.section, padding: isMobile ? '35px 16px' : '65px 16px' }}>
+        <div style={styles.sectionHeader}>
+          <span style={styles.sectionBadge}>CLINICAL & ADAPTIVE FITNESS</span>
+          <h2 style={{ ...styles.sectionTitle, fontSize: isMobile ? '1.4rem' : '1.8rem' }}>SPECIAL POPULATION MONITORING</h2>
+          <p style={styles.sectionSub}>Customized fitness, nutrition & rehab protocols tailored for specific health conditions.</p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '18px', maxWidth: '1100px', margin: '0 auto' }}>
+          
+          {/* 1. Diabetic Clients */}
+          <Card style={{ padding: '20px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px' }} className="glass-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+              <div style={{ padding: '10px', backgroundColor: 'rgba(0, 176, 255, 0.15)', borderRadius: '12px', color: '#00b0ff' }}>
+                <Activity size={22} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)' }}>Diabetic Clients</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              Specialized glycemic control macro diets, low-GI food timing, glucose tracking audits, and insulin-sensitivity enhancement workouts.
+            </p>
+          </Card>
+
+          {/* 2. PCOS-Related Clients */}
+          <Card style={{ padding: '20px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px' }} className="glass-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+              <div style={{ padding: '10px', backgroundColor: 'rgba(233, 30, 99, 0.15)', borderRadius: '12px', color: '#e91e63' }}>
+                <Heart size={22} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)' }}>PCOS / PCOD Related Clients</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              Hormone-balancing nutrition, low-cortisol resistance training, anti-inflammatory meal planning, and cycle-aware exercise splits.
+            </p>
+          </Card>
+
+          {/* 3. Thyroid Clients */}
+          <Card style={{ padding: '20px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px' }} className="glass-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+              <div style={{ padding: '10px', backgroundColor: 'rgba(156, 39, 176, 0.15)', borderRadius: '12px', color: '#ab47bc' }}>
+                <Zap size={22} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)' }}>Thyroid Clients</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              Metabolic boost meal splits, energy management protocols, thyroid-safe resistance training, and weight stabilization plans.
+            </p>
+          </Card>
+
+          {/* 4. Joint/Knee Pain Clients */}
+          <Card style={{ padding: '20px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px' }} className="glass-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+              <div style={{ padding: '10px', backgroundColor: 'rgba(255, 145, 0, 0.15)', borderRadius: '12px', color: '#ff9100' }}>
+                <ShieldAlert size={22} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)' }}>Joint & Knee Pain Clients</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              Low-impact hypertrophy, patellar tendon protection, cartilage-friendly mobility drills, and pain-free strength conditioning.
+            </p>
+          </Card>
+
+          {/* 5. Disc Bulge & Spinal Problem Clients */}
+          <Card style={{ padding: '20px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px' }} className="glass-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+              <div style={{ padding: '10px', backgroundColor: 'rgba(224, 0, 8, 0.15)', borderRadius: '12px', color: '#E00008' }}>
+                <Activity size={22} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)' }}>Disc Bulge & Spinal Problem</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              Herniation-safe core stabilization, posterior chain balance, zero-axial-load resistance training, and spinal realignment.
+            </p>
+          </Card>
+
+          {/* 6. Postpartum Recovery Clients */}
+          <Card style={{ padding: '20px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px' }} className="glass-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+              <div style={{ padding: '10px', backgroundColor: 'rgba(0, 200, 83, 0.15)', borderRadius: '12px', color: '#00c853' }}>
+                <UserCheck size={22} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)' }}>Postpartum Recovery Clients</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              Pelvic floor rehabilitation, diastasis recti repair, post-pregnancy body recomposition, and progressive stamina building.
+            </p>
+          </Card>
+
+          {/* 7. Senior Fitness Concerns (50+ Years) */}
+          <Card style={{ padding: '20px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px' }} className="glass-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+              <div style={{ padding: '10px', backgroundColor: 'rgba(255, 214, 0, 0.15)', borderRadius: '12px', color: '#ffd600' }}>
+                <Award size={22} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)' }}>Senior Fitness Concerns (50+ Yrs)</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              Bone density enhancement, balance & stability workouts, longevity training, functional mobility, and active aging splits.
+            </p>
+          </Card>
+
+        </div>
+      </section>
+
       {/* 4. SPECIALIZATIONS SECTION */}
-      <section id="specializations" style={{ ...styles.section, padding: isMobile ? '35px 16px' : '65px 16px' }}>
+      <section id="specializations" style={{ ...styles.section, background: 'rgba(18, 18, 20, 0.4)', padding: isMobile ? '35px 16px' : '65px 16px' }}>
         <div style={styles.sectionHeader}>
           <span style={styles.sectionBadge}>EXPERT CORE CAPABILITIES</span>
           <h2 style={{ ...styles.sectionTitle, fontSize: isMobile ? '1.4rem' : '1.8rem' }}>PROGRAM SPECIALIZATIONS</h2>
@@ -629,47 +785,13 @@ export default function HomePage() {
           </div>
         ) : (
           <div style={styles.plansGrid}>
-            {plans.map((p, idx) => {
-              const lowestTier = (p.pricing || []).sort((a, b) => (a.price || 0) - (b.price || 0))[0];
-              const priceDisplay = lowestTier ? `₹${lowestTier.price}` : 'Custom';
-
-              return (
-                <Card key={p.id || idx} style={{ ...styles.planCard, padding: isMobile ? '18px' : '22px' }} className="glass-card">
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
-                      <h3 style={styles.planName}>{p.plan_name || p.name}</h3>
-                      {p.badge && (
-                        <div style={styles.planBadgeInline}>{p.badge}</div>
-                      )}
-                    </div>
-                    <p style={styles.planCategory}>MRK FITNESS</p>
-
-                    <div style={styles.planPriceBox}>
-                      <span style={styles.planPrice}>{priceDisplay}</span>
-                      <span style={styles.planPeriod}> / {lowestTier?.duration || 'period'}</span>
-                    </div>
-
-                    <div style={styles.planFeatureList}>
-                      {(p.features || [
-                        'Custom Workout Plan',
-                        'Personalized Diet Plan',
-                        'Weekly Check-ins',
-                        '24/7 Trainer Support'
-                      ]).map((feat, fIdx) => (
-                        <div key={fIdx} style={styles.planFeatureItem}>
-                          <CheckCircle2 size={15} color="#00c853" />
-                          <span>{feat}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <Button onClick={() => router.push('/login')} style={{ width: '100%', marginTop: '20px', fontWeight: 800 }}>
-                    Enroll Now <ArrowRight size={16} />
-                  </Button>
-                </Card>
-              );
-            })}
+            {plans.map((p, idx) => (
+              <PlanCard 
+                key={p.id || idx} 
+                plan={p} 
+                onSelect={() => router.push('/contact')}
+              />
+            ))}
           </div>
         )}
       </section>
@@ -709,6 +831,202 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* 8.5. HOMEPAGE CONTACT & ENQUIRY FORM SECTION */}
+      <section id="contact" style={{ ...styles.section, padding: isMobile ? '40px 16px' : '70px 16px', backgroundColor: 'var(--card-hover)' }}>
+        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+            <div style={styles.badge}>
+              <MessageCircle size={14} color="var(--accent, #E00008)" />
+              <span>CONTACT FITNESS COACH</span>
+            </div>
+            <h2 style={{ ...styles.sectionTitle, fontSize: isMobile ? '1.6rem' : '2.2rem' }}>
+              Start Your Fitness Transformation Today
+            </h2>
+            <p style={{ ...styles.sectionSubtitle, fontSize: '0.9rem' }}>
+              Have questions about custom diets, workout splits, or personal coaching? Drop us a message below!
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.2fr', gap: '24px', alignItems: 'start' }}>
+            {/* Contact Info Box */}
+            <Card style={{ padding: '24px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px' }} className="glass-card">
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text)', margin: '0 0 16px 0' }}>
+                Head Coach Direct Contact
+              </h3>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '0.88rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'rgba(224, 0, 8, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Phone size={20} color="var(--accent, #E00008)" />
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block' }}>Direct Support Line</span>
+                    <strong style={{ color: 'var(--text)' }}>+91 99890 26344</strong>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'rgba(224, 0, 8, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <InstagramIcon size={20} color="var(--accent, #E00008)" />
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block' }}>Instagram DM</span>
+                    <a href="https://www.instagram.com/_.mrk.fitness._?igsh=MTg2MnU3YjhzN2xrcg==" target="_blank" rel="noreferrer" style={{ color: 'var(--accent, #E00008)', fontWeight: 700, textDecoration: 'none' }}>
+                      @_.mrk.fitness._
+                    </a>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'rgba(224, 0, 8, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Mail size={20} color="var(--accent, #E00008)" />
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block' }}>Email Support</span>
+                    <strong style={{ color: 'var(--text)' }}>mrkfitnesscoach@gmail.com</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                ⚡ <strong>Response Time:</strong> Coach Radha Krishna Maram responds within 2 hours.
+              </div>
+            </Card>
+
+            {/* Enquiry Form */}
+            <Card style={{ padding: '24px', backgroundColor: 'var(--card)', border: '1px solid rgba(224, 0, 8, 0.3)', borderRadius: '16px' }} className="glass-card">
+              {homeContactSubmitted ? (
+                <div style={{ textAlign: 'center', padding: '30px 10px' }}>
+                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'rgba(0, 200, 83, 0.15)', border: '1px solid #00c853', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                    <CheckCircle2 size={32} color="#00c853" />
+                  </div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text)', margin: '0 0 8px 0' }}>
+                    Enquiry Submitted Successfully!
+                  </h3>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                    Thank you! Head Fitness Coach <strong>Radha Krishna Maram</strong> will reach out to you shortly.
+                  </p>
+                  <Button size="sm" variant="outline" onClick={() => setHomeContactSubmitted(false)} style={{ marginTop: '16px' }}>
+                    Send Another Enquiry
+                  </Button>
+                </div>
+              ) : (
+                <form onSubmit={handleHomeContactSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)', marginBottom: '4px' }}>
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Rahul Sharma"
+                      value={homeContactForm.name}
+                      onChange={(e) => setHomeContactForm({ ...homeContactForm, name: e.target.value })}
+                      required
+                      style={{ width: '100%', padding: '10px 12px', backgroundColor: 'var(--card-hover)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '0.85rem' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)', marginBottom: '4px' }}>
+                        Email Address *
+                      </label>
+                      <input
+                        type="email"
+                        placeholder="you@example.com"
+                        value={homeContactForm.email}
+                        onChange={(e) => setHomeContactForm({ ...homeContactForm, email: e.target.value })}
+                        required
+                        style={{ width: '100%', padding: '10px 12px', backgroundColor: 'var(--card-hover)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '0.85rem' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)', marginBottom: '4px' }}>
+                        Phone Number
+                      </label>
+                      <input
+                        type="tel"
+                        placeholder="+91 98765 43210"
+                        value={homeContactForm.phone}
+                        onChange={(e) => setHomeContactForm({ ...homeContactForm, phone: e.target.value })}
+                        style={{ width: '100%', padding: '10px 12px', backgroundColor: 'var(--card-hover)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '0.85rem' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)', marginBottom: '4px' }}>
+                      Primary Fitness Goal
+                    </label>
+                    <select
+                      value={homeContactForm.category}
+                      onChange={(e) => setHomeContactForm({ ...homeContactForm, category: e.target.value })}
+                      style={{ width: '100%', padding: '10px 12px', backgroundColor: 'var(--card-hover)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '0.85rem' }}
+                    >
+                      <option value="Fat Loss">Fat Loss & Weight Management</option>
+                      <option value="Muscle Building">Muscle Building & Strength</option>
+                      <option value="Special Population Rehab">Special Population (Diabetic / PCOS / Thyroid)</option>
+                      <option value="Senior Fitness">Senior Fitness (50+ Years)</option>
+                      <option value="Membership Query">Membership & Pricing Inquiry</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)', marginBottom: '4px' }}>
+                        Preferred Contact Date
+                      </label>
+                      <input
+                        type="date"
+                        value={homeContactForm.preferredDate}
+                        onChange={(e) => setHomeContactForm({ ...homeContactForm, preferredDate: e.target.value })}
+                        style={{ width: '100%', padding: '10px 12px', backgroundColor: 'var(--card-hover)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '0.85rem' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)', marginBottom: '4px' }}>
+                        Preferred Time Slot
+                      </label>
+                      <select
+                        value={homeContactForm.preferredTime}
+                        onChange={(e) => setHomeContactForm({ ...homeContactForm, preferredTime: e.target.value })}
+                        style={{ width: '100%', padding: '10px 12px', backgroundColor: 'var(--card-hover)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '0.85rem' }}
+                      >
+                        <option value="Morning (9 AM - 12 PM)">Morning (9 AM - 12 PM)</option>
+                        <option value="Afternoon (12 PM - 4 PM)">Afternoon (12 PM - 4 PM)</option>
+                        <option value="Evening (4 PM - 8 PM)">Evening (4 PM - 8 PM)</option>
+                        <option value="Night (8 PM - 10 PM)">Night (8 PM - 10 PM)</option>
+                        <option value="Anytime">Anytime</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)', marginBottom: '4px' }}>
+                      Your Message or Goals *
+                    </label>
+                    <textarea
+                      placeholder="Tell Coach MRK about your current weight, fitness goals, or health conditions..."
+                      value={homeContactForm.message}
+                      onChange={(e) => setHomeContactForm({ ...homeContactForm, message: e.target.value })}
+                      rows={3}
+                      required
+                      style={{ width: '100%', padding: '10px 12px', backgroundColor: 'var(--card-hover)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '0.85rem', resize: 'vertical' }}
+                    />
+                  </div>
+
+                  <Button type="submit" loading={homeContactSubmitting} style={{ padding: '12px', fontSize: '0.9rem', marginTop: '4px' }}>
+                    <MessageCircle size={16} /> Send Message to Coach
+                  </Button>
+                </form>
+              )}
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* 9. FOOTER */}
       <footer style={styles.footer}>
         <div style={styles.footerContainer}>
@@ -721,12 +1039,12 @@ export default function HomePage() {
             </p>
             <div style={{ marginTop: '14px' }}>
               <a
-                href="https://instagram.com/__MRK.FITNESS.__"
+                href="https://www.instagram.com/_.mrk.fitness._?igsh=MTg2MnU3YjhzN2xrcg=="
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#e1306c', fontSize: '0.85rem', fontWeight: 700, textDecoration: 'none' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--accent, #E00008)', fontSize: '0.85rem', fontWeight: 700, textDecoration: 'none' }}
               >
-                <InstagramIcon size={18} /> Follow @__MRK.FITNESS.__
+                <InstagramIcon size={18} /> Follow @_.mrk.fitness._
               </a>
             </div>
           </div>

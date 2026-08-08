@@ -10,7 +10,8 @@ import {
   getClientCheckins, 
   getClientBloodReports,
   getPlans,
-  addDocument
+  addDocument,
+  assignPlan
 } from '@/lib/firestore';
 import Tabs from '@/components/ui/Tabs';
 import Card from '@/components/ui/Card';
@@ -156,7 +157,8 @@ export default function ClientDetailPage({ params }) {
       setDailyLogs(logs || []);
       setCheckins(checkinList || []);
       setBloodReports(reports || []);
-      setAllPlansList(membershipPlans || []);
+      const activePlans = (membershipPlans || []).filter(p => p.status !== 'inactive');
+      setAllPlansList(activePlans);
 
       if (clientData) {
         setProfileForm({
@@ -417,6 +419,48 @@ export default function ClientDetailPage({ params }) {
     { key: 'blood', label: 'Blood Reports', icon: <Heart size={16} />, content: <BloodTab bloodReports={bloodReports} onViewAttachment={(url) => { setViewerUrl(url); setIsViewerOpen(true); }} /> },
   ];
 
+  const handleRemovePlan = async () => {
+    if (!client) return;
+    if (!confirm(`Are you sure you want to remove the assigned plan from ${client.displayName || client.name}?`)) return;
+    try {
+      setLoading(true);
+      await updateClientProfile(id, {
+        currentPlan: '',
+        planStart: '',
+        planExpiry: '',
+        planId: ''
+      });
+      toast.success('Assigned plan removed successfully!');
+      await fetchClientData(id);
+    } catch (err) {
+      toast.error('Failed to remove assigned plan');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleClientDisable = async () => {
+    if (!client) return;
+    const isCurrentlyActive = client.status !== 'inactive';
+    const newStatus = isCurrentlyActive ? 'inactive' : 'active';
+    const actionText = isCurrentlyActive ? 'disable' : 'enable';
+
+    if (!confirm(`Are you sure you want to ${actionText} membership status for ${client.displayName || client.name}?`)) return;
+
+    try {
+      setLoading(true);
+      await updateClientProfile(id, {
+        status: newStatus
+      });
+      toast.success(`Client membership ${isCurrentlyActive ? 'disabled' : 'enabled'} successfully!`);
+      await fetchClientData(id);
+    } catch (err) {
+      toast.error(`Failed to ${actionText} client`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div style={styles.container} className="animate-fade-up">
       {/* Header Profile Section */}
@@ -448,6 +492,25 @@ export default function ClientDetailPage({ params }) {
         </div>
 
         <div style={styles.headerActions}>
+          <Button 
+            variant={client.status === 'inactive' ? 'success' : 'secondary'} 
+            size="sm" 
+            onClick={handleToggleClientDisable}
+          >
+            {client.status === 'inactive' ? '⚡ Enable Membership' : '⏸️ Disable Membership'}
+          </Button>
+
+          {client.currentPlan && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleRemovePlan}
+              style={{ color: '#ff1744' }}
+            >
+              🗑️ Remove Plan
+            </Button>
+          )}
+
           <Button variant="outline" size="sm" onClick={() => setIsEditProfileModalOpen(true)}>
             <Edit size={14} /> Edit Profile
           </Button>
@@ -465,7 +528,7 @@ export default function ClientDetailPage({ params }) {
             });
             setIsAssignPlanModalOpen(true);
           }}>
-            <Clipboard size={14} /> Assign Plan & Billing
+            <Clipboard size={14} /> Change / Assign Plan
           </Button>
         </div>
       </Card>

@@ -185,7 +185,7 @@ export default function PlansPage() {
   };
 
   const handleDeletePlan = async (planId) => {
-    if (!confirm('Are you sure you want to delete this membership plan?')) return;
+    if (!confirm('Are you sure you want to permanently delete/remove this membership plan?')) return;
     try {
       setLoading(true);
       await deleteDocument('Plans', planId);
@@ -193,6 +193,28 @@ export default function PlansPage() {
       await fetchPlans();
     } catch (err) {
       toast.error('Failed to delete plan');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleDeactivatePlan = async (plan) => {
+    const isCurrentlyActive = plan.status !== 'inactive';
+    const newStatus = isCurrentlyActive ? 'inactive' : 'active';
+    const actionText = isCurrentlyActive ? 'deactivate' : 'activate';
+    
+    if (!confirm(`Are you sure you want to ${actionText} "${plan.plan_name || plan.name}"?`)) return;
+    
+    try {
+      setLoading(true);
+      await updatePlan(plan.id, {
+        ...plan,
+        status: newStatus
+      });
+      toast.success(`Plan "${plan.plan_name || plan.name}" ${isCurrentlyActive ? 'deactivated' : 'activated'} successfully!`);
+      await fetchPlans();
+    } catch (err) {
+      toast.error(`Failed to ${actionText} plan`);
     } finally {
       setLoading(false);
     }
@@ -304,6 +326,7 @@ export default function PlansPage() {
               plan={plan} 
               isAdmin={true}
               onEdit={handleOpenEditModal}
+              onToggleStatus={handleToggleDeactivatePlan}
               onDelete={handleDeletePlan}
             />
           ))}

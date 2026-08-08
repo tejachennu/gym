@@ -20,12 +20,13 @@ export default function BottomNav() {
   const hasTracking = typeof planFeatures.hasTracking === 'boolean' ? planFeatures.hasTracking : hasPlan;
   const hasPostureCheckin = planFeatures.hasPostureCheckin === true;
 
+  if (profile?.status === 'inactive') return null;
+
   const navItems = [
     { label: 'Home', href: '/client', icon: Home, show: true },
     { label: 'Diet', href: '/client/diet', icon: Utensils, show: hasDiet },
     { label: 'Workout', href: '/client/workout', icon: Dumbbell, show: hasWorkout },
     { label: 'Activity', href: '/client/daily-log', icon: Activity, show: hasTracking },
-    { label: 'Posture', href: '/client/daily-log', icon: Camera, show: hasPostureCheckin },
     { label: 'History', href: '/client/history', icon: History, show: true },
     { label: 'Profile', href: '/client/profile', icon: User, show: true },
   ].filter(item => item.show);

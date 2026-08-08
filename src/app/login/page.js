@@ -86,15 +86,6 @@ export default function LoginPage() {
     }
   };
 
-  const fillDemoAdmin = () => {
-    setEmail('admin@powerhouse.com');
-    setPassword('Admin@123456');
-  };
-
-  const fillDemoClient = () => {
-    setEmail('client@powerhouse.com');
-    setPassword('Client@123456');
-  };
 
   return (
     <div style={{
@@ -136,50 +127,8 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border)' }}>
-          <p style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>⚡ Quick Demo Logins</p>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <button 
-              type="button" 
-              onClick={fillDemoAdmin}
-              style={{
-                flex: 1,
-                padding: '6px 8px',
-                borderRadius: '6px',
-                border: '1px solid var(--accent)',
-                backgroundColor: 'var(--accent-surface)',
-                color: 'var(--text)',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              👑 Fill Admin
-            </button>
-            <button 
-              type="button" 
-              onClick={fillDemoClient}
-              style={{
-                flex: 1,
-                padding: '6px 8px',
-                borderRadius: '6px',
-                border: '1px solid var(--border)',
-                backgroundColor: 'var(--card-hover)',
-                color: 'var(--text)',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              🏋️ Fill Client
-            </button>
-          </div>
-        </div>
 
-        <div style={{ marginTop: '14px', fontSize: '0.8rem' }}>
-          <span style={{ color: 'var(--text-secondary)' }}>Don't have an account? </span>
-          <Link href="/register" style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>Register</Link>
-        </div>
+
       </Card>
 
       {showReset && (

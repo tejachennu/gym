@@ -36,6 +36,7 @@ import {
   CheckCircle2,
   Dumbbell
 } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const ANGLE_LABELS = {
   front: { title: 'Front View Image', icon: '📸', tag: 'FRONT' },
@@ -128,6 +129,56 @@ export default function TransformationsPage() {
       }
     } catch (err) {
       console.error('Failed to load transformations data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  // SEED DEMO DATA FUNCTION
+  const handleSeedDemoCheckins = async () => {
+    if (!selectedClientId) return alert("Select a client first!");
+    if (!confirm("Are you sure you want to add 10 demo 10-day posture check-ins?")) return;
+    
+    setLoading(true);
+    try {
+      const { addDocument } = await import('@/lib/firestore');
+      
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 100); // start 100 days ago
+
+      for (let i = 0; i < 10; i++) {
+        const checkinDate = new Date(startDate);
+        checkinDate.setDate(startDate.getDate() + (i * 10)); // 10 days apart
+        
+        // Slightly changing weight and waist for progression!
+        const weight = (85 - (i * 0.8)).toFixed(1); 
+        const waist = (36 - (i * 0.4)).toFixed(1);
+        
+        await addDocument('BodyCheckins', {
+          clientId: selectedClientId,
+          clientEmail: selectedClient?.email || '',
+          date: checkinDate.toISOString().split('T')[0],
+          notes: `Check-in ${i+1}: Feeling stronger. Following diet 100%.`,
+          measurements: {
+            weight: weight,
+            waist: waist,
+            chest: "40",
+            rBicep: "14",
+            lBicep: "14"
+          },
+          photos: {
+            front: "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&q=80&w=800",
+            back: "https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&q=80&w=800",
+            right: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=800",
+            left: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=800"
+          }
+        });
+      }
+      
+      alert("Successfully seeded 10 demo check-ins!");
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to seed demo check-ins.");
     } finally {
       setLoading(false);
     }
@@ -284,6 +335,29 @@ export default function TransformationsPage() {
     };
   }, [beforeCheckin, afterCheckin]);
 
+  const formatMonthLabel = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric', day: 'numeric' });
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  // Chart Data for Weight Progression
+  const weightChartData = useMemo(() => {
+    if (!clientCheckins || clientCheckins.length < 2) return [];
+    return clientCheckins.map((chk, index) => {
+      const weightVal = parseFloat(chk.measurements?.weight);
+      return {
+        name: `Check-in ${index + 1}`,
+        date: formatMonthLabel(chk.date),
+        weight: !isNaN(weightVal) ? weightVal : null,
+      };
+    }).filter(d => d.weight !== null);
+  }, [clientCheckins]);
+
   // Handle Prev/Next month navigation
   const handlePrevMonth = () => {
     if (afterMonthIndex > 0) {
@@ -294,16 +368,6 @@ export default function TransformationsPage() {
   const handleNextMonth = () => {
     if (afterMonthIndex < afterCheckinsList.length - 1) {
       setAfterMonthIndex(prev => prev + 1);
-    }
-  };
-
-  const formatMonthLabel = (dateStr) => {
-    if (!dateStr) return '';
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric', day: 'numeric' });
-    } catch (e) {
-      return dateStr;
     }
   };
 
@@ -480,6 +544,18 @@ export default function TransformationsPage() {
                 setAfterMonthIndex(0);
               }}
             />
+          </div>
+
+          {/* Seed Demo Data Button */}
+          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+             <Button 
+               variant="outline" 
+               onClick={handleSeedDemoCheckins}
+               disabled={!selectedClientId || loading}
+               style={{ height: '40px', width: '100%', borderColor: 'var(--primary)', color: 'var(--primary)' }}
+             >
+               🌱 Seed 10 Demo Posters
+             </Button>
           </div>
         </div>
       </Card>
@@ -956,16 +1032,7 @@ export default function TransformationsPage() {
                         </thead>
                         <tbody>
                           {[
-                            { label: 'Body Weight', key: 'weight', unit: 'kg' },
-                            { label: 'Waist Size', key: 'waist', unit: 'in' },
-                            { label: 'Chest Size', key: 'chest', unit: 'in' },
-                            { label: 'Stomach', key: 'stomach', unit: 'in' },
-                            { label: 'Neck', key: 'neck', unit: 'in' },
-                            { label: 'Shoulder', key: 'shoulder', unit: 'in' },
-                            { label: 'Right Bicep', key: 'rBicep', unit: 'in' },
-                            { label: 'Left Bicep', key: 'lBicep', unit: 'in' },
-                            { label: 'Right Thigh', key: 'rThigh', unit: 'in' },
-                            { label: 'Left Thigh', key: 'lThigh', unit: 'in' }
+                            { label: 'Body Weight', key: 'weight', unit: 'kg' }
                           ].map(row => {
                             const bVal = beforeCheckin?.measurements?.[row.key] || '--';
                             const aVal = afterCheckin?.measurements?.[row.key] || bVal;
@@ -997,7 +1064,7 @@ export default function TransformationsPage() {
               {clientAnalytics ? (
                 <>
                   {/* CLIENT ANALYTICS HIGHLIGHT CARDS */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
                     
                     {/* Weight Delta Card */}
                     <Card style={{ padding: '16px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '12px' }}>
@@ -1017,42 +1084,6 @@ export default function TransformationsPage() {
                       </div>
                     </Card>
 
-                    {/* Waist Delta Card */}
-                    <Card style={{ padding: '16px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '12px' }}>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>
-                        📐 Waist Inch Loss
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                        <span style={{ fontSize: '1.5rem', fontWeight: 800, color: parseFloat(clientAnalytics.waistDiff) <= 0 ? '#00c853' : '#ff9100' }}>
-                          {clientAnalytics.waistAfter} in
-                        </span>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                          (was {clientAnalytics.waistBefore} in)
-                        </span>
-                      </div>
-                      <div style={{ marginTop: '8px' }}>
-                        {renderMetricDelta(clientAnalytics.waistBefore, clientAnalytics.waistAfter, 'in')}
-                      </div>
-                    </Card>
-
-                    {/* Arm Bicep Card */}
-                    <Card style={{ padding: '16px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '12px' }}>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>
-                        💪 Arm / Bicep Size
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                        <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#00b0ff' }}>
-                          {clientAnalytics.bicepAfter} in
-                        </span>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                          (was {clientAnalytics.bicepBefore} in)
-                        </span>
-                      </div>
-                      <div style={{ marginTop: '8px' }}>
-                        {renderMetricDelta(clientAnalytics.bicepBefore, clientAnalytics.bicepAfter, 'in')}
-                      </div>
-                    </Card>
-
                     {/* Journey Duration Card */}
                     <Card style={{ padding: '16px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '12px' }}>
                       <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>
@@ -1068,6 +1099,29 @@ export default function TransformationsPage() {
 
                   </div>
 
+                  {/* WEIGHT PROGRESSION LINE CHART */}
+                  {weightChartData.length >= 2 && (
+                    <Card style={{ padding: '18px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '14px' }}>
+                      <h3 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <TrendingDown size={18} color="var(--accent)" /> Weight Progression Timeline
+                      </h3>
+                      <div style={{ width: '100%', height: '300px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={weightChartData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                            <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                            <YAxis domain={['auto', 'auto']} stroke="var(--text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                            <Tooltip 
+                              contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)' }}
+                              itemStyle={{ color: 'var(--accent)', fontWeight: 'bold' }}
+                            />
+                            <Line type="monotone" dataKey="weight" name="Weight (kg)" stroke="#E00008" strokeWidth={3} dot={{ r: 5, fill: '#E00008', strokeWidth: 0 }} activeDot={{ r: 8 }} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </Card>
+                  )}
+
                   {/* VISUAL METRIC PROGRESS BARS CHART */}
                   <Card style={{ padding: '18px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '14px' }}>
                     <h3 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1076,10 +1130,7 @@ export default function TransformationsPage() {
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                       {[
-                        { title: 'Weight Reduction (kg)', before: clientAnalytics.weightBefore, after: clientAnalytics.weightAfter, unit: 'kg', color: '#00c853' },
-                        { title: 'Waist Size Reduction (in)', before: clientAnalytics.waistBefore, after: clientAnalytics.waistAfter, unit: 'in', color: '#ff9100' },
-                        { title: 'Chest Measurement (in)', before: clientAnalytics.chestBefore, after: clientAnalytics.chestAfter, unit: 'in', color: '#00b0ff' },
-                        { title: 'Bicep Muscle Size (in)', before: clientAnalytics.bicepBefore, after: clientAnalytics.bicepAfter, unit: 'in', color: '#e00008' }
+                        { title: 'Weight Progress (kg)', before: clientAnalytics.weightBefore, after: clientAnalytics.weightAfter, unit: 'kg', color: '#00c853' }
                       ].map((item, idx) => {
                         const bNum = parseFloat(item.before) || 100;
                         const aNum = parseFloat(item.after) || bNum;

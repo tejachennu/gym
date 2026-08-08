@@ -9,9 +9,11 @@ export default function PlanCard({
   plan,
   onEdit,
   onDelete,
+  onToggleStatus,
   onSelect,
   isAdmin = false
 }) {
+  const isInactive = plan.status === 'inactive';
   const pricingList = plan.pricing || [
     { duration: plan.duration || '1 Month', price: plan.startingPrice || plan.price || 0 }
   ];
@@ -31,7 +33,17 @@ export default function PlanCard({
   };
 
   return (
-    <div style={styles.cardContainer} className="glass-card animate-fade-up">
+    <div style={{ ...styles.cardContainer, opacity: isInactive ? 0.75 : 1, border: isInactive ? '1px dashed #ff9100' : '1px solid var(--border)' }} className="glass-card animate-fade-up">
+      
+      {/* Inactive Badge */}
+      {isInactive && (
+        <div style={{ position: 'absolute', top: '12px', left: '24px' }}>
+          <Badge variant="warning" size="sm">
+            🚫 DEACTIVATED
+          </Badge>
+        </div>
+      )}
+
       {/* Badge if available */}
       {plan.badge && (
         <div style={styles.badgeWrapper}>
@@ -42,7 +54,7 @@ export default function PlanCard({
       )}
 
       {/* Header Info */}
-      <div style={styles.planHeader}>
+      <div style={{ ...styles.planHeader, marginTop: isInactive ? '16px' : 0 }}>
         <h3 style={styles.planName}>{plan.plan_name || plan.name}</h3>
         {plan.category && <p style={styles.category}>{plan.category}</p>}
         {plan.description && <p style={styles.description}>"{plan.description}"</p>}
@@ -106,40 +118,30 @@ export default function PlanCard({
             </div>
           ))}
         </div>
-
-        {/* Client Portal Enabled Features */}
-        <div style={{ marginTop: '12px', padding: '8px 10px', backgroundColor: 'var(--card-hover)', borderRadius: '8px' }}>
-          <div style={styles.sectionHeader}>CLIENT PORTAL FEATURES</div>
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
-            <Badge variant={(plan.hasDiet ?? true) ? 'success' : 'secondary'} size="sm">
-              {(plan.hasDiet ?? true) ? '🥗 Diet' : '🥗 No Diet'}
-            </Badge>
-            <Badge variant={(plan.hasWorkout ?? true) ? 'success' : 'secondary'} size="sm">
-              {(plan.hasWorkout ?? true) ? '🏋️ Workout' : '🏋️ No Workout'}
-            </Badge>
-            <Badge variant={(plan.hasTracking ?? true) ? 'success' : 'secondary'} size="sm">
-              {(plan.hasTracking ?? true) ? '📊 Tracking' : '📊 No Tracking'}
-            </Badge>
-            {(plan.hasTracking ?? true) && (plan.hasPostureCheckin ?? true) && (
-              <Badge variant="success" size="sm">
-                📸 10-Day Posture
-              </Badge>
-            )}
-          </div>
-        </div>
       </div>
 
       {/* Action Footer */}
       {isAdmin ? (
         <div style={styles.adminActions}>
+          {onToggleStatus && (
+            <Button 
+              variant={isInactive ? "success" : "secondary"} 
+              size="sm" 
+              onClick={() => onToggleStatus(plan)} 
+              style={{ fontSize: '0.75rem', padding: '6px 10px' }}
+              title={isInactive ? "Activate plan" : "Deactivate plan"}
+            >
+              {isInactive ? '⚡ Activate' : '⏸️ Deactivate'}
+            </Button>
+          )}
           {onEdit && (
-            <Button variant="outline" size="sm" onClick={() => onEdit(plan)} style={{ flex: 1 }}>
-              <Edit2 size={14} /> Edit
+            <Button variant="outline" size="sm" onClick={() => onEdit(plan)} style={{ flex: 1, fontSize: '0.75rem', padding: '6px 10px' }}>
+              <Edit2 size={13} /> Edit
             </Button>
           )}
           {onDelete && (
-            <Button variant="ghost" size="sm" onClick={() => onDelete(plan.id)} style={{ color: '#ff1744' }}>
-              <Trash2 size={14} />
+            <Button variant="ghost" size="sm" onClick={() => onDelete(plan.id)} style={{ color: '#ff1744', fontSize: '0.75rem', padding: '6px 10px' }} title="Remove / Delete Plan">
+              <Trash2 size={13} /> Remove
             </Button>
           )}
         </div>
@@ -150,7 +152,7 @@ export default function PlanCard({
             onClick={() => onSelect(plan, currentPricing)}
             style={styles.selectBtn}
           >
-            Select {currentPricing.duration} Plan
+            Enroll for {currentPricing.duration || `${currentPricing.durationVal || 1} ${currentPricing.durationUnit || 'Months'}`} &rarr;
           </Button>
         )
       )}

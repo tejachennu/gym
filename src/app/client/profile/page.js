@@ -795,6 +795,25 @@ export default function ProfilePage() {
         </form>
       )}
 
+      {/* LOGOUT CARD */}
+      <Card style={{ padding: '14px', marginTop: '10px' }} className="glass-card">
+        <Button 
+          variant="danger" 
+          onClick={async () => {
+            if (confirm('Are you sure you want to log out?')) {
+              try {
+                await logoutUser();
+                router.push('/login');
+              } catch (err) {
+                console.error(err);
+              }
+            }
+          }}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', fontSize: '0.9rem', fontWeight: 800 }}
+        >
+          <LogOut size={18} /> Log Out of Account
+        </Button>
+      </Card>
     </div>
   );
 }

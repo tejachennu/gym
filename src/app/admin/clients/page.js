@@ -8,7 +8,8 @@ import {
   clearSeedClients,
   getPlans,
   addDocument,
-  updateClientProfile
+  updateClientProfile,
+  assignPlan
 } from '@/lib/firestore';
 import { registerUserByAdmin } from '@/lib/auth';
 import { useToast } from '@/components/ui/Toast';
@@ -51,6 +52,10 @@ export default function ClientsPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedProfileClient, setSelectedProfileClient] = useState(null);
   const [viewingPhotoUrl, setViewingPhotoUrl] = useState(null);
+  const [isChangePlanModalOpen, setIsChangePlanModalOpen] = useState(false);
+  const [changePlanClient, setChangePlanClient] = useState(null);
+  const [changePlanForm, setChangePlanForm] = useState({ planIdCombo: '', planStart: new Date().toISOString().split('T')[0] });
+  const [saving, setSaving] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -107,7 +112,9 @@ export default function ClientsPage() {
   const fetchPlans = async () => {
     try {
       const data = await getPlans();
-      setAllPlansList(data || []);
+      // Filter out deactivated plans so ONLY active plans are available for assignment
+      const activePlans = (data || []).filter(p => p.status !== 'inactive');
+      setAllPlansList(activePlans);
     } catch (err) {
       console.error(err);
     }
@@ -140,6 +147,161 @@ export default function ClientsPage() {
       originalAmount: priceStr,
       amountPaid: priceStr
     }));
+  };
+
+  // Remove Plan Handler
+  const handleRemovePlan = async (client) => {
+    if (!client) return;
+    if (!confirm(`Are you sure you want to remove the assigned plan from ${client.displayName || client.name}?`)) return;
+    try {
+      setLoading(true);
+      await updateClientProfile(client.id, {
+        currentPlan: '',
+        planStart: '',
+        planExpiry: '',
+        planId: ''
+      });
+      toast.success('Assigned plan removed successfully!');
+      if (selectedProfileClient?.id === client.id) {
+        setSelectedProfileClient(prev => ({
+          ...prev,
+          currentPlan: '',
+          planStart: '',
+          planExpiry: '',
+          planId: ''
+        }));
+      }
+      await fetchClients();
+    } catch (err) {
+      toast.error('Failed to remove assigned plan');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Toggle Disable / Enable Client Membership Handler
+  const handleToggleClientDisable = async (client) => {
+    if (!client) return;
+    const isCurrentlyActive = client.status !== 'inactive';
+    const newStatus = isCurrentlyActive ? 'inactive' : 'active';
+    const actionText = isCurrentlyActive ? 'disable' : 'enable';
+
+    if (!confirm(`Are you sure you want to ${actionText} membership status for ${client.displayName || client.name}?`)) return;
+
+    try {
+      setLoading(true);
+      await updateClientProfile(client.id, {
+        status: newStatus
+      });
+      toast.success(`Client membership ${isCurrentlyActive ? 'disabled' : 'enabled'} successfully!`);
+      if (selectedProfileClient?.id === client.id) {
+        setSelectedProfileClient(prev => ({
+          ...prev,
+          status: newStatus
+        }));
+      }
+      await fetchClients();
+    } catch (err) {
+      toast.error(`Failed to ${actionText} client`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Change / Switch Plan Handler
+  const handleExecuteChangePlan = async (e) => {
+    e.preventDefault();
+    if (!changePlanClient) return;
+    if (!changePlanForm.planIdCombo) return toast.error('Please select a membership plan');
+
+    try {
+      setSaving(true);
+      const [planId, tierIndexStr] = changePlanForm.planIdCombo.split('||');
+      const tierIndex = parseInt(tierIndexStr, 10) || 0;
+      const selectedPlan = allPlansList.find(p => p.id === planId);
+
+      if (!selectedPlan) return toast.error('Selected plan not found');
+
+      const tier = selectedPlan.pricing?.[tierIndex] || { durationVal: 1, durationUnit: 'Months', duration: '1 Month', price: selectedPlan.price || 0 };
+      const durationVal = parseInt(tier.durationVal, 10) || 1;
+      const durationUnit = tier.durationUnit || 'Months';
+
+      const startDate = new Date(changePlanForm.planStart);
+      const expiryDateObj = new Date(startDate);
+      if (durationUnit === 'Days') {
+        expiryDateObj.setDate(expiryDateObj.getDate() + durationVal);
+      } else if (durationUnit === 'Years') {
+        expiryDateObj.setFullYear(expiryDateObj.getFullYear() + durationVal);
+      } else {
+        expiryDateObj.setMonth(expiryDateObj.getMonth() + durationVal);
+      }
+
+      const planExpiry = expiryDateObj.toISOString().split('T')[0];
+      const planNameFormatted = `${selectedPlan.plan_name || selectedPlan.name} (${tier.duration || `${durationVal} ${durationUnit}`})`;
+
+      const existingHistory = changePlanClient.planHistory || [];
+      const updatedHistory = existingHistory.map(ph => ({ ...ph, status: 'past' }));
+
+      const newPlanFeatures = {
+        hasDiet: selectedPlan.hasDiet !== false,
+        hasWorkout: selectedPlan.hasWorkout !== false,
+        hasTracking: selectedPlan.hasTracking !== false,
+        hasPostureCheckin: selectedPlan.hasPostureCheckin === true,
+        hasDailyLog: selectedPlan.hasDailyLog !== false
+      };
+
+      const newPlanHistoryItem = {
+        id: `plan_${Date.now()}`,
+        planName: planNameFormatted,
+        planId: selectedPlan.id,
+        planStart: changePlanForm.planStart,
+        planExpiry: planExpiry,
+        originalAmount: tier.price || 0,
+        finalAmount: tier.price || 0,
+        amountPaid: tier.price || 0,
+        balance: 0,
+        paymentStatus: 'Paid',
+        status: 'active',
+        planFeatures: newPlanFeatures,
+        assignedAt: new Date().toISOString()
+      };
+
+      updatedHistory.unshift(newPlanHistoryItem);
+
+      const updatedFields = {
+        currentPlan: planNameFormatted,
+        planId: selectedPlan.id,
+        planStart: changePlanForm.planStart,
+        planExpiry: planExpiry,
+        status: 'active',
+        planFeatures: newPlanFeatures,
+        planHistory: updatedHistory
+      };
+
+      await updateClientProfile(changePlanClient.id, updatedFields);
+      try {
+        await assignPlan({ clientId: changePlanClient.id, ...newPlanHistoryItem });
+      } catch (e) {
+        console.warn('Assign plan sub-record warning:', e);
+      }
+
+      toast.success(`Plan updated to "${planNameFormatted}" successfully!`);
+
+      if (selectedProfileClient?.id === changePlanClient.id) {
+        setSelectedProfileClient(prev => ({
+          ...prev,
+          ...updatedFields
+        }));
+      }
+
+      setIsChangePlanModalOpen(false);
+      setChangePlanClient(null);
+      await fetchClients();
+    } catch (err) {
+      toast.error('Failed to change plan: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const calculateFinalAmount = () => {
@@ -385,16 +547,29 @@ export default function ClientsPage() {
   });
 
   const sortedClients = [...clients].sort((a, b) => {
-    const tA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
-    const tB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
-    return tB - tA;
+    const getTimestamp = (obj) => {
+      if (!obj?.createdAt) return 0;
+      if (obj.createdAt.seconds) return obj.createdAt.seconds * 1000;
+      if (typeof obj.createdAt === 'string') return new Date(obj.createdAt).getTime();
+      if (typeof obj.createdAt.toMillis === 'function') return obj.createdAt.toMillis();
+      return Date.now(); // Assume pending serverTimestamp is now
+    };
+    const tA = getTimestamp(a);
+    const tB = getTimestamp(b);
+    
+    if (tA !== tB) {
+      return tB - tA;
+    }
+    return String(b.clientCode || b.id || '').localeCompare(String(a.clientCode || a.id || ''));
   });
 
   const filteredClients = sortedClients.filter(c => {
+    const s = search.toLowerCase();
     const matchesSearch = 
-      (c.displayName || c.name)?.toLowerCase().includes(search.toLowerCase()) ||
-      c.email?.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone?.toLowerCase().includes(search.toLowerCase());
+      (c.displayName || c.name || '')?.toLowerCase().includes(s) ||
+      (c.email || '')?.toLowerCase().includes(s) ||
+      (c.phone || '')?.toLowerCase().includes(s) ||
+      (c.clientCode || '')?.toLowerCase().includes(s);
     
     const matchesStatus = statusFilter === 'all' || (c.status || 'active') === statusFilter;
     return matchesSearch && matchesStatus;
@@ -804,11 +979,35 @@ export default function ClientsPage() {
             </div>
 
             {/* Plan Info Card */}
-            <div style={{ padding: '12px', backgroundColor: 'rgba(224, 0, 8, 0.06)', borderRadius: '12px', border: '1px solid rgba(224, 0, 8, 0.2)' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', marginBottom: '4px' }}>
-                Assigned Membership Plan
+            <div style={{ padding: '14px', backgroundColor: 'rgba(224, 0, 8, 0.06)', borderRadius: '12px', border: '1px solid rgba(224, 0, 8, 0.2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase' }}>
+                  Assigned Membership Plan
+                </div>
+                
+                {/* QUICK PLAN MANAGEMENT ACTION BUTTONS */}
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  <button 
+                    onClick={() => handleToggleClientDisable(selectedProfileClient)}
+                    style={{ padding: '4px 9px', borderRadius: '6px', backgroundColor: selectedProfileClient.status === 'inactive' ? 'rgba(0, 200, 83, 0.15)' : 'rgba(255, 145, 0, 0.15)', border: selectedProfileClient.status === 'inactive' ? '1px solid rgba(0, 200, 83, 0.4)' : '1px solid rgba(255, 145, 0, 0.4)', color: selectedProfileClient.status === 'inactive' ? '#00c853' : '#ff9100', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
+                    title={selectedProfileClient.status === 'inactive' ? "Enable client membership" : "Disable client membership"}
+                  >
+                    {selectedProfileClient.status === 'inactive' ? '⚡ Enable' : '⏸️ Disable'}
+                  </button>
+
+                  {selectedProfileClient.currentPlan && (
+                    <button 
+                      onClick={() => handleRemovePlan(selectedProfileClient)}
+                      style={{ padding: '4px 9px', borderRadius: '6px', backgroundColor: 'rgba(224, 0, 8, 0.15)', border: '1px solid rgba(224, 0, 8, 0.4)', color: '#ff1744', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
+                      title="Remove assigned plan from client"
+                    >
+                      🗑️ Remove Plan
+                    </button>
+                  )}
+                </div>
               </div>
-              <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text)' }}>
+
+              <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text)' }}>
                 {selectedProfileClient.currentPlan || 'No Plan Assigned'}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '8px', fontSize: '0.75rem' }}>
@@ -877,6 +1076,64 @@ export default function ClientsPage() {
           </div>
         </Modal>
       )}
+      {/* CHANGE / SWITCH PLAN MODAL */}
+      {isChangePlanModalOpen && changePlanClient && (
+        <Modal
+          isOpen={isChangePlanModalOpen}
+          onClose={() => setIsChangePlanModalOpen(false)}
+          title={`Change Plan for ${changePlanClient.displayName || changePlanClient.name}`}
+          size="md"
+        >
+          <form onSubmit={handleExecuteChangePlan} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ padding: '10px 12px', backgroundColor: 'var(--card-hover)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Currently Assigned:</span>
+              <strong style={{ display: 'block', fontSize: '0.9rem', color: 'var(--accent)' }}>
+                {changePlanClient.currentPlan || 'No Plan Assigned'}
+              </strong>
+            </div>
+
+            <Select
+              label="Select New Membership Plan & Duration *"
+              value={changePlanForm.planIdCombo}
+              onChange={(e) => setChangePlanForm({ ...changePlanForm, planIdCombo: e.target.value })}
+              options={[
+                { label: '-- Select Plan & Duration Tier --', value: '' },
+                ...allPlansList.flatMap(plan => {
+                  if (plan.pricing && plan.pricing.length > 0) {
+                    return plan.pricing.map((tier, tIdx) => ({
+                      label: `${plan.plan_name || plan.name} — ${tier.duration || `${tier.durationVal || 1} ${tier.durationUnit || 'Months'}`} (₹${tier.price || 0})`,
+                      value: `${plan.id}||${tIdx}`
+                    }));
+                  }
+                  return [{
+                    label: `${plan.plan_name || plan.name} (₹${plan.price || 0})`,
+                    value: `${plan.id}||0`
+                  }];
+                })
+              ]}
+              required
+            />
+
+            <Input
+              label="Plan Start Date *"
+              type="date"
+              value={changePlanForm.planStart}
+              onChange={(e) => setChangePlanForm({ ...changePlanForm, planStart: e.target.value })}
+              required
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px' }}>
+              <Button variant="outline" type="button" onClick={() => setIsChangePlanModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? 'Updating Plan...' : 'Save & Assign New Plan'}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
       {/* PHOTO FULL VIEW MODAL */}
       {viewingPhotoUrl && (
         <Modal isOpen={!!viewingPhotoUrl} onClose={() => setViewingPhotoUrl(null)} title="Photo Full View" size="md">
