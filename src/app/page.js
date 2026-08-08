@@ -263,24 +263,24 @@ export default function HomePage() {
 
           {/* Desktop Actions / Mobile Menu Button */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {!isMobile && (
-              <div style={styles.navActions}>
-                {user ? (
-                  <Button onClick={handlePortalRedirect} style={styles.portalBtn}>
-                    <ShieldCheck size={16} /> Portal Dashboard
-                  </Button>
-                ) : (
-                  <>
+            <div style={{ ...styles.navActions, gap: isMobile ? '8px' : '14px' }}>
+              {user ? (
+                <Button onClick={handlePortalRedirect} style={{ ...styles.portalBtn, padding: isMobile ? '6px 12px' : '10px 20px', fontSize: isMobile ? '0.75rem' : '0.9rem' }}>
+                  <ShieldCheck size={16} /> {!isMobile && 'Portal Dashboard'}
+                </Button>
+              ) : (
+                <>
+                  {!isMobile && (
                     <Button variant="ghost" onClick={() => router.push('/login')} style={{ fontSize: '0.85rem' }}>
                       Log In
                     </Button>
-                    <Button onClick={() => router.push('/login')} style={styles.ctaHeaderBtn}>
-                      Get Started <ArrowRight size={16} />
-                    </Button>
-                  </>
-                )}
-              </div>
-            )}
+                  )}
+                  <Button onClick={() => router.push('/login')} style={{ ...styles.ctaHeaderBtn, padding: isMobile ? '6px 14px' : '10px 22px', fontSize: isMobile ? '0.8rem' : '0.9rem' }}>
+                    {isMobile ? 'Login' : 'Get Started'} {!isMobile && <ArrowRight size={16} />}
+                  </Button>
+                </>
+              )}
+            </div>
 
             {isMobile && (
               <button
@@ -855,15 +855,7 @@ export default function HomePage() {
               </h3>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '0.88rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'rgba(224, 0, 8, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Phone size={20} color="var(--accent, #E00008)" />
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block' }}>Direct Support Line</span>
-                    <strong style={{ color: 'var(--text)' }}>+91 99890 26344</strong>
-                  </div>
-                </div>
+
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'rgba(224, 0, 8, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>

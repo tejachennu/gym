@@ -393,19 +393,7 @@ export default function WorkoutPlansPage() {
     }
   };
 
-  const handleSeedTemplates = async () => {
-    try {
-      setLoading(true);
-      const { seedPlans } = await import('@/lib/seedPlans');
-      await seedPlans();
-      await fetchInitialData();
-      toast.success('Sample workout templates seeded!');
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   // --- MASTER TEMPLATE MODAL HANDLERS ---
   const handleOpenCreateTemplateModal = () => {
@@ -853,9 +841,8 @@ export default function WorkoutPlansPage() {
                 <Sparkles size={48} color="var(--text-muted, #666666)" />
                 <h3 style={{ margin: '16px 0 6px', color: '#FFFFFF' }}>No Workout Templates Found</h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
-                  Click &quot;Seed Templates&quot; above to generate pre-built workout templates.
+                  Create a new template to get started.
                 </p>
-                <Button onClick={handleSeedTemplates}>Seed Templates Now</Button>
               </div>
             )}
           </div>

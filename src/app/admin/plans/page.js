@@ -220,19 +220,6 @@ export default function PlansPage() {
     }
   };
 
-  const handleSeed = async () => {
-    try {
-      setLoading(true);
-      const { seedPlans: runSeed } = await import('@/lib/seedPlans');
-      await runSeed();
-      toast.success('Sample plans seeded successfully!');
-      await fetchPlans();
-    } catch (err) {
-      toast.error('Error seeding plans: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Pricing helper handlers
   const handleAddPricingTier = () => {
@@ -335,9 +322,8 @@ export default function PlansPage() {
               <CreditCard size={48} color="var(--text-muted, #666666)" />
               <h3 style={{ margin: '16px 0 6px', color: '#FFFFFF' }}>No Membership Plans Found</h3>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '20px', fontSize: '0.9rem' }}>
-                Click "Seed Demo Plans" above to populate all 6 default passes into Firestore.
+                Create a new membership plan to get started.
               </p>
-              <Button onClick={handleSeed}>Seed Demo Plans Now</Button>
             </div>
           )}
         </div>

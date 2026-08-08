@@ -133,56 +133,7 @@ export default function TransformationsPage() {
       setLoading(false);
     }
   };
-  // SEED DEMO DATA FUNCTION
-  const handleSeedDemoCheckins = async () => {
-    if (!selectedClientId) return alert("Select a client first!");
-    if (!confirm("Are you sure you want to add 10 demo 10-day posture check-ins?")) return;
-    
-    setLoading(true);
-    try {
-      const { addDocument } = await import('@/lib/firestore');
-      
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 100); // start 100 days ago
 
-      for (let i = 0; i < 10; i++) {
-        const checkinDate = new Date(startDate);
-        checkinDate.setDate(startDate.getDate() + (i * 10)); // 10 days apart
-        
-        // Slightly changing weight and waist for progression!
-        const weight = (85 - (i * 0.8)).toFixed(1); 
-        const waist = (36 - (i * 0.4)).toFixed(1);
-        
-        await addDocument('BodyCheckins', {
-          clientId: selectedClientId,
-          clientEmail: selectedClient?.email || '',
-          date: checkinDate.toISOString().split('T')[0],
-          notes: `Check-in ${i+1}: Feeling stronger. Following diet 100%.`,
-          measurements: {
-            weight: weight,
-            waist: waist,
-            chest: "40",
-            rBicep: "14",
-            lBicep: "14"
-          },
-          photos: {
-            front: "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&q=80&w=800",
-            back: "https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&q=80&w=800",
-            right: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=800",
-            left: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80&w=800"
-          }
-        });
-      }
-      
-      alert("Successfully seeded 10 demo check-ins!");
-      await fetchData();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to seed demo check-ins.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Filter clients by search
   const filteredClients = useMemo(() => {
@@ -544,18 +495,6 @@ export default function TransformationsPage() {
                 setAfterMonthIndex(0);
               }}
             />
-          </div>
-
-          {/* Seed Demo Data Button */}
-          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-             <Button 
-               variant="outline" 
-               onClick={handleSeedDemoCheckins}
-               disabled={!selectedClientId || loading}
-               style={{ height: '40px', width: '100%', borderColor: 'var(--primary)', color: 'var(--primary)' }}
-             >
-               🌱 Seed 10 Demo Posters
-             </Button>
           </div>
         </div>
       </Card>

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { 
   getAllClients, 
   deleteClient, 
-  clearSeedClients,
   getPlans,
   addDocument,
   updateClientProfile,
@@ -46,7 +45,6 @@ export default function ClientsPage() {
   const [allPlansList, setAllPlansList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [clearingSeed, setClearingSeed] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -498,23 +496,6 @@ export default function ClientsPage() {
     }
   };
 
-  const handleClearSeedData = async () => {
-    if (!confirm('Are you sure you want to remove all seed test clients? Real registered clients will be preserved.')) {
-      return;
-    }
-
-    setClearingSeed(true);
-    try {
-      const removedCount = await clearSeedClients();
-      toast.success(`Removed ${removedCount} seed test clients!`);
-      await fetchClients();
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to remove seed data');
-    } finally {
-      setClearingSeed(false);
-    }
-  };
 
   const getMembershipStatus = (client) => {
     if (client.status === 'inactive') return { label: 'Inactive', variant: 'warning' };
@@ -597,9 +578,6 @@ export default function ClientsPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <Button onClick={handleClearSeedData} variant="outline" size="sm" loading={clearingSeed} style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}>
-            <Trash2 size={14} /> Remove Seed Data
-          </Button>
           <Button onClick={() => { setNewClient(initialClientForm); setIsAddModalOpen(true); }} size="sm">
             <UserPlus size={14} /> Submit New Client
           </Button>

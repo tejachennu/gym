@@ -101,21 +101,8 @@ export default function ContactPage() {
         <div style={styles.gridContainer}>
           
           {/* Left Column: Contact Cards */}
-          <div style={styles.infoCol}>
-            <Card style={styles.infoCard} className="glass-card">
-              <div style={styles.infoIconBox}>
-                <Clock size={20} color="#ab47bc" />
-              </div>
-              <div>
-                <h4 style={styles.infoCardTitle}>Operating Hours</h4>
-                <p style={styles.infoCardText}>Morning: 05:30 AM – 11:00 AM</p>
-                <p style={styles.infoCardText}>Evening: 04:30 PM – 10:00 PM (Sunday Closed)</p>
-              </div>
-            </Card>
-          </div>
-
-          {/* Right Column: Contact Form */}
-          <div style={styles.formCol}>
+          {/* Contact Form */}
+          <div style={{ ...styles.formCol, maxWidth: '650px', margin: '0 auto', width: '100%' }}>
             <Card style={styles.formCard} className="glass-card">
               {submitted ? (
                 <div style={styles.successState}>

@@ -126,9 +126,10 @@ export default function LoginPage() {
             Submit Sign In
           </Button>
         </form>
-
-
-
+        <div style={{ marginTop: '18px', fontSize: '0.82rem', textAlign: 'center', padding: '10px 0', borderTop: '1px solid var(--border)' }}>
+          <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic', display: 'block', marginBottom: '6px' }}>Please get access from your coach to login.</span>
+          <Link href="/contact" style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>Contact Coach</Link>
+        </div>
       </Card>
 
       {showReset && (

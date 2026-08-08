@@ -437,20 +437,7 @@ export default function DietPlansPage() {
     }
   };
 
-  // Seed sample templates helper
-  const handleSeedTemplates = async () => {
-    try {
-      setLoading(true);
-      const { seedPlans } = await import('@/lib/seedPlans');
-      await seedPlans();
-      await fetchInitialData();
-      toast.success('Sample diet templates seeded!');
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   // Save Template Modal handler (Admin CRUD for master templates)
   const handleSaveTemplateModal = async (e) => {
@@ -726,9 +713,8 @@ export default function DietPlansPage() {
                 <Sparkles size={48} color="var(--text-muted, #666666)" />
                 <h3 style={{ margin: '16px 0 6px', color: '#FFFFFF' }}>No Master Diet Templates Found</h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>
-                  Click "Seed Templates" above to generate pre-built master diet templates.
+                  Create a new template to get started.
                 </p>
-                <Button onClick={handleSeedTemplates}>Seed Templates Now</Button>
               </div>
             )}
           </div>

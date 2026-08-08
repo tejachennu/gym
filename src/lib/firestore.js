@@ -232,23 +232,4 @@ export const getEnquiries = async () => {
 export const updateEnquiry = (id, data) => updateDocument("Enquiries", id, data);
 export const deleteEnquiry = (id) => deleteDocument("Enquiries", id);
 
-export const clearSeedClients = async () => {
-  const seedEmails = [
-    'teja@powerhouse.com',
-    'client@powerhouse.com',
-    'rajesh@powerhouse.com',
-    'raghava@powerhouse.com',
-    'durga@powerhouse.com',
-    'satish@powerhouse.com',
-    'ganesh@powerhouse.com'
-  ];
-  const allUsers = await getAllClients();
-  let count = 0;
-  for (const user of allUsers) {
-    if (seedEmails.includes(user.email?.toLowerCase()) || user.id === 'demo-client-id') {
-      await deleteDocument("Users", user.id);
-      count++;
-    }
-  }
-  return count;
-};
+
