@@ -180,7 +180,7 @@ export const Textarea = ({ label, error, helperText, required, disabled, style =
   );
 };
 
-export const Select = ({ label, error, helperText, required, disabled, options = [], style = {}, ...props }) => {
+export const Select = ({ label, error, helperText, required, disabled, options = [], style = {}, containerStyle = {}, ...props }) => {
   const [isFocused, setIsFocused] = useState(false);
   const cleanLabel = label?.endsWith('*') ? label.slice(0, -1).trim() : label;
 
@@ -203,7 +203,7 @@ export const Select = ({ label, error, helperText, required, disabled, options =
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', ...containerStyle }}>
       {label && (
         <label style={{ fontSize: '0.78rem', fontWeight: 600, color: error ? 'var(--danger, #ff1744)' : (isFocused ? 'var(--accent, #E00008)' : 'var(--text-secondary, #AAAAAA)') }}>
           {cleanLabel} {required && <span style={{ color: 'var(--accent, #E00008)' }}>*</span>}

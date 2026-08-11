@@ -415,6 +415,7 @@ export default function AdminDashboard() {
                 { label: 'Custom Date Range', value: 'custom' },
               ]}
               style={{ width: '180px', margin: 0, padding: '8px' }}
+              containerStyle={{ width: 'auto' }}
             />
 
             {filterType === 'custom' && (
@@ -424,12 +425,14 @@ export default function AdminDashboard() {
                   value={fromDate} 
                   onChange={(e) => { setFromDate(e.target.value); setCardPage(1); }} 
                   style={{ width: '135px' }} 
+                  containerStyle={{ width: 'auto' }}
                 />
                 <Input 
                   type="date" 
                   value={toDate} 
                   onChange={(e) => { setToDate(e.target.value); setCardPage(1); }} 
                   style={{ width: '135px' }} 
+                  containerStyle={{ width: 'auto' }}
                 />
               </>
             )}
@@ -438,7 +441,7 @@ export default function AdminDashboard() {
               variant="outline" 
               size="sm" 
               onClick={() => { setFilterType('overall'); setFromDate(''); setToDate(''); setCardPage(1); }} 
-              style={{ alignSelf: 'flex-end', height: '36px' }}
+              style={{ alignSelf: 'center', height: '36px' }}
             >
               Reset Filter
             </Button>
