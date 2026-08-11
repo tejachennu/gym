@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { getAllClients, getClientDailyLogs, getClientCheckins, getPlans } from '@/lib/firestore';
 import Card from '@/components/ui/Card';
@@ -10,7 +10,7 @@ import Avatar from '@/components/ui/Avatar';
 import Modal from '@/components/ui/Modal';
 import Pagination from '@/components/ui/Pagination';
 import Badge from '@/components/ui/Badge';
-import { Input } from '@/components/ui/Input';
+import { Input, Select } from '@/components/ui/Input';
 import { StatsSkeleton, TableSkeleton } from '@/components/ui/Loading';
 import { useRouter } from 'next/navigation';
 import { 
@@ -29,25 +29,20 @@ import {
   CheckCircle2,
   XCircle,
   Wallet,
-  Receipt
+  Receipt,
+  UserX,
+  Filter
 } from 'lucide-react';
 
 export default function AdminDashboard() {
   const { userData } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalClients: 0,
-    todaysUploads: 0,
-    pendingReviews: 0,
-    activeMemberships: 0,
-    expiringSoon: 0,
-    upcomingCheckins: 0,
-    totalRevenue: 0,
-    pendingDues: 0,
-    paidMembers: 0,
-  });
-  
+
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [filterType, setFilterType] = useState('overall');
+
   const [clientsList, setClientsList] = useState([]);
   const [masterPlansList, setMasterPlansList] = useState([]);
   const [logsMap, setLogsMap] = useState({}); // { client_id: { 'YYYY-MM-DD': logData } }
@@ -80,24 +75,6 @@ export default function AdminDashboard() {
     return false;
   };
 
-  // Generate 11-day dates window: [Today - 5, ..., Today, ..., Today + 5]
-  const generate11DaysWindow = () => {
-    const dates = [];
-    const today = new Date();
-    for (let i = -5; i <= 5; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      const isoStr = d.toISOString().split('T')[0];
-      const dayLabel = i === 0 ? 'Today' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
-      dates.push({ isoStr, dayLabel, weekday, isToday: i === 0, isFuture: i > 0, isPast: i < 0 });
-    }
-    return dates;
-  };
-
-  const datesWindow = generate11DaysWindow();
-  const last5PastDays = datesWindow.slice(1, 6);
-
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -108,23 +85,6 @@ export default function AdminDashboard() {
       setClientsList(clients);
       setMasterPlansList(fetchedPlans || []);
       
-      const total = clients.length;
-      const active = clients.filter(c => c.status === 'active' || (c.currentPlan && c.currentPlan !== 'None')).length;
-      
-      const now = new Date();
-      const nextWeek = new Date();
-      nextWeek.setDate(now.getDate() + 7);
-      const expiring = clients.filter(c => {
-        if (!c.planExpiry) return false;
-        const expiryDate = new Date(c.planExpiry);
-        return expiryDate > now && expiryDate <= nextWeek;
-      }).length;
-
-      // Billing & Revenue Totals
-      const totalRev = clients.reduce((acc, c) => acc + (parseFloat(c.amountPaid) || 0), 0);
-      const totalPending = clients.reduce((acc, c) => acc + (parseFloat(c.balance) || 0), 0);
-      const paidCount = clients.filter(c => (parseFloat(c.balance) || 0) <= 0 && parseFloat(c.amountPaid || 0) > 0).length;
-
       let logsListCombined = [];
       const tempLogsMap = {};
 
@@ -172,24 +132,6 @@ export default function AdminDashboard() {
       setLogsMap(tempLogsMap);
       logsListCombined.sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
       setAllLogs(logsListCombined);
-      
-      const todayStr = new Date().toISOString().split('T')[0];
-      const todays = logsListCombined.filter(log => log.date === todayStr).length;
-      const pending = logsListCombined.filter(log => !log.reviewed).length;
-
-      const upcomingCount = clients.filter(c => checkPostureEnabled(c, fetchedPlans || [])).length;
-
-      setStats({
-        totalClients: total,
-        todaysUploads: todays,
-        pendingReviews: pending,
-        activeMemberships: active,
-        expiringSoon: expiring,
-        upcomingCheckins: upcomingCount,
-        totalRevenue: totalRev,
-        pendingDues: totalPending,
-        paidMembers: paidCount,
-      });
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
     } finally {
@@ -198,10 +140,86 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchDashboardData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const { filteredClientsList, filteredAllLogs } = useMemo(() => {
+    let finalFrom = fromDate;
+    let finalTo = toDate;
+
+    if (filterType === 'current_month') {
+      const now = new Date();
+      finalFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      finalTo = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    } else if (filterType === 'last_month') {
+      const now = new Date();
+      finalFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
+      finalTo = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
+    } else if (filterType === 'overall') {
+      finalFrom = '';
+      finalTo = '';
+    }
+
+    const isWithin = (dateStr) => {
+      if (!dateStr) return true;
+      if (finalFrom && dateStr < finalFrom) return false;
+      if (finalTo && dateStr > finalTo) return false;
+      return true;
+    };
+
+    const getClientDate = (c) => c.joiningDate || c.planStart || (c.createdAt?.seconds ? new Date(c.createdAt.seconds * 1000).toISOString().split('T')[0] : '');
+
+    const fClients = (filterType === 'overall' && !fromDate && !toDate) ? clientsList : clientsList.filter(c => {
+       const cd = getClientDate(c);
+       if (!cd) return true;
+       return isWithin(cd);
+    });
+
+    const fLogs = (filterType === 'overall' && !fromDate && !toDate) ? allLogs : allLogs.filter(log => {
+      const ld = log.date || (log.createdAt?.seconds ? new Date(log.createdAt.seconds * 1000).toISOString().split('T')[0] : '');
+      return isWithin(ld);
+    });
+
+    return { filteredClientsList: fClients, filteredAllLogs: fLogs };
+  }, [filterType, fromDate, toDate, clientsList, allLogs]);
+
+  const stats = useMemo(() => {
+    const total = filteredClientsList.length;
+    const active = filteredClientsList.filter(c => c.status === 'active' || (c.currentPlan && c.currentPlan !== 'None')).length;
+    const inactive = filteredClientsList.filter(c => c.status === 'inactive' || (!c.currentPlan || c.currentPlan === 'None' || c.currentPlan === 'Not Assigned')).length;
+    
+    const now = new Date();
+    const nextWeek = new Date();
+    nextWeek.setDate(now.getDate() + 7);
+    const expiring = filteredClientsList.filter(c => {
+      if (!c.planExpiry) return false;
+      const expiryDate = new Date(c.planExpiry);
+      return expiryDate > now && expiryDate <= nextWeek;
+    }).length;
+
+    const totalRev = filteredClientsList.reduce((acc, c) => acc + (parseFloat(c.amountPaid) || 0), 0);
+    const totalPending = filteredClientsList.reduce((acc, c) => acc + (parseFloat(c.balance) || 0), 0);
+    const paidCount = filteredClientsList.filter(c => (parseFloat(c.balance) || 0) <= 0 && parseFloat(c.amountPaid || 0) > 0).length;
+
+    const todayStr = now.toISOString().split('T')[0];
+    const todays = filteredAllLogs.filter(log => log.date === todayStr).length;
+    const pending = filteredAllLogs.filter(log => !log.reviewed).length;
+
+    const upcomingCount = filteredClientsList.filter(c => checkPostureEnabled(c, masterPlansList)).length;
+
+    return {
+      totalClients: total,
+      todaysUploads: todays,
+      pendingReviews: pending,
+      activeMemberships: active,
+      expiringSoon: expiring,
+      upcomingCheckins: upcomingCount,
+      totalRevenue: totalRev,
+      pendingDues: totalPending,
+      paidMembers: paidCount,
+      inactiveClients: inactive,
+    };
+  }, [filteredClientsList, filteredAllLogs, masterPlansList]);
 
   const handleCardClick = (cardKey) => {
     setSelectedCard(cardKey);
@@ -209,7 +227,6 @@ export default function AdminDashboard() {
     setCardSearch('');
   };
 
-  // Compute dataset for the selected Stat Card
   const getCardDataset = () => {
     const todayStr = new Date().toISOString().split('T')[0];
     const now = new Date();
@@ -218,32 +235,32 @@ export default function AdminDashboard() {
 
     switch (selectedCard) {
       case 'totalRevenue':
-        return clientsList.filter(c => parseFloat(c.amountPaid || 0) > 0);
+        return filteredClientsList.filter(c => parseFloat(c.amountPaid || 0) > 0);
 
       case 'pendingDues':
-        return clientsList.filter(c => parseFloat(c.balance || 0) > 0);
+        return filteredClientsList.filter(c => parseFloat(c.balance || 0) > 0);
 
       case 'paidMembers':
-        return clientsList.filter(c => parseFloat(c.balance || 0) <= 0 && parseFloat(c.amountPaid || 0) > 0);
+        return filteredClientsList.filter(c => parseFloat(c.balance || 0) <= 0 && parseFloat(c.amountPaid || 0) > 0);
 
       case 'todaysUploads':
-        return allLogs.filter(log => log.date === todayStr);
+        return filteredAllLogs.filter(log => log.date === todayStr);
 
       case 'pendingReviews':
-        return allLogs.filter(log => !log.reviewed);
+        return filteredAllLogs.filter(log => !log.reviewed);
 
       case 'activeMemberships':
-        return clientsList.filter(c => c.status === 'active' || (c.currentPlan && c.currentPlan !== 'None'));
+        return filteredClientsList.filter(c => c.status === 'active' || (c.currentPlan && c.currentPlan !== 'None'));
 
       case 'expiringSoon':
-        return clientsList.filter(c => {
+        return filteredClientsList.filter(c => {
           if (!c.planExpiry) return false;
           const exp = new Date(c.planExpiry);
           return exp > now && exp <= nextWeek;
         });
 
       case 'upcomingCheckins':
-        return clientsList
+        return filteredClientsList
           .filter(c => checkPostureEnabled(c, masterPlansList))
           .map(c => {
             const cLogs = logsMap[c.id] ? Object.values(logsMap[c.id]) : [];
@@ -277,24 +294,27 @@ export default function AdminDashboard() {
 
             return {
               ...c,
-              lastCheckinDateStr: lastDate ? lastDate.toISOString().split('T')[0] : 'None',
-              nextCheckinDateStr: nextCheckinDate.toISOString().split('T')[0],
-              diffDays,
-              dueStatus,
-              dueVariant
+              checkinDueStatus: dueStatus,
+              checkinDueVariant: dueVariant,
+              nextCheckinDate: nextCheckinDate.toISOString().split('T')[0]
             };
           });
 
       case 'totalClients':
+        return filteredClientsList;
+      
+      case 'inactiveClients':
+        return filteredClientsList.filter(c => c.status === 'inactive' || (!c.currentPlan || c.currentPlan === 'None' || c.currentPlan === 'Not Assigned'));
+
       default:
-        return clientsList;
+        return filteredClientsList;
     }
   };
 
   const rawCardData = getCardDataset();
 
-  // Search filter
-  const filteredCardData = rawCardData.filter(item => {
+  // Search filter (date filtering is now upstream)
+  const filteredCardData = (rawCardData || []).filter(item => {
     if (!cardSearch.trim()) return true;
     const q = cardSearch.toLowerCase().trim();
     const name = (item.displayName || item.name || item.clientName || '').toLowerCase();
@@ -334,6 +354,9 @@ export default function AdminDashboard() {
       case 'upcomingCheckins':
         return { title: 'Upcoming 10-Day Transformation Check-ins', icon: Calendar, color: '#ab47bc' };
 
+      case 'inactiveClients':
+        return { title: 'Total Inactive & Unassigned Clients', icon: UserX, color: '#ff5252' };
+
       case 'totalClients':
       default:
         return { title: 'All Registered Gym Clients', icon: Users, color: 'var(--accent, #E00008)' };
@@ -364,6 +387,65 @@ export default function AdminDashboard() {
         </div>
       </header>
 
+      {/* Date Filter Toolbar */}
+      <Card style={{ padding: '12px', marginBottom: '14px' }} className="glass-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Filter size={16} color="var(--accent, #E00008)" />
+            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)' }}>
+              Dashboard Date Range Filter
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <Select 
+              value={filterType} 
+              onChange={(e) => { 
+                setFilterType(e.target.value); 
+                if (e.target.value !== 'custom') {
+                  setFromDate(''); 
+                  setToDate(''); 
+                }
+                setCardPage(1); 
+              }} 
+              options={[
+                { label: 'Overall (All Time)', value: 'overall' },
+                { label: 'Current Month', value: 'current_month' },
+                { label: 'Last Month', value: 'last_month' },
+                { label: 'Custom Date Range', value: 'custom' },
+              ]}
+              style={{ width: '180px', margin: 0, padding: '8px' }}
+            />
+
+            {filterType === 'custom' && (
+              <>
+                <Input 
+                  type="date" 
+                  value={fromDate} 
+                  onChange={(e) => { setFromDate(e.target.value); setCardPage(1); }} 
+                  style={{ width: '135px' }} 
+                />
+                <Input 
+                  type="date" 
+                  value={toDate} 
+                  onChange={(e) => { setToDate(e.target.value); setCardPage(1); }} 
+                  style={{ width: '135px' }} 
+                />
+              </>
+            )}
+            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => { setFilterType('overall'); setFromDate(''); setToDate(''); setCardPage(1); }} 
+              style={{ alignSelf: 'flex-end', height: '36px' }}
+            >
+              Reset Filter
+            </Button>
+          </div>
+        </div>
+      </Card>
+
       {/* Interactive Stats Cards Grid (Clickable) */}
       {loading ? (
         <div style={styles.statsGrid}>
@@ -382,6 +464,16 @@ export default function AdminDashboard() {
             color="var(--accent, #E00008)" 
             onClick={() => handleCardClick('totalClients')}
             isActive={selectedCard === 'totalClients'}
+          />
+          <StatsCard 
+            title="TOTAL INACTIVE CLIENTS" 
+            value={stats.inactiveClients} 
+            change={stats.inactiveClients > 0 ? "Disabled / Unassigned" : "All active"} 
+            changeType="down" 
+            icon={UserX} 
+            color="#ff5252" 
+            onClick={() => handleCardClick('inactiveClients')}
+            isActive={selectedCard === 'inactiveClients'}
           />
           <StatsCard 
             title="TOTAL REVENUE" 
