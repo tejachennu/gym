@@ -27,7 +27,7 @@ const Avatar = ({
   onClick,
   enableModal = false
 }) => {
-  const [currentSrc, setCurrentSrc] = useState('');
+  const [currentSrc, setCurrentSrc] = useState(() => getDirectImageUrl(src));
   const [hasError, setHasError] = useState(false);
   const [retryStep, setRetryStep] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -46,7 +46,7 @@ const Avatar = ({
   };
 
   const currentSize = sizes[size] || sizes.md;
-  const isClickable = !!onClick || (enableModal && !!src && !hasError);
+  const isClickable = !!onClick || (enableModal && !!currentSrc && !hasError);
 
   const containerStyle = {
     position: 'relative',
@@ -69,7 +69,7 @@ const Avatar = ({
     justifyContent: 'center',
     color: '#fff',
     fontWeight: 'bold',
-    background: (!src || hasError) ? 'linear-gradient(135deg, var(--accent, #E00008), #8a0005)' : 'none'
+    background: (!currentSrc || hasError) ? 'linear-gradient(135deg, var(--accent, #E00008), #8a0005)' : 'none'
   };
 
   const statuses = {
@@ -118,7 +118,7 @@ const Avatar = ({
     if (onClick) {
       onClick(e);
     }
-    if (enableModal && src && !hasError) {
+    if (enableModal && currentSrc && !hasError) {
       setIsModalOpen(true);
     }
   };
@@ -126,7 +126,7 @@ const Avatar = ({
   return (
     <>
       <div style={containerStyle} onClick={handleClick} title={name}>
-        {src && !hasError ? (
+        {currentSrc && !hasError ? (
           <img 
             src={currentSrc} 
             alt={name} 
