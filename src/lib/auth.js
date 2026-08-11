@@ -4,6 +4,8 @@ import {
   signOut, 
   sendPasswordResetEmail, 
   onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
   getAuth
 } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
@@ -138,6 +140,7 @@ export const registerUserByAdmin = async (clientData) => {
 
 export const loginUser = async (email, password) => {
   try {
+    await setPersistence(auth, browserLocalPersistence);
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     return userCredential.user;
   } catch (error) {

@@ -22,6 +22,7 @@ import { TableSkeleton } from '@/components/ui/Loading';
 import Modal from '@/components/ui/Modal';
 import Pagination from '@/components/ui/Pagination';
 import SearchableSelect from '@/components/ui/SearchableSelect';
+import ImageUpload from '@/components/ui/ImageUpload';
 import { 
   Users, 
   UserPlus, 
@@ -35,7 +36,8 @@ import {
   Trash2,
   Calendar,
   Percent,
-  IndianRupee
+  IndianRupee,
+  Camera
 } from 'lucide-react';
 
 export default function ClientsPage() {
@@ -79,6 +81,11 @@ export default function ClientsPage() {
     hasHealthIssues: 'NO',
     healthIssuesDetails: '',
     medications: '',
+    alcohol: 'NO',
+    alcoholFrequency: '',
+    smoking: 'NO',
+    smokingFrequency: '',
+    initialPhotos: { front: '', back: '', leftSide: '', rightSide: '' },
     stressLevel: 5,
     stressSources: '',
     password: '',
@@ -364,6 +371,11 @@ export default function ClientsPage() {
         hasHealthIssues: newClient.hasHealthIssues || 'NO',
         healthIssuesDetails: newClient.healthIssuesDetails || '',
         medications: newClient.medications || '',
+        alcohol: newClient.alcohol || 'NO',
+        alcoholFrequency: newClient.alcoholFrequency || '',
+        smoking: newClient.smoking || 'NO',
+        smokingFrequency: newClient.smokingFrequency || '',
+        initialPhotos: newClient.initialPhotos || { front: '', back: '', leftSide: '', rightSide: '' },
         stressLevel: newClient.stressLevel || 5,
         stressSources: newClient.stressSources || '',
         password: newClient.password
@@ -801,6 +813,50 @@ export default function ClientsPage() {
               required
             />
           </div>
+
+          {/* INITIAL BASELINE POSTURE PHOTOS */}
+          <Card style={{ padding: '12px', backgroundColor: 'var(--card-hover)', border: '1px solid var(--border)', marginTop: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+              <Camera size={16} color="var(--accent)" />
+              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text)' }}>
+                Initial Baseline Body Photos (4 Views)
+              </span>
+            </div>
+            <p style={{ margin: '0 0 10px 0', fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+              Upload Front, Back, Left Side, and Right Side baseline photos taken upon joining for future progress comparison.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 700 }}>1. Front View</p>
+                <ImageUpload 
+                  value={newClient.initialPhotos?.front}
+                  onUpload={(url) => setNewClient({ ...newClient, initialPhotos: { ...newClient.initialPhotos, front: url } })}
+                />
+              </div>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 700 }}>2. Back View</p>
+                <ImageUpload 
+                  value={newClient.initialPhotos?.back}
+                  onUpload={(url) => setNewClient({ ...newClient, initialPhotos: { ...newClient.initialPhotos, back: url } })}
+                />
+              </div>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 700 }}>3. Left Side View</p>
+                <ImageUpload 
+                  value={newClient.initialPhotos?.leftSide}
+                  onUpload={(url) => setNewClient({ ...newClient, initialPhotos: { ...newClient.initialPhotos, leftSide: url } })}
+                />
+              </div>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 700 }}>4. Right Side View</p>
+                <ImageUpload 
+                  value={newClient.initialPhotos?.rightSide}
+                  onUpload={(url) => setNewClient({ ...newClient, initialPhotos: { ...newClient.initialPhotos, rightSide: url } })}
+                />
+              </div>
+            </div>
+          </Card>
 
           {/* OPTIONAL MEMBERSHIP PLAN & BILLING ASSIGNMENT */}
           <Card style={{ padding: '12px', backgroundColor: 'var(--card-hover)', border: '1px solid var(--border)', marginTop: '4px' }}>

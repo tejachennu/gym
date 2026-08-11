@@ -23,6 +23,7 @@ import { useToast } from '@/components/ui/Toast';
 import Modal from '@/components/ui/Modal';
 import { Input, Textarea, Select } from '@/components/ui/Input';
 import SearchableSelect from '@/components/ui/SearchableSelect';
+import ImageUpload from '@/components/ui/ImageUpload';
 import { validateField } from '@/lib/validation';
 import { 
   User, 
@@ -44,7 +45,8 @@ import {
   MapPin,
   HeartPulse,
   Brain,
-  AlertTriangle
+  AlertTriangle,
+  Camera
 } from 'lucide-react';
 
 export default function ClientDetailPage({ params }) {
@@ -184,6 +186,7 @@ export default function ClientDetailPage({ params }) {
           medications: clientData.medications || '',
           stressLevel: clientData.stressLevel || 5,
           stressSources: clientData.stressSources || '',
+          initialPhotos: clientData.initialPhotos || { front: '', back: '', leftSide: '', rightSide: '', side: '' },
           notes: clientData.notes || '',
           status: clientData.status || 'active'
         });
@@ -753,6 +756,41 @@ export default function ClientDetailPage({ params }) {
             />
           </div>
 
+          {/* Section 4: Initial Baseline Body Photos */}
+          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent)', borderBottom: '1px solid var(--border)', paddingBottom: '4px', marginTop: '6px' }}>
+            📸 Initial Baseline Body Photos (4 Views)
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
+            <div>
+              <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 700 }}>1. Front View</p>
+              <ImageUpload 
+                value={profileForm.initialPhotos?.front}
+                onUpload={(url) => setProfileForm({ ...profileForm, initialPhotos: { ...profileForm.initialPhotos, front: url } })}
+              />
+            </div>
+            <div>
+              <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 700 }}>2. Back View</p>
+              <ImageUpload 
+                value={profileForm.initialPhotos?.back}
+                onUpload={(url) => setProfileForm({ ...profileForm, initialPhotos: { ...profileForm.initialPhotos, back: url } })}
+              />
+            </div>
+            <div>
+              <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 700 }}>3. Left Side View</p>
+              <ImageUpload 
+                value={profileForm.initialPhotos?.leftSide || profileForm.initialPhotos?.side}
+                onUpload={(url) => setProfileForm({ ...profileForm, initialPhotos: { ...profileForm.initialPhotos, leftSide: url } })}
+              />
+            </div>
+            <div>
+              <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 700 }}>4. Right Side View</p>
+              <ImageUpload 
+                value={profileForm.initialPhotos?.rightSide}
+                onUpload={(url) => setProfileForm({ ...profileForm, initialPhotos: { ...profileForm.initialPhotos, rightSide: url } })}
+              />
+            </div>
+          </div>
+
           <Textarea 
             label="General Trainer Remarks / Confidential Notes" 
             value={profileForm.notes} 
@@ -1092,6 +1130,46 @@ function OverviewTab({ client }) {
             <span>Trainer Remarks:</span>
             <strong>{client.notes || 'No confidential notes provided.'}</strong>
           </div>
+        </div>
+      </Card>
+
+      {/* CARD 5: Initial Baseline Posture Photos */}
+      <Card style={{ padding: '14px', gridColumn: 'span 2' }}>
+        <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Camera size={16} color="var(--accent)" /> Initial Baseline Body Photos (4 Views)
+        </h3>
+        <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+          Baseline photos recorded upon client joining for progress tracking.
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '10px' }}>
+          {[
+            { key: 'front', label: 'Front View' },
+            { key: 'back', label: 'Back View' },
+            { key: 'leftSide', altKey: 'side', label: 'Left Side View' },
+            { key: 'rightSide', label: 'Right Side View' }
+          ].map(photo => {
+            const photoUrl = client.initialPhotos?.[photo.key] || (photo.altKey ? client.initialPhotos?.[photo.altKey] : '');
+            return (
+              <div key={photo.key} style={{ textAlign: 'center', background: 'var(--card-hover)', padding: '8px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                  {photo.label}
+                </div>
+                {photoUrl ? (
+                  <img 
+                    src={photoUrl} 
+                    alt={photo.label} 
+                    style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '6px', cursor: 'pointer' }}
+                    onClick={() => window.open(photoUrl, '_blank')}
+                  />
+                ) : (
+                  <div style={{ height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: '0.7rem', fontStyle: 'italic' }}>
+                    Not Uploaded
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </Card>
     </div>

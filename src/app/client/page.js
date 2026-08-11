@@ -272,6 +272,8 @@ export default function ClientDashboard() {
     : 999;
   const isCheckinLocked = latestCheckinDate && daysPassedSinceCheckin < 10;
   const checkinDaysLeft = 10 - daysPassedSinceCheckin;
+  const nextCheckinDateObj = latestCheckinDate ? new Date(latestCheckinDate.getTime() + 10 * 24 * 60 * 60 * 1000) : new Date();
+  const nextCheckinFormatted = latestCheckinDate ? formatDateNice(nextCheckinDateObj) : 'Today (Due Now)';
 
   const clientFirstName = (profile?.displayName || profile?.name || 'Member').split(' ')[0];
 
@@ -699,36 +701,44 @@ export default function ClientDashboard() {
         </Card>
       </section>
 
-      {/* 6. 10-DAY POSTURE CHECK-IN QUICK ACTION */}
-      {hasPostureCheckin && (
-        <section>
-          <Card style={{ padding: '16px', borderRadius: '16px', borderLeft: '4px solid var(--accent, #E00008)' }} className="glass-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '42px', height: '42px', borderRadius: '12px', backgroundColor: 'rgba(224, 0, 8, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Camera size={20} color="var(--accent, #E00008)" />
-                </div>
-                <div>
-                  <h3 style={{ margin: '0 0 2px 0', fontSize: '0.95rem', fontWeight: 800, color: '#FFFFFF' }}>
-                    10-Day Body Posture & Sizing Check-in
-                  </h3>
-                  <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                    {isCheckinLocked 
-                      ? `Next check-in unlocks in ${checkinDaysLeft} day(s)` 
-                      : 'Your 10-day posture photo check-in is ready to submit!'}
-                  </p>
-                </div>
+      {/* 6. 10-DAY POSTURE & MEASUREMENTS CHECK-IN QUICK ACTION */}
+      <section>
+        <Card style={{ padding: '16px', borderRadius: '16px', borderLeft: '4px solid var(--accent, #E00008)' }} className="glass-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '44px', height: '44px', borderRadius: '12px', backgroundColor: 'rgba(224, 0, 8, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Camera size={22} color="var(--accent, #E00008)" />
               </div>
-
-              <Link href="/client/daily-log" style={{ textDecoration: 'none' }}>
-                <Button size="sm" style={{ padding: '8px 16px', fontSize: '0.82rem' }}>
-                  {isCheckinLocked ? 'View History' : 'Submit Check-in'} <ChevronRight size={16} />
-                </Button>
-              </Link>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ margin: '0 0 2px 0', fontSize: '0.95rem', fontWeight: 800, color: '#FFFFFF' }}>
+                    10-Day Body Check-in & Measurements
+                  </h3>
+                  <Badge variant={latestCheckinDate ? 'success' : 'warning'} style={{ fontSize: '0.68rem' }}>
+                    {latestCheckinDate ? `Submitted: ${formatDateNice(latestCheckinDate)}` : 'DUE TODAY'}
+                  </Badge>
+                </div>
+                {latestCheckinDate && (
+                  <div style={{ fontSize: '0.8rem', color: '#FFFFFF', fontWeight: 700, marginTop: '2px' }}>
+                    📅 Last Check-in Submitted: <span style={{ color: '#00c853' }}>{formatDateNice(latestCheckinDate)}</span>
+                  </div>
+                )}
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                  {latestCheckinDate 
+                    ? `Check-in recorded on ${formatDateNice(latestCheckinDate)}` 
+                    : 'Submit your 10-day body photos & 14-point measurements now!'}
+                </p>
+              </div>
             </div>
-          </Card>
-        </section>
-      )}
+
+            <Link href="/client/checkin" style={{ textDecoration: 'none' }}>
+              <Button size="sm" style={{ padding: '8px 16px', fontSize: '0.82rem', fontWeight: 800 }}>
+                {latestCheckinDate ? 'View History / Update' : 'Submit Check-in Now'} <ChevronRight size={16} />
+              </Button>
+            </Link>
+          </div>
+        </Card>
+      </section>
 
       {/* 7. ALL MEMBERSHIP PLANS & HISTORY POPUP MODAL */}
       {isPlanModalOpen && (

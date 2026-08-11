@@ -31,6 +31,8 @@ import {
   Smartphone
 } from 'lucide-react';
 
+import ImageUpload from '@/components/ui/ImageUpload';
+
 export default function ProfilePage() {
   const { user, userData, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -67,6 +69,11 @@ export default function ProfilePage() {
     hasHealthIssues: 'NO',
     healthIssuesDetails: '',
     medications: '',
+    alcohol: 'NO',
+    alcoholFrequency: '',
+    smoking: 'NO',
+    smokingFrequency: '',
+    initialPhotos: { front: '', side: '', back: '' },
     stressLevel: 5,
     stressSources: ''
   });
@@ -105,6 +112,11 @@ export default function ProfilePage() {
               hasHealthIssues: clientData.hasHealthIssues || 'NO',
               healthIssuesDetails: clientData.healthIssuesDetails || '',
               medications: clientData.medications || '',
+              alcohol: clientData.alcohol || 'NO',
+              alcoholFrequency: clientData.alcoholFrequency || '',
+              smoking: clientData.smoking || 'NO',
+              smokingFrequency: clientData.smokingFrequency || '',
+              initialPhotos: clientData.initialPhotos || { front: '', back: '', leftSide: '', rightSide: '', side: '' },
               stressLevel: clientData.stressLevel || 5,
               stressSources: clientData.stressSources || ''
             });
@@ -212,6 +224,11 @@ export default function ProfilePage() {
         hasHealthIssues: form.hasHealthIssues,
         healthIssuesDetails: form.healthIssuesDetails,
         medications: form.medications,
+        alcohol: form.alcohol,
+        alcoholFrequency: form.alcoholFrequency,
+        smoking: form.smoking,
+        smokingFrequency: form.smokingFrequency,
+        initialPhotos: form.initialPhotos,
         stressLevel: form.stressLevel,
         stressSources: form.stressSources,
         photoURL: profileImage,
@@ -464,7 +481,7 @@ export default function ProfilePage() {
               <h3 style={styles.sectionTitle}>Stress Levels & Lifestyle</h3>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={styles.summaryLabel}>Stress Level Rating:</span>
                 <span style={styles.stressBadge}>
@@ -476,6 +493,61 @@ export default function ProfilePage() {
                   Main Stress Sources: <span style={{ color: 'var(--text)' }}>{form.stressSources}</span>
                 </div>
               )}
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '130px', padding: '8px 10px', background: 'var(--card-hover)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>🍷 Alcohol Consumption</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: form.alcohol === 'YES' ? '#ffb300' : '#00c853', marginTop: '2px' }}>
+                    {form.alcohol === 'YES' ? `YES (${form.alcoholFrequency || 'Occasional'})` : 'NO'}
+                  </div>
+                </div>
+                <div style={{ flex: 1, minWidth: '130px', padding: '8px 10px', background: 'var(--card-hover)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>🚬 Smoking Habit</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: form.smoking === 'YES' ? '#ff5252' : '#00c853', marginTop: '2px' }}>
+                    {form.smoking === 'YES' ? `YES (${form.smokingFrequency || 'Occasional'})` : 'NO'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* 5. Initial Baseline Body Photos */}
+          <Card style={styles.sectionCard} className="glass-card">
+            <div style={styles.sectionHeader}>
+              <Camera size={16} color="var(--accent, #E00008)" />
+              <h3 style={styles.sectionTitle}>Initial Baseline Body Photos</h3>
+            </div>
+            <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              Baseline body photos recorded upon joining for future progress comparison.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
+              {[
+                { key: 'front', label: 'Front View' },
+                { key: 'back', label: 'Back View' },
+                { key: 'leftSide', altKey: 'side', label: 'Left Side View' },
+                { key: 'rightSide', label: 'Right Side View' }
+              ].map(photo => {
+                const photoUrl = form.initialPhotos?.[photo.key] || (photo.altKey ? form.initialPhotos?.[photo.altKey] : '');
+                return (
+                  <div key={photo.key} style={{ textAlign: 'center', background: 'var(--card-hover)', padding: '8px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                      {photo.label}
+                    </div>
+                    {photoUrl ? (
+                      <img 
+                        src={photoUrl} 
+                        alt={photo.label} 
+                        style={{ width: '100%', height: '90px', objectFit: 'cover', borderRadius: '6px', cursor: 'pointer' }}
+                        onClick={() => window.open(photoUrl, '_blank')}
+                      />
+                    ) : (
+                      <div style={{ height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: '0.7rem', fontStyle: 'italic' }}>
+                        Not Uploaded
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </Card>
 
@@ -781,6 +853,89 @@ export default function ProfilePage() {
                 onChange={(e) => setForm({ ...form, stressSources: e.target.value })}
                 rows={2}
               />
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
+                <div>
+                  <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Alcohol Consumption?</label>
+                  <Select
+                    value={form.alcohol}
+                    onChange={(e) => setForm({ ...form, alcohol: e.target.value })}
+                    options={[
+                      { label: 'NO 🚫', value: 'NO' },
+                      { label: 'YES 🍷', value: 'YES' }
+                    ]}
+                  />
+                  {form.alcohol === 'YES' && (
+                    <Input
+                      placeholder="Frequency (e.g. Occasional, Weekly)"
+                      value={form.alcoholFrequency}
+                      onChange={(e) => setForm({ ...form, alcoholFrequency: e.target.value })}
+                      containerStyle={{ marginTop: '4px' }}
+                    />
+                  )}
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Smoking Habit?</label>
+                  <Select
+                    value={form.smoking}
+                    onChange={(e) => setForm({ ...form, smoking: e.target.value })}
+                    options={[
+                      { label: 'NO 🚫', value: 'NO' },
+                      { label: 'YES 🚬', value: 'YES' }
+                    ]}
+                  />
+                  {form.smoking === 'YES' && (
+                    <Input
+                      placeholder="Frequency (e.g. Daily, Occasional)"
+                      value={form.smokingFrequency}
+                      onChange={(e) => setForm({ ...form, smokingFrequency: e.target.value })}
+                      containerStyle={{ marginTop: '4px' }}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Baseline Photos Edit */}
+          <Card style={styles.sectionCard} className="glass-card">
+            <div style={styles.sectionHeader}>
+              <Camera size={16} color="var(--accent, #E00008)" />
+              <h3 style={styles.sectionTitle}>Initial / Baseline Body Photos</h3>
+            </div>
+            <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              Upload Front, Back, Left Side, and Right Side photos taken when starting your fitness program.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '10px' }}>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 700 }}>1. Front View</p>
+                <ImageUpload 
+                  value={form.initialPhotos?.front}
+                  onUpload={(url) => setForm({ ...form, initialPhotos: { ...form.initialPhotos, front: url } })} 
+                />
+              </div>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 700 }}>2. Back View</p>
+                <ImageUpload 
+                  value={form.initialPhotos?.back}
+                  onUpload={(url) => setForm({ ...form, initialPhotos: { ...form.initialPhotos, back: url } })} 
+                />
+              </div>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 700 }}>3. Left Side View</p>
+                <ImageUpload 
+                  value={form.initialPhotos?.leftSide || form.initialPhotos?.side}
+                  onUpload={(url) => setForm({ ...form, initialPhotos: { ...form.initialPhotos, leftSide: url } })} 
+                />
+              </div>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 700 }}>4. Right Side View</p>
+                <ImageUpload 
+                  value={form.initialPhotos?.rightSide}
+                  onUpload={(url) => setForm({ ...form, initialPhotos: { ...form.initialPhotos, rightSide: url } })} 
+                />
+              </div>
             </div>
           </Card>
 

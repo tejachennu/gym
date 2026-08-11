@@ -75,6 +75,7 @@ export default function DietPlansPage() {
     return d.toISOString().split('T')[0];
   });
   const [mealsState, setMealsState] = useState(getEmptyMealsState());
+  const [supplements, setSupplements] = useState([]);
   const [statusBanner, setStatusBanner] = useState(null);
 
   // Template Modal State (Admin CRUD for templates)
@@ -83,7 +84,8 @@ export default function DietPlansPage() {
   const [templateForm, setTemplateForm] = useState({
     templateName: '',
     description: '',
-    mealsState: getEmptyMealsState()
+    mealsState: getEmptyMealsState(),
+    supplements: []
   });
 
   function getEmptyMealsState() {
@@ -149,6 +151,7 @@ export default function DietPlansPage() {
     d.setDate(d.getDate() + 30);
     setToDate(d.toISOString().split('T')[0]);
     setMealsState(getEmptyMealsState());
+    setSupplements([]);
     setStatusBanner(null);
     setIsDietModalOpen(true);
   };
@@ -161,6 +164,7 @@ export default function DietPlansPage() {
     setToDate(plan.toDate || new Date().toISOString().split('T')[0]);
     if (plan.mealsState) setMealsState(plan.mealsState);
     else setMealsState(getEmptyMealsState());
+    setSupplements(plan.supplements || []);
     setStatusBanner(null);
     setIsDietModalOpen(true);
   };
@@ -171,7 +175,25 @@ export default function DietPlansPage() {
     if (!tmpl) return;
     setPlanTitle(tmpl.templateName);
     if (tmpl.mealsState) setMealsState(tmpl.mealsState);
+    if (tmpl.supplements) setSupplements(tmpl.supplements);
     toast.success(`Loaded "${tmpl.templateName}" template into builder!`);
+  };
+
+  // Supplements handlers
+  const handleAddSupplement = () => {
+    setSupplements(prev => [...prev, { name: '', dosage: '', timing: 'Morning', instructions: '' }]);
+  };
+
+  const handleRemoveSupplement = (index) => {
+    setSupplements(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleSupplementChange = (index, field, value) => {
+    setSupplements(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
   };
 
   // Food handlers inside meal slots
@@ -394,6 +416,7 @@ export default function DietPlansPage() {
         status,
         mealsState: cleanedMealsState,
         totals: calculateTotals(cleanedMealsState),
+        supplements: supplements,
         meals: MEAL_SLOTS.map((slot) => ({
           slotId: slot.id,
           slotName: slot.name,
@@ -905,6 +928,59 @@ export default function DietPlansPage() {
                 </div>
               );
             })}
+          </div>
+
+          {/* Supplements Builder Section */}
+          <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '14px', border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.2rem' }}>💊</span>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#FFFFFF' }}>Supplements Prescription (Optional)</h3>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={handleAddSupplement}>
+                <Plus size={14} /> Add Supplement
+              </Button>
+            </div>
+
+            {supplements.length === 0 ? (
+              <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                No supplements added yet. Click "+ Add Supplement" to prescribe vitamins, protein, or health supplements.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {supplements.map((supp, sIdx) => (
+                  <div key={sIdx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr 2fr auto', gap: '8px', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                    <Input 
+                      placeholder="Supplement Name (e.g. Multivitamin / Whey)" 
+                      value={supp.name} 
+                      onChange={(e) => handleSupplementChange(sIdx, 'name', e.target.value)}
+                    />
+                    <Input 
+                      placeholder="Dosage (e.g. 1 Tablet)" 
+                      value={supp.dosage} 
+                      onChange={(e) => handleSupplementChange(sIdx, 'dosage', e.target.value)}
+                    />
+                    <Input 
+                      placeholder="Timing (e.g. Morning / Post-Workout)" 
+                      value={supp.timing} 
+                      onChange={(e) => handleSupplementChange(sIdx, 'timing', e.target.value)}
+                    />
+                    <Input 
+                      placeholder="Instructions (e.g. With milk after food)" 
+                      value={supp.instructions} 
+                      onChange={(e) => handleSupplementChange(sIdx, 'instructions', e.target.value)}
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => handleRemoveSupplement(sIdx)}
+                      style={styles.trashBtn}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Modal Save Actions */}

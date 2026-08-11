@@ -244,43 +244,48 @@ export default function WorkoutPlansPage() {
   };
 
   const handleAddPlanExerciseRow = () => {
-    const updated = [...planDays];
-    const currentDay = updated[activeDayIndex] || { dayTitle: 'Day Routine', exercises: [] };
-    updated[activeDayIndex] = {
-      ...currentDay,
-      exercises: [
-        ...currentDay.exercises,
-        { name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }
-      ]
-    };
-    setPlanDays(updated);
+    setPlanDays(prev => {
+      const updated = [...prev];
+      const currentDay = updated[activeDayIndex] || { dayTitle: 'Day Routine', exercises: [] };
+      updated[activeDayIndex] = {
+        ...currentDay,
+        exercises: [
+          ...(currentDay.exercises || []),
+          { _rowId: `row_${Date.now()}_${Math.random()}`, name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }
+        ]
+      };
+      return updated;
+    });
   };
 
   const handleRemovePlanExerciseRow = (exIdx) => {
-    const updated = [...planDays];
-    const currentDay = updated[activeDayIndex];
-    if (!currentDay) return;
-    updated[activeDayIndex] = {
-      ...currentDay,
-      exercises: currentDay.exercises.filter((_, i) => i !== exIdx)
-    };
-    setPlanDays(updated);
+    setPlanDays(prev => {
+      return prev.map((day, dIdx) => {
+        if (dIdx !== activeDayIndex) return day;
+        return {
+          ...day,
+          exercises: (day.exercises || []).filter((_, i) => i !== exIdx)
+        };
+      });
+    });
   };
 
   const handlePlanExerciseChange = (exIdx, field, value) => {
-    const updated = [...planDays];
-    const currentDay = updated[activeDayIndex];
-    if (!currentDay) return;
-    const curExercises = [...currentDay.exercises];
-    curExercises[exIdx] = {
-      ...curExercises[exIdx],
-      [field]: field === 'sets' ? Number(value) || 0 : value
-    };
-    updated[activeDayIndex] = {
-      ...currentDay,
-      exercises: curExercises
-    };
-    setPlanDays(updated);
+    setPlanDays(prev => {
+      return prev.map((day, dIdx) => {
+        if (dIdx !== activeDayIndex) return day;
+        const curExercises = [...(day.exercises || [])];
+        if (!curExercises[exIdx]) return day;
+        curExercises[exIdx] = {
+          ...curExercises[exIdx],
+          [field]: field === 'sets' ? Number(value) || 0 : value
+        };
+        return {
+          ...day,
+          exercises: curExercises
+        };
+      });
+    });
   };
 
   // Save Workout Plan for Client
@@ -461,48 +466,50 @@ export default function WorkoutPlansPage() {
   };
 
   const handleAddTmplExerciseRow = () => {
-    const updated = [...templateForm.days];
-    const curDay = updated[tmplActiveDayIndex] || { dayTitle: 'Day Routine', exercises: [] };
-    updated[tmplActiveDayIndex] = {
-      ...curDay,
-      exercises: [...curDay.exercises, { name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }]
-    };
-    setTemplateForm({
-      ...templateForm,
-      days: updated
+    setTemplateForm(prev => {
+      const updated = [...prev.days];
+      const curDay = updated[tmplActiveDayIndex] || { dayTitle: 'Day Routine', exercises: [] };
+      updated[tmplActiveDayIndex] = {
+        ...curDay,
+        exercises: [
+          ...(curDay.exercises || []),
+          { _rowId: `tmpl_${Date.now()}_${Math.random()}`, name: '', sets: 3, reps: '10', weight: '', rest: '60s', notes: '' }
+        ]
+      };
+      return { ...prev, days: updated };
     });
   };
 
   const handleRemoveTmplExerciseRow = (exIdx) => {
-    const updated = [...templateForm.days];
-    const curDay = updated[tmplActiveDayIndex];
-    if (!curDay) return;
-    updated[tmplActiveDayIndex] = {
-      ...curDay,
-      exercises: curDay.exercises.filter((_, i) => i !== exIdx)
-    };
-    setTemplateForm({
-      ...templateForm,
-      days: updated
+    setTemplateForm(prev => {
+      const updatedDays = prev.days.map((day, dIdx) => {
+        if (dIdx !== tmplActiveDayIndex) return day;
+        return {
+          ...day,
+          exercises: (day.exercises || []).filter((_, i) => i !== exIdx)
+        };
+      });
+      return { ...prev, days: updatedDays };
     });
   };
+  const handleTmplRemoveExerciseRow = handleRemoveTmplExerciseRow;
 
   const handleTmplExerciseChange = (exIdx, field, value) => {
-    const updated = [...templateForm.days];
-    const curDay = updated[tmplActiveDayIndex];
-    if (!curDay) return;
-    const curEx = [...curDay.exercises];
-    curEx[exIdx] = {
-      ...curEx[exIdx],
-      [field]: field === 'sets' ? Number(value) || 0 : value
-    };
-    updated[tmplActiveDayIndex] = {
-      ...curDay,
-      exercises: curEx
-    };
-    setTemplateForm({
-      ...templateForm,
-      days: updated
+    setTemplateForm(prev => {
+      const updatedDays = prev.days.map((day, dIdx) => {
+        if (dIdx !== tmplActiveDayIndex) return day;
+        const curEx = [...(day.exercises || [])];
+        if (!curEx[exIdx]) return day;
+        curEx[exIdx] = {
+          ...curEx[exIdx],
+          [field]: field === 'sets' ? Number(value) || 0 : value
+        };
+        return {
+          ...day,
+          exercises: curEx
+        };
+      });
+      return { ...prev, days: updatedDays };
     });
   };
 
@@ -1024,15 +1031,27 @@ export default function WorkoutPlansPage() {
             </div>
 
             {(planDays[activeDayIndex]?.exercises || []).map((ex, idx) => (
-              <div key={idx} style={styles.exerciseBuilderCard}>
+              <div key={ex._rowId || `plan_ex_${activeDayIndex}_${idx}`} style={styles.exerciseBuilderCard}>
                 <div style={styles.exerciseCardHeader}>
                   <span style={styles.exerciseNumLabel}>Exercise #{idx + 1}</span>
                   <button 
                     type="button" 
-                    onClick={() => handleRemovePlanExerciseRow(idx)} 
-                    style={styles.removeExRowBtn}
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleRemovePlanExerciseRow(idx); }} 
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255, 23, 68, 0.35)',
+                      backgroundColor: 'rgba(255, 23, 68, 0.12)',
+                      color: '#ff1744',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
                   >
-                    Remove
+                    <Trash2 size={13} /> Remove
                   </button>
                 </div>
 
@@ -1226,7 +1245,7 @@ export default function WorkoutPlansPage() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '280px', overflowY: 'auto', paddingRight: '4px' }}>
             {(templateForm.days[tmplActiveDayIndex]?.exercises || []).map((ex, idx) => (
-              <div key={idx} style={styles.exerciseTmplRow}>
+              <div key={ex._rowId || `tmpl_ex_${tmplActiveDayIndex}_${idx}`} style={styles.exerciseTmplRow}>
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1.5fr auto', gap: '8px', alignItems: 'center' }}>
                   <Input 
                     placeholder="Exercise Name" 
@@ -1256,8 +1275,9 @@ export default function WorkoutPlansPage() {
                   />
                   <button 
                     type="button" 
-                    onClick={() => handleTmplRemoveExerciseRow(idx)} 
-                    style={{ background: 'none', border: 'none', color: '#ff1744', cursor: 'pointer', padding: '4px' }}
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleTmplRemoveExerciseRow(idx); }} 
+                    style={{ background: 'none', border: 'none', color: '#ff1744', cursor: 'pointer', padding: '4px', fontWeight: 700 }}
+                    title="Remove Exercise"
                   >
                     ✕
                   </button>
@@ -1476,7 +1496,7 @@ const styles = {
   },
   exerciseCardHeader: {
     display: 'flex',
-    justify: 'space-between',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: '10px'
   },

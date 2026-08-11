@@ -65,6 +65,75 @@ function formatDateNice(dateStr) {
   }
 }
 
+function getAssignedWorkoutForDate(workoutPlan, cardDate) {
+  if (!workoutPlan) return { dayTitle: '', exercises: [], matchedDayIndex: 0 };
+
+  const days = workoutPlan.days;
+  if (!days || !Array.isArray(days) || days.length === 0) {
+    return {
+      dayTitle: workoutPlan.planTitle || workoutPlan.title || 'Workout Plan',
+      exercises: workoutPlan.exercises || [],
+      matchedDayIndex: 0
+    };
+  }
+
+  if (days.length === 1) {
+    return {
+      dayTitle: days[0].dayTitle || workoutPlan.planTitle || 'Workout Plan',
+      exercises: days[0].exercises || [],
+      matchedDayIndex: 0
+    };
+  }
+
+  const d = new Date(cardDate || new Date());
+  const weekdayName = d.toLocaleDateString('en-US', { weekday: 'long' });
+  const shortWeekday = weekdayName.slice(0, 3);
+
+  // 1. Try matching dayTitle by weekday name
+  const titleIdx = days.findIndex(day => {
+    const title = (day.dayTitle || '').toLowerCase();
+    return title.includes(weekdayName.toLowerCase()) || title.includes(shortWeekday.toLowerCase());
+  });
+
+  if (titleIdx !== -1) {
+    return {
+      dayTitle: days[titleIdx].dayTitle,
+      exercises: days[titleIdx].exercises || [],
+      matchedDayIndex: titleIdx
+    };
+  }
+
+  // 2. Try date offset from fromDate / planStart
+  const startStr = workoutPlan.fromDate || workoutPlan.planStart;
+  if (startStr) {
+    const startDate = new Date(startStr);
+    startDate.setHours(0, 0, 0, 0);
+    const currDate = new Date(cardDate);
+    currDate.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.floor((currDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    if (!isNaN(diffDays) && diffDays >= 0) {
+      const dayIdx = diffDays % days.length;
+      return {
+        dayTitle: days[dayIdx].dayTitle || `Day ${dayIdx + 1}`,
+        exercises: days[dayIdx].exercises || [],
+        matchedDayIndex: dayIdx
+      };
+    }
+  }
+
+  // 3. Fallback: Day of week index (Monday=0 ... Sunday=6)
+  const jsDay = d.getDay();
+  const monBasedIndex = (jsDay + 6) % 7;
+  const targetIndex = monBasedIndex % days.length;
+
+  return {
+    dayTitle: days[targetIndex]?.dayTitle || `Day ${targetIndex + 1}`,
+    exercises: days[targetIndex]?.exercises || [],
+    matchedDayIndex: targetIndex
+  };
+}
+
 export default function MonitoringPage() {
   const toast = useToast();
 
@@ -89,6 +158,7 @@ export default function MonitoringPage() {
   const [remarksMap, setRemarksMap] = useState({});
   const [reviewingMap, setReviewingMap] = useState({});
   const [viewingPhotoUrl, setViewingPhotoUrl] = useState(null);
+  const [cardDayMap, setCardDayMap] = useState({});
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
@@ -441,7 +511,24 @@ export default function MonitoringPage() {
 
             const completedExerciseIndices = dailyLog?.completedExercises || [];
             const workoutPlanTitle = workoutPlan?.title || workoutPlan?.planName || dailyLog?.workoutPlanTitle || 'Workout Plan';
-            const totalExercises = workoutPlan?.exercises?.length || 0;
+
+            // Resolve assigned workout for cardDate
+            const assignedInfo = getAssignedWorkoutForDate(workoutPlan, cardDate);
+            const activeDayIdx = cardDayMap[cardId] !== undefined ? cardDayMap[cardId] : assignedInfo.matchedDayIndex;
+
+            const activeDayObj = (workoutPlan?.days && workoutPlan.days.length > activeDayIdx) 
+              ? workoutPlan.days[activeDayIdx] 
+              : null;
+
+            const assignedExercises = activeDayObj 
+              ? (activeDayObj.exercises || []) 
+              : assignedInfo.exercises;
+
+            const assignedDayTitle = activeDayObj 
+              ? (activeDayObj.dayTitle || `Day ${activeDayIdx + 1}`) 
+              : assignedInfo.dayTitle;
+
+            const totalExercises = assignedExercises.length;
             const completedCount = completedExerciseIndices.length;
             const workoutProgress = totalExercises > 0 ? Math.round((completedCount / totalExercises) * 100) : (dailyLog?.workoutCompleted ? 100 : 0);
 
@@ -534,10 +621,15 @@ export default function MonitoringPage() {
                 </div>
 
                 <div style={styles.innerBlock}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
                     <div style={styles.blockTitleRow}>
                       <Dumbbell size={12} color="#00c853" />
                       <span style={styles.blockTitle}>Workout Progress</span>
+                      {assignedDayTitle && (
+                        <span style={{ fontSize: '0.72rem', color: '#00c853', fontWeight: 700 }}>
+                          ({assignedDayTitle})
+                        </span>
+                      )}
                     </div>
 
                     {totalExercises > 0 && (
@@ -546,6 +638,32 @@ export default function MonitoringPage() {
                       </span>
                     )}
                   </div>
+
+                  {/* Multi-day switcher pills for trainer */}
+                  {workoutPlan?.days && workoutPlan.days.length > 1 && (
+                    <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', marginBottom: '8px', paddingBottom: '2px' }}>
+                      {workoutPlan.days.map((dayItem, dIdx) => (
+                        <button
+                          key={dIdx}
+                          type="button"
+                          onClick={() => setCardDayMap(prev => ({ ...prev, [cardId]: dIdx }))}
+                          style={{
+                            padding: '3px 8px',
+                            borderRadius: '12px',
+                            border: activeDayIdx === dIdx ? '1px solid #00c853' : '1px solid var(--border)',
+                            backgroundColor: activeDayIdx === dIdx ? 'rgba(0, 200, 83, 0.15)' : 'var(--card-hover)',
+                            color: activeDayIdx === dIdx ? '#00c853' : 'var(--text-secondary)',
+                            fontSize: '0.68rem',
+                            fontWeight: activeDayIdx === dIdx ? 700 : 500,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {dayItem.dayTitle || `Day ${dIdx + 1}`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                   {totalExercises > 0 && (
                     <div style={{ height: '4px', backgroundColor: 'var(--border)', borderRadius: '10px', overflow: 'hidden', marginBottom: '6px' }}>
@@ -558,9 +676,9 @@ export default function MonitoringPage() {
                     </div>
                   )}
 
-                  {workoutPlan?.exercises && workoutPlan.exercises.length > 0 ? (
+                  {assignedExercises && assignedExercises.length > 0 ? (
                     <div style={styles.exerciseList}>
-                      {workoutPlan.exercises.map((ex, idx) => {
+                      {assignedExercises.map((ex, idx) => {
                         const isDone = completedExerciseIndices.includes(idx);
                         return (
                           <div key={idx} style={{

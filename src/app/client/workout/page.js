@@ -61,13 +61,14 @@ export default function WorkoutPlanPage() {
   const saveWorkoutLog = async () => {
     if (!user?.uid || !workoutPlan) return;
     try {
-      setSaving(true);
-      const allCompleted = completedExercises.length === workoutPlan.exercises.length;
+      const hasDaysList = workoutPlan?.days && Array.isArray(workoutPlan.days) && workoutPlan.days.length > 0;
+      const currentDayExercises = hasDaysList ? (workoutPlan.days[activeDayIndex]?.exercises || []) : (workoutPlan.exercises || []);
+      const allCompleted = completedExercises.length === currentDayExercises.length && currentDayExercises.length > 0;
 
       // Calculate total weight volume lifted today across completed exercises
       let totalWeightVolume = 0;
       completedExercises.forEach(idx => {
-        const ex = workoutPlan.exercises[idx];
+        const ex = currentDayExercises[idx];
         if (ex) {
           const sets = Number(ex.sets) || 1;
           const reps = Number(ex.reps) || 1;
@@ -106,17 +107,23 @@ export default function WorkoutPlanPage() {
     );
   }
 
-  if (!workoutPlan || !workoutPlan.exercises || workoutPlan.exercises.length === 0) {
+  const hasDays = workoutPlan?.days && Array.isArray(workoutPlan.days) && workoutPlan.days.length > 0;
+  const currentDayObj = hasDays ? workoutPlan.days[activeDayIndex] : null;
+  const activeExercises = currentDayObj ? (currentDayObj.exercises || []) : (workoutPlan.exercises || []);
+
+  if (!workoutPlan || activeExercises.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '12px', background: 'var(--card)', borderRadius: '10px', border: '1px solid var(--border)' }}>
         <Dumbbell size={32} color="var(--text-secondary)" style={{ marginBottom: '10px', opacity: 0.5 }} />
-        <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem' }}>No Workout Plan</h3>
-        <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.8rem' }}>You don&apos;t have an active workout plan right now.</p>
+        <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem' }}>No Workout Exercises</h3>
+        <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.8rem' }}>
+          {hasDays ? `No exercises assigned for ${currentDayObj?.dayTitle || 'this day'}.` : "You don't have an active workout plan right now."}
+        </p>
       </div>
     );
   }
 
-  const totalExercises = workoutPlan.exercises.length;
+  const totalExercises = activeExercises.length;
   const completedCount = completedExercises.length;
   const progressPercent = totalExercises === 0 ? 0 : Math.round((completedCount / totalExercises) * 100);
   const allCompleted = completedCount === totalExercises && totalExercises > 0;
@@ -124,7 +131,7 @@ export default function WorkoutPlanPage() {
   // Calculate live volume lifted for completed exercises
   let currentVolume = 0;
   completedExercises.forEach(idx => {
-    const ex = workoutPlan.exercises[idx];
+    const ex = activeExercises[idx];
     if (ex) {
       const sets = Number(ex.sets) || 1;
       const reps = Number(ex.reps) || 1;
@@ -137,9 +144,6 @@ export default function WorkoutPlanPage() {
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
 
-  const hasDays = workoutPlan?.days && Array.isArray(workoutPlan.days) && workoutPlan.days.length > 1;
-  const currentDayObj = hasDays ? workoutPlan.days[activeDayIndex] : null;
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '80px' }}>
       
@@ -150,7 +154,11 @@ export default function WorkoutPlanPage() {
             <button
               key={dIdx}
               type="button"
-              onClick={() => setActiveDayIndex(dIdx)}
+              onClick={() => {
+                setActiveDayIndex(dIdx);
+                setCompletedExercises([]);
+                setIsSubmittedToday(false);
+              }}
               style={{
                 padding: '6px 14px',
                 borderRadius: '20px',
@@ -238,7 +246,7 @@ export default function WorkoutPlanPage() {
 
       {/* Exercise Cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {workoutPlan.exercises.map((ex, idx) => {
+        {activeExercises.map((ex, idx) => {
           const isCompleted = completedExercises.includes(idx);
           return (
             <Card key={idx} style={{ 

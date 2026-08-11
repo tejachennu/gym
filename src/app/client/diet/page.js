@@ -483,6 +483,46 @@ export default function DietPlanPage() {
         })}
       </div>
 
+      {/* Prescribed Supplements Section */}
+      {activePlan?.supplements && activePlan.supplements.length > 0 && (
+        <Card style={{ padding: '16px', borderRadius: '16px', borderLeft: '4px solid #ab47bc' }} className="glass-card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <span style={{ fontSize: '1.2rem' }}>💊</span>
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#FFFFFF' }}>Prescribed Supplements</h3>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {activePlan.supplements.map((supp, sIdx) => (
+              <div key={sIdx} style={{ padding: '10px 12px', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderRadius: '10px', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#FFFFFF' }}>
+                    {supp.name}
+                  </div>
+                  {supp.instructions && (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                      Instructions: {supp.instructions}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  {supp.dosage && (
+                    <Badge variant="info" style={{ fontSize: '0.7rem' }}>
+                      Dosage: {supp.dosage}
+                    </Badge>
+                  )}
+                  {supp.timing && (
+                    <Badge variant="success" style={{ fontSize: '0.7rem' }}>
+                      Timing: {supp.timing}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {/* Modal for Full Size Photo Preview */}
       <Modal
         isOpen={!!viewingPhotoUrl}

@@ -1,20 +1,37 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { submitCheckin } from '@/lib/firestore';
+import { submitCheckin, getClientCheckins } from '@/lib/firestore';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import Badge from '@/components/ui/Badge';
+import Modal from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import ImageUpload from '@/components/ui/ImageUpload';
 import { useToast } from '@/components/ui/Toast';
 import { validateField } from '@/lib/validation';
-import { Camera, Ruler, Send } from 'lucide-react';
+import { Camera, Ruler, Send, History, Calendar, Eye, Sparkles } from 'lucide-react';
+
+function formatDateNice(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch (e) {
+    return dateStr;
+  }
+}
 
 export default function CheckinPage() {
   const { user } = useAuth();
   const toast = useToast();
+  const [activeTab, setActiveTab] = useState('new'); // 'new' | 'history'
+  const [checkinsHistory, setCheckinsHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [previewPhotoUrl, setPreviewPhotoUrl] = useState(null);
   
   const [photos, setPhotos] = useState({ front: '', back: '', left: '', right: '' });
   const [measurements, setMeasurements] = useState({
@@ -35,6 +52,23 @@ export default function CheckinPage() {
     lCalf: ''
   });
 
+  const loadHistory = async () => {
+    if (!user?.uid) return;
+    try {
+      setLoadingHistory(true);
+      const data = await getClientCheckins(user.uid);
+      setCheckinsHistory(data || []);
+    } catch (err) {
+      console.error('Failed to load check-in history:', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    loadHistory();
+  }, [user]);
+
   const handleSubmit = async () => {
     if (!user) return;
 
@@ -52,6 +86,13 @@ export default function CheckinPage() {
         measurements
       });
       toast.success('10-Day Check-in submitted successfully!');
+      setPhotos({ front: '', back: '', left: '', right: '' });
+      setMeasurements({
+        weight: '', neck: '', shoulder: '', chest: '', waist: '', stomach: '', highHip: '',
+        rBicep: '', lBicep: '', rForearm: '', lForearm: '', rThigh: '', lThigh: '', rCalf: '', lCalf: ''
+      });
+      await loadHistory();
+      setActiveTab('history');
     } catch (err) {
       toast.error(err);
     } finally {
@@ -59,70 +100,265 @@ export default function CheckinPage() {
     }
   };
 
+  // Calculate next check-in date from latest check-in
+  const latestCheckin = checkinsHistory[0];
+  const latestDateObj = latestCheckin?.date ? new Date(latestCheckin.date) : null;
+  const nextCheckinDateObj = latestDateObj ? new Date(latestDateObj.getTime() + 10 * 24 * 60 * 60 * 1000) : null;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '60px' }} className="animate-fade-up">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '60px' }} className="animate-fade-up">
+      {/* Page Header */}
       <div style={{ textAlign: 'center', padding: '4px 0' }}>
         <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0 0 2px 0', color: 'var(--text)' }}>
-          📸 Body Check-In & Measurements
+          📸 10-Day Body Check-In & Progress History
         </h2>
         <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
-          Upload your posture photos & 14-point body measurements every 10 days
+          Track body posture photos & 14-point measurements every 10 days
         </p>
       </div>
 
-      {/* Progress Photos Card */}
-      <Card style={{ padding: '12px' }} className="glass-card">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-          <Camera size={16} color="var(--accent, #E00008)" />
-          <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: 'var(--text)' }}>Progress Photos</h3>
-        </div>
+      {/* Tab Switcher: Submit Check-in vs View History */}
+      <div style={{ display: 'flex', gap: '8px', backgroundColor: 'rgba(255,255,255,0.03)', padding: '4px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+        <button
+          type="button"
+          onClick={() => setActiveTab('new')}
+          style={{
+            flex: 1,
+            padding: '8px 12px',
+            borderRadius: '10px',
+            border: 'none',
+            backgroundColor: activeTab === 'new' ? 'var(--accent, #E00008)' : 'transparent',
+            color: activeTab === 'new' ? '#FFFFFF' : 'var(--text-secondary)',
+            fontSize: '0.8rem',
+            fontWeight: activeTab === 'new' ? 800 : 500,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px'
+          }}
+        >
+          <Camera size={15} /> + New Check-in
+        </button>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
-          <div><p style={{ margin: '0 0 3px 0', fontSize: '0.72rem', fontWeight: 700 }}>1. Front View</p><ImageUpload onUpload={(url) => setPhotos({...photos, front: url})} /></div>
-          <div><p style={{ margin: '0 0 3px 0', fontSize: '0.72rem', fontWeight: 700 }}>2. Back View</p><ImageUpload onUpload={(url) => setPhotos({...photos, back: url})} /></div>
-          <div><p style={{ margin: '0 0 3px 0', fontSize: '0.72rem', fontWeight: 700 }}>3. Left Side</p><ImageUpload onUpload={(url) => setPhotos({...photos, left: url})} /></div>
-          <div><p style={{ margin: '0 0 3px 0', fontSize: '0.72rem', fontWeight: 700 }}>4. Right Side</p><ImageUpload onUpload={(url) => setPhotos({...photos, right: url})} /></div>
-        </div>
-      </Card>
+        <button
+          type="button"
+          onClick={() => setActiveTab('history')}
+          style={{
+            flex: 1,
+            padding: '8px 12px',
+            borderRadius: '10px',
+            border: 'none',
+            backgroundColor: activeTab === 'history' ? 'var(--accent, #E00008)' : 'transparent',
+            color: activeTab === 'history' ? '#FFFFFF' : 'var(--text-secondary)',
+            fontSize: '0.8rem',
+            fontWeight: activeTab === 'history' ? 800 : 500,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px'
+          }}
+        >
+          <History size={15} /> Previous Check-ins ({checkinsHistory.length})
+        </button>
+      </div>
 
-      {/* 14-Point Measurements Input Card */}
-      <Card style={{ padding: '12px' }} className="glass-card">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-          <Ruler size={16} color="#00c853" />
-          <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: 'var(--text)' }}>
-            14-Point Body Measurements (cm)
-          </h3>
-        </div>
+      {/* TAB 1: NEW CHECK-IN FORM */}
+      {activeTab === 'new' && (
+        <>
+          {/* Submitted Date Banner */}
+          {latestCheckin && (
+            <Card style={{ padding: '10px 14px', backgroundColor: 'rgba(0, 200, 83, 0.12)', border: '1px solid rgba(0, 200, 83, 0.3)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Calendar size={18} color="#00c853" />
+              <div style={{ fontSize: '0.78rem' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Last Check-in Submitted Date: </span>
+                <strong style={{ color: '#00c853' }}>{formatDateNice(latestCheckin.date)}</strong>
+              </div>
+            </Card>
+          )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <Input type="number" numeric={true} allowDecimal={true} label="Body Weight kg (Max 3 digits) *" value={measurements.weight} onChange={(e) => setMeasurements({...measurements, weight: e.target.value})} required />
+          {/* Progress Photos Card */}
+          <Card style={{ padding: '12px' }} className="glass-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+              <Camera size={16} color="var(--accent, #E00008)" />
+              <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: 'var(--text)' }}>Progress Photos</h3>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
+              <div><p style={{ margin: '0 0 3px 0', fontSize: '0.72rem', fontWeight: 700 }}>1. Front View</p><ImageUpload value={photos.front} onUpload={(url) => setPhotos({...photos, front: url})} /></div>
+              <div><p style={{ margin: '0 0 3px 0', fontSize: '0.72rem', fontWeight: 700 }}>2. Back View</p><ImageUpload value={photos.back} onUpload={(url) => setPhotos({...photos, back: url})} /></div>
+              <div><p style={{ margin: '0 0 3px 0', fontSize: '0.72rem', fontWeight: 700 }}>3. Left Side</p><ImageUpload value={photos.left} onUpload={(url) => setPhotos({...photos, left: url})} /></div>
+              <div><p style={{ margin: '0 0 3px 0', fontSize: '0.72rem', fontWeight: 700 }}>4. Right Side</p><ImageUpload value={photos.right} onUpload={(url) => setPhotos({...photos, right: url})} /></div>
+            </div>
+          </Card>
+
+          {/* 14-Point Measurements Input Card */}
+          <Card style={{ padding: '12px' }} className="glass-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+              <Ruler size={16} color="#00c853" />
+              <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: 'var(--text)' }}>
+                14-Point Body Measurements (cm)
+              </h3>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Input type="number" numeric={true} allowDecimal={true} label="Body Weight kg (Max 3 digits) *" value={measurements.weight} onChange={(e) => setMeasurements({...measurements, weight: e.target.value})} required />
+              </div>
+
+              <Input type="number" numeric={true} allowDecimal={true} label="1. Neck (cm)" value={measurements.neck} onChange={(e) => setMeasurements({...measurements, neck: e.target.value})} />
+              <Input type="number" numeric={true} allowDecimal={true} label="2. Shoulder (cm)" value={measurements.shoulder} onChange={(e) => setMeasurements({...measurements, shoulder: e.target.value})} />
+              <Input type="number" numeric={true} allowDecimal={true} label="3. Chest (cm)" value={measurements.chest} onChange={(e) => setMeasurements({...measurements, chest: e.target.value})} />
+              <Input type="number" numeric={true} allowDecimal={true} label="4. Waist (cm)" value={measurements.waist} onChange={(e) => setMeasurements({...measurements, waist: e.target.value})} />
+              <Input type="number" numeric={true} allowDecimal={true} label="5. Stomach (cm)" value={measurements.stomach} onChange={(e) => setMeasurements({...measurements, stomach: e.target.value})} />
+              <Input type="number" numeric={true} allowDecimal={true} label="6. High Hip (cm)" value={measurements.highHip} onChange={(e) => setMeasurements({...measurements, highHip: e.target.value})} />
+
+              <Input type="number" numeric={true} allowDecimal={true} label="7. Right Bicep" value={measurements.rBicep} onChange={(e) => setMeasurements({...measurements, rBicep: e.target.value})} />
+              <Input type="number" numeric={true} allowDecimal={true} label="8. Left Bicep" value={measurements.lBicep} onChange={(e) => setMeasurements({...measurements, lBicep: e.target.value})} />
+
+              <Input type="number" numeric={true} allowDecimal={true} label="9. Right Forearm" value={measurements.rForearm} onChange={(e) => setMeasurements({...measurements, rForearm: e.target.value})} />
+              <Input type="number" numeric={true} allowDecimal={true} label="10. Left Forearm" value={measurements.lForearm} onChange={(e) => setMeasurements({...measurements, lForearm: e.target.value})} />
+
+              <Input type="number" numeric={true} allowDecimal={true} label="11. Right Thigh" value={measurements.rThigh} onChange={(e) => setMeasurements({...measurements, rThigh: e.target.value})} />
+              <Input type="number" numeric={true} allowDecimal={true} label="12. Left Thigh" value={measurements.lThigh} onChange={(e) => setMeasurements({...measurements, lThigh: e.target.value})} />
+
+              <Input type="number" numeric={true} allowDecimal={true} label="13. Right Calf" value={measurements.rCalf} onChange={(e) => setMeasurements({...measurements, rCalf: e.target.value})} />
+              <Input type="number" numeric={true} allowDecimal={true} label="14. Left Calf" value={measurements.lCalf} onChange={(e) => setMeasurements({...measurements, lCalf: e.target.value})} />
+            </div>
+          </Card>
+
+          <Button onClick={handleSubmit} loading={submitting} style={{ padding: '10px', fontSize: '0.85rem', fontWeight: 800 }}>
+            <Send size={15} /> Submit 10-Day Check-in
+          </Button>
+        </>
+      )}
+
+      {/* TAB 2: PAST CHECK-INS HISTORY LIST */}
+      {activeTab === 'history' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {loadingHistory ? (
+            <Card style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              Loading check-in history...
+            </Card>
+          ) : checkinsHistory.length === 0 ? (
+            <Card style={{ padding: '24px', textAlign: 'center' }}>
+              <History size={36} color="var(--text-secondary)" style={{ marginBottom: '8px', opacity: 0.5 }} />
+              <h3 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#FFFFFF' }}>No Previous Check-ins Recorded</h3>
+              <p style={{ margin: '0 0 12px 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                You haven&apos;t submitted any 10-day body check-ins yet. Click &quot;+ New Check-in&quot; to log your baseline!
+              </p>
+              <Button size="sm" onClick={() => setActiveTab('new')}>
+                + Submit Baseline Check-in
+              </Button>
+            </Card>
+          ) : (
+            checkinsHistory.map((item, idx) => {
+              const cDate = item.date || item.createdAt;
+              const meas = item.measurements || {};
+              const p = item.photos || {};
+
+              return (
+                <Card key={item.id || idx} style={{ padding: '14px', borderRadius: '14px' }} className="glass-card">
+                  {/* Card Header: Date & Weight */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', paddingBottom: '8px', borderBottom: '1px solid var(--border)' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Calendar size={14} color="var(--accent, #E00008)" />
+                        <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#FFFFFF' }}>
+                          Check-in: {formatDateNice(cDate)}
+                        </span>
+                        {idx === 0 && (
+                          <Badge variant="success" style={{ fontSize: '0.65rem' }}>LATEST</Badge>
+                        )}
+                      </div>
+                    </div>
+                    {meas.weight && (
+                      <div style={{ background: 'rgba(0, 200, 83, 0.15)', border: '1px solid rgba(0, 200, 83, 0.3)', padding: '4px 10px', borderRadius: '10px', color: '#00c853', fontWeight: 800, fontSize: '0.85rem' }}>
+                        Weight: {meas.weight} kg
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Body Photos Thumbnails */}
+                  {(p.front || p.back || p.left || p.right) && (
+                    <div style={{ marginBottom: '12px' }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                        📸 Posture Photos:
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                        {[
+                          { key: 'front', label: 'Front' },
+                          { key: 'back', label: 'Back' },
+                          { key: 'left', label: 'Left Side' },
+                          { key: 'right', label: 'Right Side' }
+                        ].map(({ key, label }) => (
+                          <div key={key} style={{ textAlign: 'center' }}>
+                            {p[key] ? (
+                              <img
+                                src={p[key]}
+                                alt={label}
+                                onClick={() => setPreviewPhotoUrl(p[key])}
+                                style={{
+                                  width: '100%',
+                                  height: '70px',
+                                  objectFit: 'cover',
+                                  borderRadius: '8px',
+                                  border: '1px solid var(--border)',
+                                  cursor: 'pointer'
+                                }}
+                              />
+                            ) : (
+                              <div style={{ height: '70px', background: 'var(--card-hover)', borderRadius: '8px', border: '1px dashed var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+                                No Photo
+                              </div>
+                            )}
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'block', marginTop: '2px' }}>{label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Measurements Summary Grid */}
+                  <div style={{ fontSize: '0.75rem' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                      📏 Measurements (cm):
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '4px' }}>
+                      {meas.neck && <div style={{ background: 'var(--card-hover)', padding: '3px 6px', borderRadius: '4px' }}>Neck: <strong>{meas.neck} cm</strong></div>}
+                      {meas.chest && <div style={{ background: 'var(--card-hover)', padding: '3px 6px', borderRadius: '4px' }}>Chest: <strong>{meas.chest} cm</strong></div>}
+                      {meas.waist && <div style={{ background: 'var(--card-hover)', padding: '3px 6px', borderRadius: '4px' }}>Waist: <strong>{meas.waist} cm</strong></div>}
+                      {meas.stomach && <div style={{ background: 'var(--card-hover)', padding: '3px 6px', borderRadius: '4px' }}>Stomach: <strong>{meas.stomach} cm</strong></div>}
+                      {meas.rBicep && <div style={{ background: 'var(--card-hover)', padding: '3px 6px', borderRadius: '4px' }}>R Bicep: <strong>{meas.rBicep} cm</strong></div>}
+                      {meas.lBicep && <div style={{ background: 'var(--card-hover)', padding: '3px 6px', borderRadius: '4px' }}>L Bicep: <strong>{meas.lBicep} cm</strong></div>}
+                      {meas.rThigh && <div style={{ background: 'var(--card-hover)', padding: '3px 6px', borderRadius: '4px' }}>R Thigh: <strong>{meas.rThigh} cm</strong></div>}
+                      {meas.lThigh && <div style={{ background: 'var(--card-hover)', padding: '3px 6px', borderRadius: '4px' }}>L Thigh: <strong>{meas.lThigh} cm</strong></div>}
+                    </div>
+                  </div>
+                </Card>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* Image Full Screen Preview Modal */}
+      <Modal
+        isOpen={!!previewPhotoUrl}
+        onClose={() => setPreviewPhotoUrl(null)}
+        title="Check-in Photo Preview"
+      >
+        {previewPhotoUrl && (
+          <div style={{ textAlign: 'center' }}>
+            <img
+              src={previewPhotoUrl}
+              alt="Full Check-in Preview"
+              style={{ maxWidth: '100%', maxHeight: '75vh', borderRadius: '10px', objectFit: 'contain' }}
+            />
           </div>
-
-          <Input type="number" numeric={true} allowDecimal={true} label="1. Neck (cm)" value={measurements.neck} onChange={(e) => setMeasurements({...measurements, neck: e.target.value})} />
-          <Input type="number" numeric={true} allowDecimal={true} label="2. Shoulder (cm)" value={measurements.shoulder} onChange={(e) => setMeasurements({...measurements, shoulder: e.target.value})} />
-          <Input type="number" numeric={true} allowDecimal={true} label="3. Chest (cm)" value={measurements.chest} onChange={(e) => setMeasurements({...measurements, chest: e.target.value})} />
-          <Input type="number" numeric={true} allowDecimal={true} label="4. Waist (cm)" value={measurements.waist} onChange={(e) => setMeasurements({...measurements, waist: e.target.value})} />
-          <Input type="number" numeric={true} allowDecimal={true} label="5. Stomach (cm)" value={measurements.stomach} onChange={(e) => setMeasurements({...measurements, stomach: e.target.value})} />
-          <Input type="number" numeric={true} allowDecimal={true} label="6. High Hip (cm)" value={measurements.highHip} onChange={(e) => setMeasurements({...measurements, highHip: e.target.value})} />
-
-          <Input type="number" numeric={true} allowDecimal={true} label="7. Right Bicep" value={measurements.rBicep} onChange={(e) => setMeasurements({...measurements, rBicep: e.target.value})} />
-          <Input type="number" numeric={true} allowDecimal={true} label="8. Left Bicep" value={measurements.lBicep} onChange={(e) => setMeasurements({...measurements, lBicep: e.target.value})} />
-
-          <Input type="number" numeric={true} allowDecimal={true} label="9. Right Forearm" value={measurements.rForearm} onChange={(e) => setMeasurements({...measurements, rForearm: e.target.value})} />
-          <Input type="number" numeric={true} allowDecimal={true} label="10. Left Forearm" value={measurements.lForearm} onChange={(e) => setMeasurements({...measurements, lForearm: e.target.value})} />
-
-          <Input type="number" numeric={true} allowDecimal={true} label="11. Right Thigh" value={measurements.rThigh} onChange={(e) => setMeasurements({...measurements, rThigh: e.target.value})} />
-          <Input type="number" numeric={true} allowDecimal={true} label="12. Left Thigh" value={measurements.lThigh} onChange={(e) => setMeasurements({...measurements, lThigh: e.target.value})} />
-
-          <Input type="number" numeric={true} allowDecimal={true} label="13. Right Calf" value={measurements.rCalf} onChange={(e) => setMeasurements({...measurements, rCalf: e.target.value})} />
-          <Input type="number" numeric={true} allowDecimal={true} label="14. Left Calf" value={measurements.lCalf} onChange={(e) => setMeasurements({...measurements, lCalf: e.target.value})} />
-        </div>
-      </Card>
-
-      <Button onClick={handleSubmit} loading={submitting} style={{ padding: '10px', fontSize: '0.85rem', fontWeight: 800 }}>
-        <Send size={15} /> Submit
-      </Button>
+        )}
+      </Modal>
     </div>
   );
 }

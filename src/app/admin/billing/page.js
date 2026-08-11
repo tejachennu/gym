@@ -59,6 +59,8 @@ export default function BillingPage() {
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
     clientId: '',
+    customClientName: '',
+    customClientPhone: '',
     planName: '',
     originalAmount: '',
     discountType: 'percentage',  // 'percentage' or 'amount'
@@ -131,6 +133,8 @@ export default function BillingPage() {
     setForm({
       date: new Date().toISOString().split('T')[0],
       clientId: selectedClient || '',
+      customClientName: '',
+      customClientPhone: '',
       planName: '',
       originalAmount: '',
       discountType: 'percentage',
@@ -146,10 +150,7 @@ export default function BillingPage() {
   const handleSubmitInvoice = async (e) => {
     e.preventDefault();
 
-    const targetClientId = form.clientId || selectedClient;
-    if (!targetClientId) {
-      return toast.warning('Please select a client for this invoice.');
-    }
+    const targetClientId = form.clientId || selectedClient || '';
 
     const amountErr = validateField('Original Amount', form.originalAmount, { required: true, numeric: true, allowDecimal: true });
     const paidErr = validateField('Amount Paid', form.amountPaid, { required: true, numeric: true, allowDecimal: true });
@@ -166,15 +167,27 @@ export default function BillingPage() {
 
     setSaving(true);
     try {
-      const selectedClientObj = clients.find(c => c.id === targetClientId);
+      let clientName = form.customClientName.trim() || 'Walk-in Customer';
+      let clientPhone = form.customClientPhone.trim() || '';
+      let clientEmail = '';
+
+      if (targetClientId) {
+        const selectedClientObj = clients.find(c => c.id === targetClientId);
+        if (selectedClientObj) {
+          clientName = selectedClientObj.displayName || selectedClientObj.name || 'Client';
+          clientPhone = selectedClientObj.phone || '';
+          clientEmail = selectedClientObj.email || '';
+        }
+      }
+
       const finalAmount = calculateFinalAmount();
       const discountAmt = (parseFloat(form.originalAmount) || 0) - finalAmount;
 
       const data = {
-        clientId: targetClientId,
-        clientName: selectedClientObj?.displayName || selectedClientObj?.name || 'Client',
-        clientEmail: selectedClientObj?.email || '',
-        clientPhone: selectedClientObj?.phone || '',
+        clientId: targetClientId || 'walkin',
+        clientName: clientName,
+        clientEmail: clientEmail,
+        clientPhone: clientPhone,
         date: form.date,
         planName: form.planName.trim(),
         originalAmount: parseFloat(form.originalAmount) || 0,
@@ -563,18 +576,38 @@ export default function BillingPage() {
       >
         <form onSubmit={handleSubmitInvoice} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <SearchableSelect 
-            label="Client *"
-            placeholder="Search & Select Client..."
-            value={form.clientId || selectedClient}
+            label="Client (Optional — Leave empty for Direct / Walk-in Billing)"
+            placeholder="Search Registered Client (or leave empty for Walk-in)..."
+            value={form.clientId}
             onChange={(e) => setForm({ ...form, clientId: e.target.value })}
-            options={clients.map((c) => ({
-              label: c.displayName || c.name || 'No Name',
-              value: c.id,
-              email: c.email || '',
-              phone: c.phone || ''
-            }))}
-            required
+            options={[
+              { label: '👤 Direct / Walk-in Billing (No Client Assigned)', value: '' },
+              ...clients.map((c) => ({
+                label: c.displayName || c.name || 'No Name',
+                value: c.id,
+                email: c.email || '',
+                phone: c.phone || ''
+              }))
+            ]}
           />
+
+          {!form.clientId && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <Input 
+                label="Customer / Walk-in Name (Optional)" 
+                placeholder="e.g. Walk-in Customer / Guest Name"
+                value={form.customClientName}
+                onChange={(e) => setForm({ ...form, customClientName: e.target.value })}
+              />
+              <Input 
+                label="Customer Mobile (Optional)" 
+                placeholder="e.g. 9876543210"
+                value={form.customClientPhone}
+                onChange={(e) => setForm({ ...form, customClientPhone: e.target.value })}
+                numeric={true}
+              />
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <Input 
