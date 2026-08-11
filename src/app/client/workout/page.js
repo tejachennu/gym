@@ -109,7 +109,7 @@ export default function WorkoutPlanPage() {
 
   const hasDays = workoutPlan?.days && Array.isArray(workoutPlan.days) && workoutPlan.days.length > 0;
   const currentDayObj = hasDays ? workoutPlan.days[activeDayIndex] : null;
-  const activeExercises = currentDayObj ? (currentDayObj.exercises || []) : (workoutPlan.exercises || []);
+  const activeExercises = currentDayObj ? (currentDayObj.exercises || []) : (workoutPlan?.exercises || []);
 
   if (!workoutPlan || activeExercises.length === 0) {
     return (
