@@ -15,6 +15,7 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import { CardSkeleton } from '@/components/ui/Loading';
 import { useToast } from '@/components/ui/Toast';
 import Modal from '@/components/ui/Modal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import Badge from '@/components/ui/Badge';
 import { 
   Heart, 
@@ -34,6 +35,7 @@ export default function BloodReportsPage() {
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState('');
   const [reportsList, setReportsList] = useState([]);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -205,14 +207,20 @@ export default function BloodReportsPage() {
     }
   };
 
-  const handleDeleteReport = async (id) => {
-    if (!confirm('Are you sure you want to delete this blood report entry?')) return;
+  const handleDeleteReport = (id) => {
+    setConfirmDeleteId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDeleteId) return;
     try {
-      await deleteBloodReport(id);
+      await deleteBloodReport(confirmDeleteId);
       toast.success('Blood report entry deleted successfully');
       await loadBloodReports(selectedClient);
     } catch (err) {
       toast.error('Failed to delete blood report');
+    } finally {
+      setConfirmDeleteId(null);
     }
   };
 
@@ -522,6 +530,16 @@ export default function BloodReportsPage() {
           </div>
         </div>
       </Modal>
+      <ConfirmModal 
+        isOpen={!!confirmDeleteId}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Blood Report"
+        message="Are you sure you want to delete this blood report entry? This action cannot be undone."
+        confirmText="Delete Report"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { Input, Select, Textarea } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Loading';
 import EmptyState from '@/components/ui/EmptyState';
 import Modal from '@/components/ui/Modal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import Badge from '@/components/ui/Badge';
 import { useToast } from '@/components/ui/Toast';
 import Avatar from '@/components/ui/Avatar';
@@ -68,6 +69,7 @@ export default function EnquiriesPage() {
   const [selectedEnquiry, setSelectedEnquiry] = useState(null);
   const [updating, setUpdating] = useState(false);
   const [converting, setConverting] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', onConfirm: null, variant: 'danger', confirmText: 'Confirm' });
 
   // Form for Walk-in Enquiry
   const [walkinForm, setWalkinForm] = useState({
@@ -220,60 +222,75 @@ export default function EnquiriesPage() {
   };
 
   // Convert Enquiry directly to Client
-  const handleConvertToClient = async (enquiry) => {
+  const handleConvertToClient = (enquiry) => {
     if (!enquiry) return;
-    if (!confirm(`Are you sure you want to convert ${enquiry.name} into a registered Gym Client?`)) return;
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Convert to Member',
+      message: `Are you sure you want to convert ${enquiry.name} into a registered Gym Client?`,
+      confirmText: 'Convert Client',
+      variant: 'primary',
+      onConfirm: async () => {
+        setConverting(true);
+        try {
+          const clientCode = String(100 + Math.floor(Math.random() * 900));
+          const newClientData = {
+            displayName: enquiry.name,
+            name: enquiry.name,
+            email: enquiry.email || `${enquiry.phone}@mrkfitness.com`,
+            phone: enquiry.phone || '',
+            gender: enquiry.gender || 'Male',
+            age: enquiry.age || '',
+            goal: enquiry.goal || 'Fat Loss',
+            clientCode: clientCode,
+            role: 'client',
+            status: 'active',
+            currentPlan: enquiry.preferredPlan || 'Standard 1 Month Plan',
+            createdAt: new Date().toISOString()
+          };
 
-    setConverting(true);
-    try {
-      // Create user document in Users collection
-      const clientCode = String(100 + Math.floor(Math.random() * 900));
-      const newClientData = {
-        displayName: enquiry.name,
-        name: enquiry.name,
-        email: enquiry.email || `${enquiry.phone}@mrkfitness.com`,
-        phone: enquiry.phone || '',
-        gender: enquiry.gender || 'Male',
-        age: enquiry.age || '',
-        goal: enquiry.goal || 'Fat Loss',
-        clientCode: clientCode,
-        role: 'client',
-        status: 'active',
-        currentPlan: enquiry.preferredPlan || 'Standard 1 Month Plan',
-        createdAt: new Date().toISOString()
-      };
+          await addDocument('Users', newClientData);
+          await updateEnquiry(enquiry.id, {
+            status: 'converted',
+            convertedAt: new Date().toISOString(),
+            clientCode: clientCode
+          });
 
-      await addDocument('Users', newClientData);
-
-      // Update Enquiry Status to Converted
-      await updateEnquiry(enquiry.id, {
-        status: 'converted',
-        convertedAt: new Date().toISOString(),
-        clientCode: clientCode
-      });
-
-      toast.success(`🎉 ${enquiry.name} converted to Member (Code: ${clientCode})!`);
-      setSelectedEnquiry(null);
-      fetchEnquiriesList();
-    } catch (err) {
-      console.error('Failed to convert enquiry to client:', err);
-      toast.error('Failed to convert enquiry to client');
-    } finally {
-      setConverting(false);
-    }
+          toast.success(`🎉 ${enquiry.name} converted to Member (Code: ${clientCode})!`);
+          setSelectedEnquiry(null);
+          fetchEnquiriesList();
+        } catch (err) {
+          console.error('Failed to convert enquiry to client:', err);
+          toast.error('Failed to convert enquiry to client');
+        } finally {
+          setConverting(false);
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
   // Delete Enquiry
-  const handleDeleteEnquiry = async (id, name) => {
-    if (!confirm(`Are you sure you want to delete enquiry for ${name}?`)) return;
-    try {
-      await deleteEnquiry(id);
-      toast.success('Enquiry deleted');
-      if (selectedEnquiry?.id === id) setSelectedEnquiry(null);
-      fetchEnquiriesList();
-    } catch (err) {
-      toast.error('Failed to delete enquiry');
-    }
+  const handleDeleteEnquiry = (id, name) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Delete Enquiry',
+      message: `Are you sure you want to delete the enquiry for ${name}?`,
+      confirmText: 'Delete Enquiry',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteEnquiry(id);
+          toast.success('Enquiry deleted');
+          if (selectedEnquiry?.id === id) setSelectedEnquiry(null);
+          fetchEnquiriesList();
+        } catch (err) {
+          toast.error('Failed to delete enquiry');
+        } finally {
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
   const formatNiceDate = (dateVal) => {
@@ -789,6 +806,16 @@ export default function EnquiriesPage() {
         </Modal>
       )}
 
+      <ConfirmModal 
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        cancelText="Cancel"
+        variant={confirmConfig.variant}
+      />
     </div>
   );
 }

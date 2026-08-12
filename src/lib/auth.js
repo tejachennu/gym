@@ -40,11 +40,23 @@ export const onAuthChange = (callback) => {
   return onAuthStateChanged(auth, callback);
 };
 
-export const getUserProfile = async (uid) => {
+export const getUserProfile = async (uid, email) => {
   try {
     const userDoc = await getDoc(doc(db, "Users", uid));
     if (userDoc.exists()) {
       return { id: userDoc.id, ...userDoc.data() };
+    }
+    if (email) {
+      const { collection, query, where, getDocs, setDoc: firestoreSetDoc } = await import("firebase/firestore");
+      const q = query(collection(db, "Users"), where("email", "==", email));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const foundDoc = snap.docs[0];
+        const data = foundDoc.data();
+        const mergedData = { ...data, uid, id: uid };
+        await firestoreSetDoc(doc(db, "Users", uid), mergedData, { merge: true });
+        return mergedData;
+      }
     }
     return null;
   } catch (error) {

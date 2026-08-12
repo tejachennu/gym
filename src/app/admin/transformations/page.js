@@ -5,6 +5,7 @@ import { getAllClients, getDocuments } from '@/lib/firestore';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Spinner } from '@/components/ui/Loading';
 import EmptyState from '@/components/ui/EmptyState';
 import Modal from '@/components/ui/Modal';
@@ -76,27 +77,38 @@ export default function TransformationsPage() {
         getDocuments('DailyLogs')
       ]);
 
-      // Normalize checkins from both BodyCheckins and DailyLogs collections
+      function extractPhotos(item) {
+        let p = item.photos || item.posturePhotos || item.initialPhotos || {};
+        let front = p.front || item.frontPhoto || item.front || '';
+        let back = p.back || item.backPhoto || item.back || '';
+        let left = p.left || p.leftSide || p.side || item.leftPhoto || item.leftSide || item.side || '';
+        let right = p.right || p.rightSide || item.rightPhoto || item.rightSide || '';
+        return { front, back, left, right };
+      }
+
+      // Normalize checkins from BodyCheckins, DailyLogs, and client initialPhotos
       const normalizedCheckins = [];
 
       checkinsList.forEach(chk => {
-        const photos = chk.photos || chk.posturePhotos || {};
-        if (photos.front || photos.back || photos.left || photos.right) {
+        const photos = extractPhotos(chk);
+        const measurements = chk.measurements || chk.sizing || {};
+        if (photos.front || photos.back || photos.left || photos.right || Object.keys(measurements).length > 0) {
           normalizedCheckins.push({
             id: chk.id,
             clientId: chk.clientId || chk.userId,
             clientEmail: chk.clientEmail || chk.userEmail,
             date: chk.date || (chk.createdAt?.toDate ? chk.createdAt.toDate().toISOString().split('T')[0] : '2026-01-01'),
             photos: photos,
-            measurements: chk.measurements || chk.sizing || {},
+            measurements: measurements,
             notes: chk.notes || chk.feedback || ''
           });
         }
       });
 
       dailyLogsList.forEach(log => {
-        const photos = log.photos || log.posturePhotos || {};
-        if (photos.front || photos.back || photos.left || photos.right) {
+        const photos = extractPhotos(log);
+        const measurements = log.sizing || log.measurements || {};
+        if (photos.front || photos.back || photos.left || photos.right || Object.keys(measurements).length > 0) {
           const exists = normalizedCheckins.some(c => c.id === log.id || (c.clientId === log.clientId && c.date === log.date));
           if (!exists) {
             normalizedCheckins.push({
@@ -105,9 +117,30 @@ export default function TransformationsPage() {
               clientEmail: log.clientEmail,
               date: log.date || (log.createdAt?.toDate ? log.createdAt.toDate().toISOString().split('T')[0] : '2026-01-01'),
               photos: photos,
-              measurements: log.sizing || log.measurements || {},
+              measurements: measurements,
               notes: log.trainerFeedback || ''
             });
+          }
+        }
+      });
+
+      // Include initial baseline photos from client profile if present
+      (clientList || []).forEach(c => {
+        if (c.initialPhotos) {
+          const photos = extractPhotos({ initialPhotos: c.initialPhotos });
+          if (photos.front || photos.back || photos.left || photos.right) {
+            const hasExisting = normalizedCheckins.some(chk => chk.clientId === c.id);
+            if (!hasExisting) {
+              normalizedCheckins.push({
+                id: `initial_${c.id}`,
+                clientId: c.id,
+                clientEmail: c.email,
+                date: c.joiningDate || c.planStart || '2026-01-01',
+                photos: photos,
+                measurements: { weight: c.weight || '', height: c.height || '' },
+                notes: 'Initial Baseline Profile Photos'
+              });
+            }
           }
         }
       });
@@ -378,92 +411,31 @@ export default function TransformationsPage() {
         </Button>
       </div>
 
-      {/* TOP GLOBAL ANALYTICS KPI DASHBOARD */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-        <Card style={{ padding: '14px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ padding: '10px', backgroundColor: 'rgba(224, 0, 8, 0.12)', borderRadius: '10px', color: 'var(--accent)' }}>
-              <Flame size={20} />
-            </div>
-            <div>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', fontWeight: 600 }}>TRANSFORMING CLIENTS</span>
-              <strong style={{ fontSize: '1.2rem', color: 'var(--text)', fontWeight: 800 }}>{globalAnalytics.activeTransformations} Members</strong>
-            </div>
-          </div>
-        </Card>
 
-        <Card style={{ padding: '14px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ padding: '10px', backgroundColor: 'rgba(0, 200, 83, 0.12)', borderRadius: '10px', color: '#00c853' }}>
-              <Camera size={20} />
-            </div>
-            <div>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', fontWeight: 600 }}>POSTURE CHECK-INS</span>
-              <strong style={{ fontSize: '1.2rem', color: 'var(--text)', fontWeight: 800 }}>{globalAnalytics.totalSubmissions} Photosets</strong>
-            </div>
-          </div>
-        </Card>
-
-        <Card style={{ padding: '14px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ padding: '10px', backgroundColor: 'rgba(255, 145, 0, 0.12)', borderRadius: '10px', color: '#ff9100' }}>
-              <TrendingDown size={20} />
-            </div>
-            <div>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', fontWeight: 600 }}>AVG WEIGHT DROP</span>
-              <strong style={{ fontSize: '1.2rem', color: '#00c853', fontWeight: 800 }}>-{globalAnalytics.avgWeightDrop} kg / Client</strong>
-            </div>
-          </div>
-        </Card>
-
-        <Card style={{ padding: '14px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ padding: '10px', backgroundColor: 'rgba(0, 176, 255, 0.12)', borderRadius: '10px', color: '#00b0ff' }}>
-              <Award size={20} />
-            </div>
-            <div>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block', fontWeight: 600 }}>TOTAL INCH LOSS</span>
-              <strong style={{ fontSize: '1.2rem', color: '#00b0ff', fontWeight: 800 }}>-{globalAnalytics.totalWaistDrop} in Waist</strong>
-            </div>
-          </div>
-        </Card>
-      </div>
 
       {/* Filter & Search Bar Toolbar */}
       <Card style={{ padding: '14px', backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '12px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', alignItems: 'end' }}>
           
-          {/* Client Search */}
-          <div>
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
-              🔍 Search Client Name / Code
-            </label>
-            <div style={{ position: 'relative' }}>
-              <Input
-                placeholder="Search by name, email, code..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ paddingLeft: '32px' }}
-              />
-              <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-            </div>
-          </div>
-
-          {/* Client Selector Dropdown */}
-          <div>
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
-              👤 Select Client ({filteredClients.length} found)
-            </label>
-            <Select
+          {/* Unified Search & Select Client */}
+          <div style={{ flex: '1 1 300px' }}>
+            <SearchableSelect
+              label="Search & Select Client"
+              placeholder="-- Search & Select Client --"
               value={selectedClientId}
               onChange={(e) => {
                 setSelectedClientId(e.target.value);
                 setAfterMonthIndex(0);
               }}
-              options={filteredClients.map(c => ({
-                label: `${c.displayName || c.name || 'Member'} (${c.clientCode || '100'})`,
-                value: c.id
-              }))}
+              options={[
+                { label: '👥 All Clients (Select Client)', value: '' },
+                ...clients.map(c => ({
+                  label: `${c.displayName || c.name || 'Member'} • Code: ${c.clientCode || '100'} ${c.phone ? `(${c.phone})` : ''}`,
+                  value: c.id,
+                  email: c.email || '',
+                  phone: c.phone || ''
+                }))
+              ]}
             />
           </div>
 
@@ -971,7 +943,21 @@ export default function TransformationsPage() {
                         </thead>
                         <tbody>
                           {[
-                            { label: 'Body Weight', key: 'weight', unit: 'kg' }
+                            { label: 'Body Weight', key: 'weight', unit: 'kg' },
+                            { label: 'Chest', key: 'chest', unit: 'in' },
+                            { label: 'Neck', key: 'neck', unit: 'in' },
+                            { label: 'Shoulder', key: 'shoulder', unit: 'in' },
+                            { label: 'Waist', key: 'waist', unit: 'in' },
+                            { label: 'Stomach', key: 'stomach', unit: 'in' },
+                            { label: 'Butt / Hip', key: 'highHip', unit: 'in' },
+                            { label: 'Right Biceps', key: 'rBicep', unit: 'in' },
+                            { label: 'Left Biceps', key: 'lBicep', unit: 'in' },
+                            { label: 'Right Forearm', key: 'rForearm', unit: 'in' },
+                            { label: 'Left Forearm', key: 'lForearm', unit: 'in' },
+                            { label: 'Right Thigh', key: 'rThigh', unit: 'in' },
+                            { label: 'Left Thigh', key: 'lThigh', unit: 'in' },
+                            { label: 'Right Calf', key: 'rCalf', unit: 'in' },
+                            { label: 'Left Calf', key: 'lCalf', unit: 'in' }
                           ].map(row => {
                             const bVal = beforeCheckin?.measurements?.[row.key] || '--';
                             const aVal = afterCheckin?.measurements?.[row.key] || bVal;
@@ -979,8 +965,8 @@ export default function TransformationsPage() {
                             return (
                               <tr key={row.key} style={{ borderBottom: '1px solid var(--border)' }}>
                                 <td style={{ padding: '8px 10px', fontWeight: 700, color: 'var(--text)' }}>{row.label}</td>
-                                <td style={{ padding: '8px 10px', color: 'var(--text-secondary)' }}>{bVal !== '--' ? `${bVal} ${row.unit}` : '--'}</td>
-                                <td style={{ padding: '8px 10px', color: 'var(--text)', fontWeight: 700 }}>{aVal !== '--' ? `${aVal} ${row.unit}` : '--'}</td>
+                                <td style={{ padding: '8px 10px', color: 'var(--text-secondary)' }}>{bVal !== '--' && bVal !== '' ? `${bVal} ${row.unit}` : '--'}</td>
+                                <td style={{ padding: '8px 10px', color: 'var(--text)', fontWeight: 700 }}>{aVal !== '--' && aVal !== '' ? `${aVal} ${row.unit}` : '--'}</td>
                                 <td style={{ padding: '8px 10px' }}>{renderMetricDelta(bVal, aVal, row.unit)}</td>
                               </tr>
                             );

@@ -20,8 +20,10 @@ import Avatar from '@/components/ui/Avatar';
 import Badge from '@/components/ui/Badge';
 import { TableSkeleton } from '@/components/ui/Loading';
 import Modal from '@/components/ui/Modal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import Pagination from '@/components/ui/Pagination';
 import SearchableSelect from '@/components/ui/SearchableSelect';
+import { ALL_COUNTRIES } from '@/lib/countries';
 import ImageUpload from '@/components/ui/ImageUpload';
 import { 
   Users, 
@@ -49,8 +51,12 @@ export default function ClientsPage() {
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [countryFilter, setCountryFilter] = useState('all');
+  const [genderFilter, setGenderFilter] = useState('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedProfileClient, setSelectedProfileClient] = useState(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', onConfirm: null, variant: 'danger', confirmText: 'Confirm' });
   const [viewingPhotoUrl, setViewingPhotoUrl] = useState(null);
   const [isChangePlanModalOpen, setIsChangePlanModalOpen] = useState(false);
   const [changePlanClient, setChangePlanClient] = useState(null);
@@ -68,6 +74,9 @@ export default function ClientsPage() {
     age: '',
     dob: '',
     gender: 'Male',
+    country: 'India',
+    sleepTiming: '',
+    workingHours: '',
     profession: '',
     location: '',
     height: '',
@@ -146,71 +155,95 @@ export default function ClientsPage() {
       }
     }
 
-    setNewClient(prev => ({
-      ...prev,
-      planIdCombo: combo,
-      originalAmount: priceStr,
-      amountPaid: priceStr
-    }));
+    setNewClient(prev => {
+      const orig = parseFloat(priceStr) || 0;
+      const discVal = parseFloat(prev.discountValue) || 0;
+      const finalAmt = prev.discountType === 'percentage' 
+        ? Math.max(0, orig * (1 - discVal / 100))
+        : Math.max(0, orig - discVal);
+      return {
+        ...prev,
+        planIdCombo: combo,
+        originalAmount: priceStr,
+        amountPaid: String(finalAmt)
+      };
+    });
   };
 
   // Remove Plan Handler
-  const handleRemovePlan = async (client) => {
+  const handleRemovePlan = (client) => {
     if (!client) return;
-    if (!confirm(`Are you sure you want to remove the assigned plan from ${client.displayName || client.name}?`)) return;
-    try {
-      setLoading(true);
-      await updateClientProfile(client.id, {
-        currentPlan: '',
-        planStart: '',
-        planExpiry: '',
-        planId: ''
-      });
-      toast.success('Assigned plan removed successfully!');
-      if (selectedProfileClient?.id === client.id) {
-        setSelectedProfileClient(prev => ({
-          ...prev,
-          currentPlan: '',
-          planStart: '',
-          planExpiry: '',
-          planId: ''
-        }));
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Remove Assigned Plan',
+      message: `Are you sure you want to remove the assigned plan from ${client.displayName || client.name}?`,
+      confirmText: 'Remove Plan',
+      variant: 'warning',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          await updateClientProfile(client.id, {
+            currentPlan: '',
+            planStart: '',
+            planExpiry: '',
+            planId: ''
+          });
+          toast.success('Assigned plan removed successfully!');
+          if (selectedProfileClient?.id === client.id) {
+            setSelectedProfileClient(prev => ({
+              ...prev,
+              currentPlan: '',
+              planStart: '',
+              planExpiry: '',
+              planId: ''
+            }));
+          }
+          await fetchClients();
+        } catch (err) {
+          toast.error('Failed to remove assigned plan');
+        } finally {
+          setLoading(false);
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        }
       }
-      await fetchClients();
-    } catch (err) {
-      toast.error('Failed to remove assigned plan');
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   // Toggle Disable / Enable Client Membership Handler
-  const handleToggleClientDisable = async (client) => {
+  const handleToggleClientDisable = (client) => {
     if (!client) return;
     const isCurrentlyActive = client.status !== 'inactive';
     const newStatus = isCurrentlyActive ? 'inactive' : 'active';
     const actionText = isCurrentlyActive ? 'disable' : 'enable';
 
-    if (!confirm(`Are you sure you want to ${actionText} membership status for ${client.displayName || client.name}?`)) return;
-
-    try {
-      setLoading(true);
-      await updateClientProfile(client.id, {
-        status: newStatus
-      });
-      toast.success(`Client membership ${isCurrentlyActive ? 'disabled' : 'enabled'} successfully!`);
-      if (selectedProfileClient?.id === client.id) {
-        setSelectedProfileClient(prev => ({
-          ...prev,
-          status: newStatus
-        }));
+    setConfirmConfig({
+      isOpen: true,
+      title: `${isCurrentlyActive ? 'Disable' : 'Enable'} Membership`,
+      message: `Are you sure you want to ${actionText} membership status for ${client.displayName || client.name}?`,
+      confirmText: `${isCurrentlyActive ? 'Disable' : 'Enable'} Membership`,
+      variant: isCurrentlyActive ? 'warning' : 'primary',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          await updateClientProfile(client.id, {
+            status: newStatus
+          });
+          toast.success(`Client membership ${isCurrentlyActive ? 'disabled' : 'enabled'} successfully!`);
+          if (selectedProfileClient?.id === client.id) {
+            setSelectedProfileClient(prev => ({
+              ...prev,
+              status: newStatus
+            }));
+          }
+          await fetchClients();
+        } catch (err) {
+          toast.error(`Failed to ${actionText} client membership`);
+        } finally {
+          setLoading(false);
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        }
       }
-      await fetchClients();
-    } catch (err) {
-      toast.error(`Failed to ${actionText} client`);
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   // Change / Switch Plan Handler
@@ -358,6 +391,9 @@ export default function ClientsPage() {
         age: newClient.age,
         dob: newClient.dob || '',
         gender: newClient.gender || 'Male',
+        country: newClient.country || 'India',
+        sleepTiming: newClient.sleepTiming || '',
+        workingHours: newClient.workingHours || '',
         profession: newClient.profession || '',
         location: newClient.location || '',
         height: newClient.height || '',
@@ -413,7 +449,8 @@ export default function ClientsPage() {
           const discountVal = parseFloat(newClient.discountValue) || 0;
           const finalAmt = calculateFinalAmount();
           const discountAmt = originalAmt - finalAmt;
-          const paidAmt = parseFloat(newClient.amountPaid) || 0;
+          const userPaid = parseFloat(newClient.amountPaid) || 0;
+          const paidAmt = Math.min(userPaid, finalAmt);
           const balanceAmt = Math.max(0, finalAmt - paidAmt);
           const planNameFormatted = `${selectedPlan.plan_name || selectedPlan.name} (${durationVal} ${durationUnit})`;
 
@@ -492,20 +529,27 @@ export default function ClientsPage() {
     }
   };
 
-  const handleDeleteClient = async (e, clientId, clientName) => {
+  const handleDeleteClient = (e, clientId, clientName) => {
     e.stopPropagation();
-    if (!confirm(`Are you sure you want to delete client "${clientName}"? This action cannot be undone.`)) {
-      return;
-    }
-
-    try {
-      await deleteClient(clientId);
-      toast.success(`Client "${clientName}" deleted successfully`);
-      await fetchClients();
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to delete client');
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Delete Client Account',
+      message: `Are you sure you want to delete client "${clientName}"? This action cannot be undone.`,
+      confirmText: 'Delete Client',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteClient(clientId);
+          toast.success(`Client "${clientName}" deleted successfully`);
+          await fetchClients();
+        } catch (err) {
+          console.error(err);
+          toast.error('Failed to delete client');
+        } finally {
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
 
@@ -565,7 +609,10 @@ export default function ClientsPage() {
       (c.clientCode || '')?.toLowerCase().includes(s);
     
     const matchesStatus = statusFilter === 'all' || (c.status || 'active') === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesCountry = countryFilter === 'all' || (c.country || 'India') === countryFilter;
+    const matchesGender = genderFilter === 'all' || (c.gender || 'Male').toLowerCase() === genderFilter.toLowerCase();
+
+    return matchesSearch && matchesStatus && matchesCountry && matchesGender;
   });
 
   const totalItems = filteredClients.length;
@@ -622,10 +669,39 @@ export default function ClientsPage() {
             }}
             style={styles.filterSelect}
           >
-            <option value="all">All Clients ({clients.length})</option>
+            <option value="all">All Status ({clients.length})</option>
             <option value="active">Active Members</option>
             <option value="inactive">Inactive</option>
           </select>
+
+          <select
+            value={genderFilter}
+            onChange={(e) => {
+              setGenderFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            style={styles.filterSelect}
+          >
+            <option value="all">All Genders</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+
+          <div style={{ minWidth: '180px' }}>
+            <SearchableSelect 
+              placeholder="All Countries"
+              value={countryFilter === 'all' ? '' : countryFilter}
+              onChange={(e) => {
+                setCountryFilter(e.target.value || 'all');
+                setCurrentPage(1);
+              }}
+              options={[
+                { label: '🌏 All Countries', value: '' },
+                ...ALL_COUNTRIES.map(c => ({ label: c, value: c }))
+              ]}
+            />
+          </div>
         </div>
       </div>
 
@@ -804,6 +880,16 @@ export default function ClientsPage() {
               ]}
             />
 
+            <SearchableSelect 
+              label="Country"
+              placeholder="-- Select Country --"
+              value={newClient.country}
+              onChange={(e) => setNewClient({ ...newClient, country: e.target.value })}
+              options={ALL_COUNTRIES.map(c => ({ label: c, value: c }))}
+            />
+          </div>
+
+          <div style={styles.formRow}>
             <Input 
               label="Password *" 
               type="password"
@@ -1180,6 +1266,16 @@ export default function ClientsPage() {
           </div>
         </Modal>
       )}
+      <ConfirmModal 
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        cancelText="Cancel"
+        variant={confirmConfig.variant}
+      />
     </div>
   );
 }

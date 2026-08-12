@@ -180,7 +180,7 @@ export const Textarea = ({ label, error, helperText, required, disabled, style =
   );
 };
 
-export const Select = ({ label, error, helperText, required, disabled, options = [], style = {}, containerStyle = {}, ...props }) => {
+export const Select = ({ label, error, helperText, required, disabled, options = [], style = {}, containerStyle = {}, children, ...props }) => {
   const [isFocused, setIsFocused] = useState(false);
   const cleanLabel = label?.endsWith('*') ? label.slice(0, -1).trim() : label;
 
@@ -217,8 +217,8 @@ export const Select = ({ label, error, helperText, required, disabled, options =
           onBlur={() => setIsFocused(false)}
           {...props}
         >
-          {options.map((opt, i) => (
-            <option key={i} value={typeof opt === 'object' ? opt.value : opt} style={{ backgroundColor: 'var(--card, #121214)', color: 'var(--text, #FFFFFF)' }}>
+          {children ? children : options.map((opt, i) => (
+            <option key={i} value={typeof opt === 'object' ? opt.value : opt} style={{ backgroundColor: '#121214', color: '#FFFFFF' }}>
               {typeof opt === 'object' ? opt.label : opt}
             </option>
           ))}

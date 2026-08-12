@@ -30,7 +30,7 @@ const Tabs = ({ tabs = [], activeTab, onChange }) => {
   };
 
   const tabStyle = (isActive) => ({
-    padding: '16px 24px',
+    padding: '12px 16px',
     color: isActive ? '#E00008' : '#AAAAAA',
     fontWeight: isActive ? '600' : '500',
     cursor: 'pointer',

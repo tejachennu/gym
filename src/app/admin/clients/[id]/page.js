@@ -21,8 +21,10 @@ import { Spinner } from '@/components/ui/Loading';
 import Button from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import Modal from '@/components/ui/Modal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import { Input, Textarea, Select } from '@/components/ui/Input';
 import SearchableSelect from '@/components/ui/SearchableSelect';
+import { ALL_COUNTRIES } from '@/lib/countries';
 import ImageUpload from '@/components/ui/ImageUpload';
 import { validateField } from '@/lib/validation';
 import { 
@@ -53,6 +55,8 @@ export default function ClientDetailPage({ params }) {
   const { id } = use(params);
   const toast = useToast();
   
+  const [activeTab, setActiveTab] = useState('profile');
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', onConfirm: null, variant: 'danger', confirmText: 'Confirm' });
   const [client, setClient] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -93,6 +97,9 @@ export default function ClientDetailPage({ params }) {
     age: '',
     dob: '',
     gender: 'Male',
+    country: 'India',
+    sleepTiming: '',
+    workingHours: '',
     profession: '',
     location: '',
     joiningDate: '',
@@ -170,6 +177,9 @@ export default function ClientDetailPage({ params }) {
           age: clientData.age || '',
           dob: clientData.dob || '',
           gender: clientData.gender || 'Male',
+          country: clientData.country || 'India',
+          sleepTiming: clientData.sleepTiming || '',
+          workingHours: clientData.workingHours || '',
           profession: clientData.profession || '',
           location: clientData.location || clientData.address || '',
           joiningDate: clientData.joiningDate || clientData.planStart || '',
@@ -236,12 +246,19 @@ export default function ClientDetailPage({ params }) {
       }
     }
 
-    setAssignPlanForm(prev => ({
-      ...prev,
-      planIdCombo: combo,
-      originalAmount: priceStr,
-      amountPaid: priceStr
-    }));
+    setAssignPlanForm(prev => {
+      const orig = parseFloat(priceStr) || 0;
+      const discVal = parseFloat(prev.discountValue) || 0;
+      const finalAmt = prev.discountType === 'percentage' 
+        ? Math.max(0, orig * (1 - discVal / 100))
+        : Math.max(0, orig - discVal);
+      return {
+        ...prev,
+        planIdCombo: combo,
+        originalAmount: priceStr,
+        amountPaid: String(finalAmt)
+      };
+    });
   };
 
   const calculateFinalAmount = () => {
@@ -307,7 +324,8 @@ export default function ClientDetailPage({ params }) {
       const discountVal = parseFloat(assignPlanForm.discountValue) || 0;
       const finalAmt = calculateFinalAmount();
       const discountAmt = originalAmt - finalAmt;
-      const paidAmt = parseFloat(assignPlanForm.amountPaid) || 0;
+      const userPaid = parseFloat(assignPlanForm.amountPaid) || 0;
+      const paidAmt = Math.min(userPaid, finalAmt);
       const balanceAmt = Math.max(0, finalAmt - paidAmt);
       const planNameFormatted = `${selectedPlan.plan_name || selectedPlan.name} (${durationVal} ${durationUnit})`;
 
@@ -422,46 +440,63 @@ export default function ClientDetailPage({ params }) {
     { key: 'blood', label: 'Blood Reports', icon: <Heart size={16} />, content: <BloodTab bloodReports={bloodReports} onViewAttachment={(url) => { setViewerUrl(url); setIsViewerOpen(true); }} /> },
   ];
 
-  const handleRemovePlan = async () => {
+  const handleRemovePlan = () => {
     if (!client) return;
-    if (!confirm(`Are you sure you want to remove the assigned plan from ${client.displayName || client.name}?`)) return;
-    try {
-      setLoading(true);
-      await updateClientProfile(id, {
-        currentPlan: '',
-        planStart: '',
-        planExpiry: '',
-        planId: ''
-      });
-      toast.success('Assigned plan removed successfully!');
-      await fetchClientData(id);
-    } catch (err) {
-      toast.error('Failed to remove assigned plan');
-    } finally {
-      setLoading(false);
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Remove Assigned Plan',
+      message: `Are you sure you want to remove the assigned plan from ${client.displayName || client.name}?`,
+      confirmText: 'Remove Plan',
+      variant: 'warning',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          await updateClientProfile(id, {
+            currentPlan: '',
+            planStart: '',
+            planExpiry: '',
+            planId: ''
+          });
+          toast.success('Assigned plan removed successfully!');
+          await fetchClientData(id);
+        } catch (err) {
+          toast.error('Failed to remove assigned plan');
+        } finally {
+          setLoading(false);
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
-  const handleToggleClientDisable = async () => {
+  const handleToggleClientDisable = () => {
     if (!client) return;
     const isCurrentlyActive = client.status !== 'inactive';
     const newStatus = isCurrentlyActive ? 'inactive' : 'active';
     const actionText = isCurrentlyActive ? 'disable' : 'enable';
 
-    if (!confirm(`Are you sure you want to ${actionText} membership status for ${client.displayName || client.name}?`)) return;
-
-    try {
-      setLoading(true);
-      await updateClientProfile(id, {
-        status: newStatus
-      });
-      toast.success(`Client membership ${isCurrentlyActive ? 'disabled' : 'enabled'} successfully!`);
-      await fetchClientData(id);
-    } catch (err) {
-      toast.error(`Failed to ${actionText} client`);
-    } finally {
-      setLoading(false);
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: `${isCurrentlyActive ? 'Disable' : 'Enable'} Membership`,
+      message: `Are you sure you want to ${actionText} membership status for ${client.displayName || client.name}?`,
+      confirmText: `${isCurrentlyActive ? 'Disable' : 'Enable'} Membership`,
+      variant: isCurrentlyActive ? 'warning' : 'primary',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          await updateClientProfile(id, {
+            status: newStatus
+          });
+          toast.success(`Client membership ${isCurrentlyActive ? 'disabled' : 'enabled'} successfully!`);
+          await fetchClientData(id);
+        } catch (err) {
+          toast.error(`Failed to ${actionText} client`);
+        } finally {
+          setLoading(false);
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
   return (
@@ -598,6 +633,28 @@ export default function ClientDetailPage({ params }) {
                 { label: 'Female', value: 'Female' },
                 { label: 'Other', value: 'Other' }
               ]}
+            />
+            <SearchableSelect 
+              label="Country"
+              placeholder="-- Select Country --"
+              value={profileForm.country}
+              onChange={(e) => setProfileForm({ ...profileForm, country: e.target.value })}
+              options={ALL_COUNTRIES.map(c => ({ label: c, value: c }))}
+            />
+            <Input 
+              label="Sleep Timing" 
+              placeholder="e.g. 10:00 PM - 06:00 AM"
+              value={profileForm.sleepTiming} 
+              onChange={(e) => setProfileForm({ ...profileForm, sleepTiming: e.target.value })}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+            <Input 
+              label="Working Hours" 
+              placeholder="e.g. 09:00 AM - 05:00 PM"
+              value={profileForm.workingHours} 
+              onChange={(e) => setProfileForm({ ...profileForm, workingHours: e.target.value })}
             />
             <Input 
               label="Profession" 
@@ -958,6 +1015,17 @@ export default function ClientDetailPage({ params }) {
           </div>
         </div>
       </Modal>
+
+      <ConfirmModal 
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        cancelText="Cancel"
+        variant={confirmConfig.variant}
+      />
     </div>
   );
 }
@@ -968,7 +1036,7 @@ function OverviewTab({ client }) {
   const bmi = (heightVal > 0 && weightVal > 0) ? (weightVal / ((heightVal / 100) ** 2)).toFixed(1) : 'N/A';
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '14px' }}>
       {/* CARD 1: Personal & Contact Information */}
       <Card style={{ padding: '14px' }}>
         <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1134,7 +1202,7 @@ function OverviewTab({ client }) {
       </Card>
 
       {/* CARD 5: Initial Baseline Posture Photos */}
-      <Card style={{ padding: '14px', gridColumn: 'span 2' }}>
+      <Card style={{ padding: '14px', gridColumn: '1 / -1' }}>
         <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Camera size={16} color="var(--accent)" /> Initial Baseline Body Photos (4 Views)
         </h3>
@@ -1333,12 +1401,19 @@ const styles = {
     display: 'flex',
     gap: '8px',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    marginTop: '4px',
   },
   metricRow: {
     display: 'flex',
     justifyContent: 'space-between',
+    alignItems: 'center',
     fontSize: '0.78rem',
     borderBottom: '1px dashed var(--border)',
-    paddingBottom: '4px',
+    paddingBottom: '5px',
+    paddingTop: '2px',
+    flexWrap: 'wrap',
+    gap: '6px',
+    wordBreak: 'break-word',
   },
 };

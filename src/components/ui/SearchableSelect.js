@@ -29,6 +29,34 @@ export default function SearchableSelect({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Temporarily elevate parent stacking contexts while open so dropdown floats over all cards/containers
+  useEffect(() => {
+    if (!isOpen || !containerRef.current) return;
+
+    const parentsToElevate = [];
+    let curr = containerRef.current.parentElement;
+    while (curr && curr !== document.body && curr.nodeType === 1) {
+      const prevZ = curr.style.zIndex;
+      const prevPos = curr.style.position;
+      const compPos = window.getComputedStyle(curr).position;
+
+      if (compPos === 'static') {
+        curr.style.position = 'relative';
+      }
+      curr.style.zIndex = '99999';
+
+      parentsToElevate.push({ el: curr, prevZ, prevPos });
+      curr = curr.parentElement;
+    }
+
+    return () => {
+      parentsToElevate.forEach(({ el, prevZ, prevPos }) => {
+        el.style.zIndex = prevZ;
+        el.style.position = prevPos;
+      });
+    };
+  }, [isOpen]);
+
   const selectedOption = options.find(opt => opt.value === value);
 
   // Filter options based on search query matching name, email, or phone
@@ -52,7 +80,7 @@ export default function SearchableSelect({
   const cleanLabel = label?.endsWith('*') ? label.slice(0, -1).trim() : label;
 
   return (
-    <div ref={containerRef} style={{ ...styles.container, ...style }}>
+    <div ref={containerRef} style={{ ...styles.container, zIndex: isOpen ? 99999 : 'auto', ...style }}>
       {label && (
         <label style={styles.label}>
           {cleanLabel} {required && <span style={{ color: 'var(--accent, #E00008)' }}>*</span>}
@@ -146,6 +174,7 @@ const styles = {
     flexDirection: 'column',
     gap: '6px',
     width: '100%',
+    position: 'relative',
   },
   label: {
     fontSize: '0.85rem',
@@ -172,15 +201,16 @@ const styles = {
     top: 'calc(100% + 6px)',
     left: 0,
     right: 0,
-    backgroundColor: 'var(--card)',
-    border: '1px solid var(--border, #2a2a30)',
+    backgroundColor: '#18181b',
+    border: '1px solid var(--border, #3f3f46)',
     borderRadius: '16px',
-    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.9)',
-    zIndex: 10002,
+    boxShadow: '0 25px 60px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.08)',
+    zIndex: 999999,
     padding: '8px',
     display: 'flex',
     flexDirection: 'column',
     gap: '8px',
+    backdropFilter: 'none',
   },
   searchBox: {
     position: 'relative',
@@ -213,7 +243,7 @@ const styles = {
     alignItems: 'center',
   },
   list: {
-    maxHeight: '350px',
+    maxHeight: '250px',
     overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',

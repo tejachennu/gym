@@ -18,6 +18,7 @@ import { Select, Input, Textarea } from '@/components/ui/Input';
 import { CardSkeleton } from '@/components/ui/Loading';
 import { useToast } from '@/components/ui/Toast';
 import Modal from '@/components/ui/Modal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import Badge from '@/components/ui/Badge';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import { 
@@ -57,8 +58,9 @@ function formatDateNice(dateStr) {
 export default function DietPlansPage() {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState('client-diets'); // 'client-diets' | 'templates'
-  const [clients, setClients] = useState([]);
+  const [viewMode, setViewMode] = useState('templates'); // 'templates' or 'history'
   const [selectedClient, setSelectedClient] = useState('');
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', onConfirm: null, variant: 'danger', confirmText: 'Confirm' });
   const [clientPlans, setClientPlans] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -449,15 +451,25 @@ export default function DietPlansPage() {
     }
   };
 
-  const handleDeleteClientPlan = async (planId) => {
-    if (!confirm('Are you sure you want to delete this assigned diet plan?')) return;
-    try {
-      await deleteDietPlan(planId);
-      toast.success('Diet plan deleted successfully');
-      await loadClientDietHistory(selectedClient);
-    } catch (err) {
-      toast.error('Failed to delete diet plan');
-    }
+  const handleDeleteClientPlan = (planId) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Delete Assigned Diet Plan',
+      message: 'Are you sure you want to delete this assigned diet plan? This action cannot be undone.',
+      confirmText: 'Delete Plan',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteDietPlan(planId);
+          toast.success('Diet plan deleted successfully');
+          await loadClientDietHistory(selectedClient);
+        } catch (err) {
+          toast.error('Failed to delete diet plan');
+        } finally {
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
 
@@ -486,15 +498,25 @@ export default function DietPlansPage() {
     }
   };
 
-  const handleDeleteTemplate = async (templateId) => {
-    if (!confirm('Are you sure you want to delete this diet template?')) return;
-    try {
-      await deleteDietTemplate(templateId);
-      toast.success('Template deleted');
-      await fetchInitialData();
-    } catch (err) {
-      toast.error('Failed to delete template');
-    }
+  const handleDeleteTemplate = (templateId) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Delete Master Diet Template',
+      message: 'Are you sure you want to delete this diet template? This action cannot be undone.',
+      confirmText: 'Delete Template',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteDietTemplate(templateId);
+          toast.success('Template deleted');
+          await fetchInitialData();
+        } catch (err) {
+          toast.error('Failed to delete template');
+        } finally {
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
   const selectedClientObj = clients.find(c => c.id === selectedClient);
@@ -747,7 +769,19 @@ export default function DietPlansPage() {
       {/* POPUP MODAL 1: DIET PLAN BUILDER POPUP (FOR ASSIGNING & EDITING CLIENT DIETS) */}
       <Modal
         isOpen={isDietModalOpen}
-        onClose={() => setIsDietModalOpen(false)}
+        onClose={() => {
+          setConfirmConfig({
+            isOpen: true,
+            title: 'Exit Unsaved Changes',
+            message: 'Do you want to exit? Your unsaved changes will be lost.',
+            confirmText: 'Discard & Exit',
+            variant: 'warning',
+            onConfirm: () => {
+              setIsDietModalOpen(false);
+              setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+            }
+          });
+        }}
         title={editingPlanId ? `Edit Diet Plan for ${selectedClientObj?.displayName || 'Client'}` : `Add New Diet Plan for ${selectedClientObj?.displayName || 'Client'}`}
         size="xl"
       >
@@ -998,7 +1032,19 @@ export default function DietPlansPage() {
       {/* POPUP MODAL 2: CREATE / EDIT MASTER TEMPLATE MODAL */}
       <Modal
         isOpen={isTemplateModalOpen}
-        onClose={() => setIsTemplateModalOpen(false)}
+        onClose={() => {
+          setConfirmConfig({
+            isOpen: true,
+            title: 'Exit Unsaved Changes',
+            message: 'Do you want to exit? Your unsaved changes will be lost.',
+            confirmText: 'Discard & Exit',
+            variant: 'warning',
+            onConfirm: () => {
+              setIsTemplateModalOpen(false);
+              setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+            }
+          });
+        }}
         title={editingTemplateId ? "Edit Master Diet Template" : "Create Master Diet Template"}
         size="xl"
       >
@@ -1149,6 +1195,16 @@ export default function DietPlansPage() {
           </div>
         </form>
       </Modal>
+      <ConfirmModal 
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        cancelText="Cancel"
+        variant={confirmConfig.variant}
+      />
     </div>
   );
 }

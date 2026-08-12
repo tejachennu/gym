@@ -15,7 +15,7 @@ export function AuthProvider({ children }) {
       setUser(firebaseUser);
       if (firebaseUser) {
         try {
-          let profile = await getUserProfile(firebaseUser.uid);
+          let profile = await getUserProfile(firebaseUser.uid, firebaseUser.email);
           if (!profile) {
             const role = firebaseUser.email?.toLowerCase().includes('admin') ? 'admin' : 'client';
             const newProfile = {

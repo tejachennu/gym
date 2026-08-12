@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { getAllClients, getClientDailyLogs, getClientCheckins, getPlans } from '@/lib/firestore';
+import { getAllClients, getClientDailyLogs, getClientCheckins, getPlans, getDocuments } from '@/lib/firestore';
 import Card from '@/components/ui/Card';
 import StatsCard from '@/components/ui/StatsCard';
 import Button from '@/components/ui/Button';
@@ -44,6 +44,7 @@ export default function AdminDashboard() {
   const [filterType, setFilterType] = useState('overall');
 
   const [clientsList, setClientsList] = useState([]);
+  const [billingInvoices, setBillingInvoices] = useState([]);
   const [masterPlansList, setMasterPlansList] = useState([]);
   const [logsMap, setLogsMap] = useState({}); // { client_id: { 'YYYY-MM-DD': logData } }
   const [allLogs, setAllLogs] = useState([]);
@@ -78,12 +79,14 @@ export default function AdminDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const [clients, fetchedPlans] = await Promise.all([
+      const [clients, fetchedPlans, billingData] = await Promise.all([
         getAllClients(),
-        getPlans()
+        getPlans(),
+        getDocuments('Billing').catch(() => [])
       ]);
       setClientsList(clients);
       setMasterPlansList(fetchedPlans || []);
+      setBillingInvoices(billingData || []);
       
       let logsListCombined = [];
       const tempLogsMap = {};
@@ -189,17 +192,55 @@ export default function AdminDashboard() {
     const inactive = filteredClientsList.filter(c => c.status === 'inactive' || (!c.currentPlan || c.currentPlan === 'None' || c.currentPlan === 'Not Assigned')).length;
     
     const now = new Date();
+    const todayZero = new Date();
+    todayZero.setHours(0, 0, 0, 0);
+
     const nextWeek = new Date();
     nextWeek.setDate(now.getDate() + 7);
+
     const expiring = filteredClientsList.filter(c => {
       if (!c.planExpiry) return false;
       const expiryDate = new Date(c.planExpiry);
-      return expiryDate > now && expiryDate <= nextWeek;
+      return expiryDate >= todayZero && expiryDate <= nextWeek;
     }).length;
 
-    const totalRev = filteredClientsList.reduce((acc, c) => acc + (parseFloat(c.amountPaid) || 0), 0);
-    const totalPending = filteredClientsList.reduce((acc, c) => acc + (parseFloat(c.balance) || 0), 0);
-    const paidCount = filteredClientsList.filter(c => (parseFloat(c.balance) || 0) <= 0 && parseFloat(c.amountPaid || 0) > 0).length;
+    const expiredCount = filteredClientsList.filter(c => {
+      if (!c.planExpiry) return false;
+      const expiryDate = new Date(c.planExpiry);
+      expiryDate.setHours(23, 59, 59, 999);
+      return expiryDate < todayZero;
+    }).length;
+
+    const getInvoicePaid = (item) => {
+      const paid = parseFloat(item.amountPaid) || 0;
+      const orig = parseFloat(item.originalAmount) || 0;
+      const disc = parseFloat(item.discountAmount) || 0;
+      const finalAmt = item.finalAmount !== undefined 
+        ? parseFloat(item.finalAmount) 
+        : (orig > 0 ? Math.max(0, orig - disc) : paid);
+      const bal = parseFloat(item.balance) || 0;
+
+      if (paid > 0) {
+        if (disc > 0 && orig > 0 && paid === orig) {
+          return Math.max(0, paid - disc);
+        }
+        return Math.min(paid, finalAmt);
+      }
+      return Math.max(0, finalAmt - bal);
+    };
+
+    let totalRev = 0;
+    let totalPending = 0;
+
+    if (billingInvoices && billingInvoices.length > 0) {
+      totalRev = billingInvoices.reduce((acc, inv) => acc + getInvoicePaid(inv), 0);
+      totalPending = billingInvoices.reduce((acc, inv) => acc + (parseFloat(inv.balance) || 0), 0);
+    } else {
+      totalRev = filteredClientsList.reduce((acc, c) => acc + getInvoicePaid(c), 0);
+      totalPending = filteredClientsList.reduce((acc, c) => acc + (parseFloat(c.balance) || 0), 0);
+    }
+
+    const paidCount = filteredClientsList.filter(c => (parseFloat(c.balance) || 0) <= 0 && getInvoicePaid(c) > 0).length;
 
     const todayStr = now.toISOString().split('T')[0];
     const todays = filteredAllLogs.filter(log => log.date === todayStr).length;
@@ -207,16 +248,20 @@ export default function AdminDashboard() {
 
     const upcomingCount = filteredClientsList.filter(c => checkPostureEnabled(c, masterPlansList)).length;
 
+    const unpaidCount = filteredClientsList.filter(c => (parseFloat(c.balance) || 0) > 0).length;
+
     return {
       totalClients: total,
       todaysUploads: todays,
       pendingReviews: pending,
       activeMemberships: active,
       expiringSoon: expiring,
+      expiredMemberships: expiredCount,
       upcomingCheckins: upcomingCount,
       totalRevenue: totalRev,
       pendingDues: totalPending,
       paidMembers: paidCount,
+      unpaidMembers: unpaidCount,
       inactiveClients: inactive,
     };
   }, [filteredClientsList, filteredAllLogs, masterPlansList]);
@@ -253,10 +298,24 @@ export default function AdminDashboard() {
         return filteredClientsList.filter(c => c.status === 'active' || (c.currentPlan && c.currentPlan !== 'None'));
 
       case 'expiringSoon':
+        const todayExpiring = new Date();
+        todayExpiring.setHours(0, 0, 0, 0);
+        const nextWeekExpiring = new Date();
+        nextWeekExpiring.setDate(todayExpiring.getDate() + 7);
         return filteredClientsList.filter(c => {
           if (!c.planExpiry) return false;
           const exp = new Date(c.planExpiry);
-          return exp > now && exp <= nextWeek;
+          return exp >= todayExpiring && exp <= nextWeekExpiring;
+        });
+
+      case 'expiredMemberships':
+        const todayZeroExp = new Date();
+        todayZeroExp.setHours(0, 0, 0, 0);
+        return filteredClientsList.filter(c => {
+          if (!c.planExpiry) return false;
+          const exp = new Date(c.planExpiry);
+          exp.setHours(23, 59, 59, 999);
+          return exp < todayZeroExp;
         });
 
       case 'upcomingCheckins':
@@ -334,7 +393,8 @@ export default function AdminDashboard() {
         return { title: 'Total Revenue Collected', icon: Wallet, color: '#00c853' };
 
       case 'pendingDues':
-        return { title: 'Pending Dues & Unpaid Balances', icon: Receipt, color: '#ff9100' };
+      case 'unpaidMembers':
+        return { title: '⚠️ Unpaid Members & Pending Dues', icon: Receipt, color: '#ff9100' };
 
       case 'paidMembers':
         return { title: 'Fully Paid Memberships', icon: CheckCircle2, color: '#00e676' };
@@ -350,6 +410,9 @@ export default function AdminDashboard() {
 
       case 'expiringSoon':
         return { title: 'Memberships Expiring Soon', icon: AlertTriangle, color: '#ff1744' };
+
+      case 'expiredMemberships':
+        return { title: 'Expired Client Memberships', icon: XCircle, color: '#d50000' };
 
       case 'upcomingCheckins':
         return { title: 'Upcoming 10-Day Transformation Check-ins', icon: Calendar, color: '#ab47bc' };
@@ -547,6 +610,16 @@ export default function AdminDashboard() {
             color="#ff1744" 
             onClick={() => handleCardClick('expiringSoon')}
             isActive={selectedCard === 'expiringSoon'}
+          />
+          <StatsCard 
+            title="EXPIRED MEMBERSHIPS" 
+            value={stats.expiredMemberships} 
+            change={stats.expiredMemberships > 0 ? "Plans Expired" : "No Expired Plans"} 
+            changeType="down" 
+            icon={XCircle} 
+            color="#d50000" 
+            onClick={() => handleCardClick('expiredMemberships')}
+            isActive={selectedCard === 'expiredMemberships'}
           />
           <StatsCard 
             title="UPCOMING CHECK-INS" 

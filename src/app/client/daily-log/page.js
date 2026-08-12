@@ -101,14 +101,15 @@ export default function TrackingPage() {
   // Combined Activity & Wellness State
   const [activityWellnessForm, setActivityWellnessForm] = useState({
     steps: '',
+    stepsScreenshot: '',
     water: '',
     sleepHours: '',
-    workoutWeight: '',
     sleepQuality: 'Good',
     energyLevel: 'Medium',
     mood: 'Good',
     dailyNotes: ''
   });
+  const [uploadingStepsScreenshot, setUploadingStepsScreenshot] = useState(false);
 
   // Combined Posture Photos & Sizing Measurements State
   const [posturePhotos, setPosturePhotos] = useState({ front: '', back: '', left: '', right: '' });
@@ -142,9 +143,9 @@ export default function TrackingPage() {
       if (tLog) {
         setActivityWellnessForm({
           steps: tLog.steps !== undefined ? String(tLog.steps) : '',
+          stepsScreenshot: tLog.stepsScreenshot || '',
           water: tLog.water !== undefined ? String(tLog.water) : '',
           sleepHours: tLog.sleepHours !== undefined ? String(tLog.sleepHours) : '',
-          workoutWeight: tLog.workoutWeight !== undefined ? String(tLog.workoutWeight) : '',
           sleepQuality: tLog.sleepQuality || 'Good',
           energyLevel: tLog.energyLevel || 'Medium',
           mood: tLog.mood || 'Good',
@@ -219,9 +220,9 @@ export default function TrackingPage() {
       await submitDailyLog(user.uid, {
         date: todayDateString,
         steps: activityWellnessForm.steps ? Number(activityWellnessForm.steps) : 0,
+        stepsScreenshot: activityWellnessForm.stepsScreenshot || '',
         water: activityWellnessForm.water ? Number(activityWellnessForm.water) : 0,
         sleepHours: activityWellnessForm.sleepHours ? Number(activityWellnessForm.sleepHours) : 0,
-        workoutWeight: activityWellnessForm.workoutWeight ? Number(activityWellnessForm.workoutWeight) : 0,
         sleepQuality: activityWellnessForm.sleepQuality,
         energyLevel: activityWellnessForm.energyLevel,
         mood: activityWellnessForm.mood,
@@ -310,8 +311,7 @@ export default function TrackingPage() {
       date: log.date.split('-').slice(1).join('/'),
       steps: log.steps || 0,
       water: log.water || 0,
-      sleepHours: log.sleepHours || 0,
-      workoutWeight: log.workoutWeight || 0
+      sleepHours: log.sleepHours || 0
     }));
 
   // Filter Sizing Chart Data
@@ -468,25 +468,7 @@ export default function TrackingPage() {
                   )}
                 </Button>
 
-                {/* GRAPH 1: WORKOUT WEIGHT LIFTED */}
-                <Card style={styles.chartCard} className="glass-card">
-                  <h4 style={{ ...styles.chartTitle, color: '#00c853', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Dumbbell size={16} color="#00c853" /> 🏋️ Workout Weight Lifted Analytics ({fromDate} to {toDate})
-                  </h4>
-                  {activityChartData.length > 0 ? (
-                    <div style={{ width: '100%', height: 165 }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={activityChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                          <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={10} />
-                          <YAxis stroke="var(--text-secondary)" fontSize={10} />
-                          <Tooltip contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '11px' }} formatter={(val) => [`${val} kg`, 'Lifted Weight / Volume']} />
-                          <Area type="monotone" dataKey="workoutWeight" stroke="#00c853" fill="#00c853" fillOpacity={0.25} strokeWidth={2} />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ) : <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No workout weight data found for date range.</p>}
-                </Card>
+
 
                 {/* GRAPH 2: STEPS */}
                 <Card style={styles.chartCard} className="glass-card">
@@ -529,14 +511,69 @@ export default function TrackingPage() {
               {showInputPopup && (
                 <Modal isOpen={showInputPopup} onClose={() => setShowInputPopup(false)} title="Log Today's Activity & Wellness" size="md">
                   <form onSubmit={handleSaveActivityWellness} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      <Input label="Steps (e.g. 10000)" type="number" value={activityWellnessForm.steps} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, steps: e.target.value })} />
-                      <Input label="Water (Litres e.g. 3)" type="number" step="0.1" value={activityWellnessForm.water} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, water: e.target.value })} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', alignItems: 'end' }}>
+                        <Input label="Steps (e.g. 10000)" type="number" value={activityWellnessForm.steps} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, steps: e.target.value })} />
+                        <Input label="Water (Litres e.g. 3)" type="number" step="0.1" value={activityWellnessForm.water} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, water: e.target.value })} />
+                      </div>
+
+                      {/* Steps Screenshot Upload Option */}
+                      <div style={{ padding: '8px', backgroundColor: 'var(--card-hover)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                          <Camera size={14} color="var(--accent)" /> Upload Daily Steps Screenshot (Optional)
+                        </label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            id="steps-screenshot-input"
+                            style={{ display: 'none' }}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setUploadingStepsScreenshot(true);
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setActivityWellnessForm(prev => ({ ...prev, stepsScreenshot: reader.result }));
+                                  setUploadingStepsScreenshot(false);
+                                  toast.success('Steps screenshot attached!');
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                          <label 
+                            htmlFor="steps-screenshot-input"
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              backgroundColor: 'var(--card)',
+                              border: '1px solid var(--border)',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}
+                          >
+                            {uploadingStepsScreenshot ? <Spinner size={12} /> : <Upload size={12} color="var(--accent)" />}
+                            {activityWellnessForm.stepsScreenshot ? '✓ Change Screenshot' : '📸 Upload Steps Proof'}
+                          </label>
+                          {activityWellnessForm.stepsScreenshot && (
+                            <span 
+                              onClick={() => setViewingPhotoUrl(activityWellnessForm.stepsScreenshot)} 
+                              style={{ fontSize: '0.72rem', color: '#00c853', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
+                            >
+                              View Screenshot 👁️
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
                       <Input label="Sleep Duration (Hours e.g. 7.5)" type="number" step="0.5" value={activityWellnessForm.sleepHours} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, sleepHours: e.target.value })} />
-                      <Input label="Workout Weight Lifted (kg)" type="number" step="0.5" value={activityWellnessForm.workoutWeight} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, workoutWeight: e.target.value })} />
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
@@ -677,16 +714,22 @@ export default function TrackingPage() {
                         <TrendingUp size={14} /> 2. Enter Body Sizing Measurements (Optional)
                       </h4>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '6px' }}>
                         <Input label="Weight (kg)" type="number" step="0.1" value={sizingForm.weight} onChange={(e) => setSizingForm({ ...sizingForm, weight: e.target.value })} />
-                        <Input label="Waist (in)" type="number" step="0.1" value={sizingForm.waist} onChange={(e) => setSizingForm({ ...sizingForm, waist: e.target.value })} />
                         <Input label="Chest (in)" type="number" step="0.1" value={sizingForm.chest} onChange={(e) => setSizingForm({ ...sizingForm, chest: e.target.value })} />
-                        <Input label="Stomach (in)" type="number" step="0.1" value={sizingForm.stomach} onChange={(e) => setSizingForm({ ...sizingForm, stomach: e.target.value })} />
                         <Input label="Neck (in)" type="number" step="0.1" value={sizingForm.neck} onChange={(e) => setSizingForm({ ...sizingForm, neck: e.target.value })} />
                         <Input label="Shoulder (in)" type="number" step="0.1" value={sizingForm.shoulder} onChange={(e) => setSizingForm({ ...sizingForm, shoulder: e.target.value })} />
-                        <Input label="Right Bicep" type="number" step="0.1" value={sizingForm.rBicep} onChange={(e) => setSizingForm({ ...sizingForm, rBicep: e.target.value })} />
-                        <Input label="Left Bicep" type="number" step="0.1" value={sizingForm.lBicep} onChange={(e) => setSizingForm({ ...sizingForm, lBicep: e.target.value })} />
-                        <Input label="Right Thigh" type="number" step="0.1" value={sizingForm.rThigh} onChange={(e) => setSizingForm({ ...sizingForm, rThigh: e.target.value })} />
+                        <Input label="Waist (in)" type="number" step="0.1" value={sizingForm.waist} onChange={(e) => setSizingForm({ ...sizingForm, waist: e.target.value })} />
+                        <Input label="Stomach (in)" type="number" step="0.1" value={sizingForm.stomach} onChange={(e) => setSizingForm({ ...sizingForm, stomach: e.target.value })} />
+                        <Input label="Butt / Hip (in)" type="number" step="0.1" value={sizingForm.highHip} onChange={(e) => setSizingForm({ ...sizingForm, highHip: e.target.value })} />
+                        <Input label="Right Bicep (in)" type="number" step="0.1" value={sizingForm.rBicep} onChange={(e) => setSizingForm({ ...sizingForm, rBicep: e.target.value })} />
+                        <Input label="Left Bicep (in)" type="number" step="0.1" value={sizingForm.lBicep} onChange={(e) => setSizingForm({ ...sizingForm, lBicep: e.target.value })} />
+                        <Input label="Right Forearm" type="number" step="0.1" value={sizingForm.rForearm} onChange={(e) => setSizingForm({ ...sizingForm, rForearm: e.target.value })} />
+                        <Input label="Left Forearm" type="number" step="0.1" value={sizingForm.lForearm} onChange={(e) => setSizingForm({ ...sizingForm, lForearm: e.target.value })} />
+                        <Input label="Right Thigh (in)" type="number" step="0.1" value={sizingForm.rThigh} onChange={(e) => setSizingForm({ ...sizingForm, rThigh: e.target.value })} />
+                        <Input label="Left Thigh (in)" type="number" step="0.1" value={sizingForm.lThigh} onChange={(e) => setSizingForm({ ...sizingForm, lThigh: e.target.value })} />
+                        <Input label="Right Calf (in)" type="number" step="0.1" value={sizingForm.rCalf} onChange={(e) => setSizingForm({ ...sizingForm, rCalf: e.target.value })} />
+                        <Input label="Left Calf (in)" type="number" step="0.1" value={sizingForm.lCalf} onChange={(e) => setSizingForm({ ...sizingForm, lCalf: e.target.value })} />
                       </div>
                     </Card>
 

@@ -99,8 +99,7 @@ const ImageUpload = ({
         }
       }
     } catch (err) {
-      console.error('Drive file upload failed:', err);
-      alert(`Google Drive Upload failed: ${err.message}`);
+      console.error('Google Drive Upload failed:', err);
     } finally {
       setUploading(false);
     }

@@ -19,6 +19,7 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import { CardSkeleton } from '@/components/ui/Loading';
 import { useToast } from '@/components/ui/Toast';
 import Modal from '@/components/ui/Modal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import Badge from '@/components/ui/Badge';
 import { 
   Dumbbell, 
@@ -80,6 +81,7 @@ export default function WorkoutPlansPage() {
   const [activeTab, setActiveTab] = useState('client-workouts'); // 'client-workouts' | 'templates'
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState('');
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', onConfirm: null, variant: 'danger', confirmText: 'Confirm' });
   const [clientPlans, setClientPlans] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -387,15 +389,25 @@ export default function WorkoutPlansPage() {
     }
   };
 
-  const handleDeleteClientPlan = async (planId) => {
-    if (!confirm('Are you sure you want to delete this assigned workout plan?')) return;
-    try {
-      await deleteWorkoutPlan(planId);
-      toast.success('Workout plan deleted successfully');
-      await loadClientWorkoutHistory(selectedClient);
-    } catch (err) {
-      toast.error('Failed to delete workout plan');
-    }
+  const handleDeleteClientPlan = (planId) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Delete Assigned Workout Plan',
+      message: 'Are you sure you want to delete this assigned workout plan? This action cannot be undone.',
+      confirmText: 'Delete Plan',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteWorkoutPlan(planId);
+          toast.success('Workout plan deleted successfully');
+          await loadClientWorkoutHistory(selectedClient);
+        } catch (err) {
+          toast.error('Failed to delete workout plan');
+        } finally {
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
 
@@ -567,15 +579,25 @@ export default function WorkoutPlansPage() {
     }
   };
 
-  const handleDeleteTemplate = async (templateId) => {
-    if (!confirm('Are you sure you want to delete this workout template?')) return;
-    try {
-      await deleteWorkoutTemplate(templateId);
-      toast.success('Template deleted');
-      await fetchInitialData();
-    } catch (err) {
-      toast.error('Failed to delete template');
-    }
+  const handleDeleteTemplate = (templateId) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Delete Master Workout Template',
+      message: 'Are you sure you want to delete this workout template? This action cannot be undone.',
+      confirmText: 'Delete Template',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteWorkoutTemplate(templateId);
+          toast.success('Template deleted');
+          await fetchInitialData();
+        } catch (err) {
+          toast.error('Failed to delete template');
+        } finally {
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
   const selectedClientObj = clients.find(c => c.id === selectedClient);
@@ -859,7 +881,19 @@ export default function WorkoutPlansPage() {
       {/* POPUP MODAL 1: WORKOUT PLAN BUILDER FOR CLIENT */}
       <Modal
         isOpen={isWorkoutModalOpen}
-        onClose={() => setIsWorkoutModalOpen(false)}
+        onClose={() => {
+          setConfirmConfig({
+            isOpen: true,
+            title: 'Exit Unsaved Changes',
+            message: 'Do you want to exit? Your unsaved changes will be lost.',
+            confirmText: 'Discard & Exit',
+            variant: 'warning',
+            onConfirm: () => {
+              setIsWorkoutModalOpen(false);
+              setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+            }
+          });
+        }}
         title={editingPlanId ? `Edit Workout Plan for ${selectedClientObj?.displayName || 'Client'}` : `Add New Workout Plan for ${selectedClientObj?.displayName || 'Client'}`}
         size="xl"
       >
@@ -1119,7 +1153,19 @@ export default function WorkoutPlansPage() {
       {/* POPUP MODAL 2: CREATE / EDIT MASTER WORKOUT TEMPLATE */}
       <Modal
         isOpen={isTemplateModalOpen}
-        onClose={() => setIsTemplateModalOpen(false)}
+        onClose={() => {
+          setConfirmConfig({
+            isOpen: true,
+            title: 'Exit Unsaved Changes',
+            message: 'Do you want to exit? Your unsaved changes will be lost.',
+            confirmText: 'Discard & Exit',
+            variant: 'warning',
+            onConfirm: () => {
+              setIsTemplateModalOpen(false);
+              setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+            }
+          });
+        }}
         title={editingTemplateId ? "Edit Master Workout Template" : "Create Master Workout Template"}
         size="lg"
       >
@@ -1291,6 +1337,16 @@ export default function WorkoutPlansPage() {
           </Button>
         </form>
       </Modal>
+      <ConfirmModal 
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        cancelText="Cancel"
+        variant={confirmConfig.variant}
+      />
     </div>
   );
 }

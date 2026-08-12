@@ -9,6 +9,7 @@ import Badge from '@/components/ui/Badge';
 import Avatar from '@/components/ui/Avatar';
 import { getClientNotifications, markAsRead, deleteNotification } from '@/lib/firestore';
 import Card from '@/components/ui/Card';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import { logoutUser } from '@/lib/auth';
 import { Sun, Moon, Bell, Trash2, CheckCircle2, AlertTriangle, Info, MessageCircle, LogOut } from 'lucide-react';
 
@@ -18,6 +19,8 @@ export default function ClientLayout({ children }) {
   const router = useRouter();
   const [notifications, setNotifications] = useState([]);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     if (!loading) {
@@ -50,14 +53,16 @@ export default function ClientLayout({ children }) {
     }
   };
 
-  const handleLogout = async () => {
-    if (confirm('Are you sure you want to log out?')) {
-      try {
-        await logoutUser();
-        router.push('/login');
-      } catch (err) {
-        console.error(err);
-      }
+  const handleLogoutConfirm = async () => {
+    setLoggingOut(true);
+    try {
+      await logoutUser();
+      router.push('/login');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoggingOut(false);
+      setIsLogoutModalOpen(false);
     }
   };
 
@@ -109,7 +114,7 @@ export default function ClientLayout({ children }) {
             </a>
 
             <button
-              onClick={handleLogout}
+              onClick={() => setIsLogoutModalOpen(true)}
               style={{
                 backgroundColor: 'rgba(255, 255, 255, 0.08)',
                 border: '1px solid var(--border)',
@@ -249,7 +254,7 @@ export default function ClientLayout({ children }) {
 
           {/* Logout Button */}
           <button 
-            onClick={handleLogout}
+            onClick={() => setIsLogoutModalOpen(true)}
             style={{
               background: 'rgba(224, 0, 8, 0.12)',
               border: '1px solid rgba(224, 0, 8, 0.3)',
@@ -400,6 +405,17 @@ export default function ClientLayout({ children }) {
       </main>
 
       <BottomNav />
+      <ConfirmModal 
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+        onConfirm={handleLogoutConfirm}
+        title="Log Out"
+        message="Are you sure you want to log out of your account?"
+        confirmText="Log Out"
+        cancelText="Cancel"
+        variant="danger"
+        loading={loggingOut}
+      />
     </div>
   );
 }

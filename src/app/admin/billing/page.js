@@ -9,6 +9,7 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import { TableSkeleton } from '@/components/ui/Loading';
 import { useToast } from '@/components/ui/Toast';
 import Modal from '@/components/ui/Modal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import Badge from '@/components/ui/Badge';
 import Pagination from '@/components/ui/Pagination';
 import { validateField } from '@/lib/validation';
@@ -24,7 +25,8 @@ import {
   AlertCircle,
   CreditCard,
   CheckCircle,
-  Search
+  Search,
+  Wallet
 } from 'lucide-react';
 
 export default function BillingPage() {
@@ -41,6 +43,7 @@ export default function BillingPage() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   // Payment Recording Modal State
   const [paymentModalInvoice, setPaymentModalInvoice] = useState(null);
@@ -50,11 +53,39 @@ export default function BillingPage() {
     notes: ''
   });
 
-  // Date Filters (Default 1 Month)
-  const defaultToDate = new Date().toISOString().split('T')[0];
-  const defaultFromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-  const [fromDate, setFromDate] = useState(defaultFromDate);
-  const [toDate, setToDate] = useState(defaultToDate);
+  // Date Filters & Presets (Overall, This Month, Last Month, Custom)
+  const [quickFilter, setQuickFilter] = useState('current_month');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+
+  useEffect(() => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    setFromDate(start);
+    setToDate(end);
+  }, []);
+
+  const handleQuickFilterChange = (val) => {
+    setQuickFilter(val);
+    const now = new Date();
+    if (val === 'current_month') {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      setFromDate(start);
+      setToDate(end);
+    } else if (val === 'last_month') {
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
+      const end = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
+      setFromDate(start);
+      setToDate(end);
+    } else if (val === 'overall') {
+      setFromDate('');
+      setToDate('');
+    }
+    setCurrentPage(1);
+  };
 
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -182,6 +213,9 @@ export default function BillingPage() {
 
       const finalAmount = calculateFinalAmount();
       const discountAmt = (parseFloat(form.originalAmount) || 0) - finalAmount;
+      const userEnteredPaid = parseFloat(form.amountPaid) || 0;
+      const actualPaid = Math.min(userEnteredPaid, finalAmount);
+      const actualBalance = Math.max(0, finalAmount - actualPaid);
 
       const data = {
         clientId: targetClientId || 'walkin',
@@ -195,11 +229,11 @@ export default function BillingPage() {
         discountValue: parseFloat(form.discountValue) || 0,
         discountAmount: discountAmt,
         finalAmount: finalAmount,
-        amountPaid: parseFloat(form.amountPaid) || 0,
-        balance: finalAmount - (parseFloat(form.amountPaid) || 0),
+        amountPaid: actualPaid,
+        balance: actualBalance,
         paymentMethod: form.paymentMethod,
         notes: form.notes.trim(),
-        status: (finalAmount - (parseFloat(form.amountPaid) || 0)) <= 0 ? 'Paid' : 'Partial',
+        status: actualBalance <= 0 ? 'Paid' : 'Partial',
         updatedAtStr: new Date().toISOString()
       };
 
@@ -265,20 +299,38 @@ export default function BillingPage() {
     }
   };
 
-  const handleDeleteInvoice = async (id) => {
-    if (!confirm('Are you sure you want to delete this billing record?')) return;
+  const handleDeleteInvoice = (id) => {
+    setConfirmDeleteId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDeleteId) return;
     try {
-      await deleteDocument('Billing', id);
+      await deleteDocument('Billing', confirmDeleteId);
       toast.success('Billing record deleted');
       await fetchAllInvoices();
       if (selectedClient) await loadClientInvoices(selectedClient);
     } catch (err) {
       toast.error('Failed to delete billing record');
+    } finally {
+      setConfirmDeleteId(null);
     }
   };
 
-  // Date filtered list
-  const dateFilteredInvoices = (selectedClient ? invoices : allInvoices).filter(inv => {
+  // Date & Single Search Filtered List
+  const dateFilteredInvoices = allInvoices.filter(inv => {
+    // 1. Single Unified Search Filter (Name, Phone, Email, Plan Name, Client ID)
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const nameMatch = inv.clientName?.toLowerCase().includes(q);
+      const emailMatch = inv.clientEmail?.toLowerCase().includes(q);
+      const phoneMatch = inv.clientPhone?.includes(q);
+      const planMatch = inv.planName?.toLowerCase().includes(q);
+      const idMatch = inv.clientId?.toLowerCase() === q;
+      if (!nameMatch && !emailMatch && !phoneMatch && !planMatch && !idMatch) return false;
+    }
+
+    // 2. Date Filter
     const d = inv.date || '';
     if (fromDate && d && d < fromDate) return false;
     if (toDate && d && d > toDate) return false;
@@ -295,8 +347,23 @@ export default function BillingPage() {
     currentPage * itemsPerPage
   );
 
-  // Summary Stats
-  const totalCollected = dateFilteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.amountPaid) || 0), 0);
+  // Summary Stats (Strictly excluding discounts from Total Collected)
+  const getInvoicePaid = (inv) => {
+    const finalAmt = inv.finalAmount !== undefined ? parseFloat(inv.finalAmount) : Math.max(0, (parseFloat(inv.originalAmount) || 0) - (parseFloat(inv.discountAmount) || 0));
+    const bal = parseFloat(inv.balance) || 0;
+    return Math.max(0, finalAmt - bal);
+  };
+
+  const totalOriginalAmount = dateFilteredInvoices.reduce((sum, inv) => {
+    const orig = parseFloat(inv.originalAmount);
+    if (!isNaN(orig) && orig > 0) return sum + orig;
+    const paid = getInvoicePaid(inv);
+    const disc = parseFloat(inv.discountAmount) || 0;
+    const bal = parseFloat(inv.balance) || 0;
+    return sum + (paid + disc + bal);
+  }, 0);
+
+  const totalCollected = dateFilteredInvoices.reduce((sum, inv) => sum + getInvoicePaid(inv), 0);
   const totalDiscount = dateFilteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.discountAmount) || 0), 0);
   const totalBalance = dateFilteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.balance) || 0), 0);
 
@@ -330,7 +397,15 @@ export default function BillingPage() {
       </header>
 
       {/* Summary Stats Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
+        <Card style={{ padding: '12px', background: 'linear-gradient(135deg, rgba(59,130,246,0.1) 0%, var(--card) 100%)', border: '1px solid rgba(59,130,246,0.3)' }} className="glass-card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+            <Wallet size={14} color="#3b82f6" />
+            <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>Overall Amount</span>
+          </div>
+          <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#3b82f6' }}>₹{totalOriginalAmount.toLocaleString('en-IN')}</span>
+        </Card>
+
         <Card style={{ padding: '12px', background: 'linear-gradient(135deg, rgba(0,200,83,0.1) 0%, var(--card) 100%)', border: '1px solid rgba(0,200,83,0.3)' }} className="glass-card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
             <TrendingUp size={14} color="#00c853" />
@@ -378,20 +453,27 @@ export default function BillingPage() {
         </Card>
       </div>
 
-      {/* Client Selector & Date Filter */}
-      <Card style={{ padding: '12px' }} className="glass-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-          <div style={{ flex: 1, minWidth: '200px', maxWidth: '350px' }}>
+      {/* Single Unified Filter Bar */}
+      <Card style={{ padding: '14px', position: 'relative', zIndex: 100 }} className="glass-card">
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          
+          {/* ONE SINGLE SEARCH FILTER */}
+          <div style={{ flex: '1 1 280px', minWidth: '240px' }}>
             <SearchableSelect 
-              label="Filter by Client (or leave empty for all)"
-              placeholder="Type name, phone, or email..."
-              value={selectedClient} 
-              onChange={(e) => setSelectedClient(e.target.value)}
+              label="Search Client Name, Phone or Plan"
+              placeholder="Type name, phone, or plan..."
+              value={searchQuery} 
+              onChange={(e) => { 
+                const val = e.target.value;
+                setSearchQuery(val); 
+                setCurrentPage(1); 
+                if (val.trim()) handleQuickFilterChange('overall');
+              }}
               options={[
-                { label: '🔍 Show All Clients', value: '' },
+                { label: '🔍 Show All (Clear Search)', value: '' },
                 ...clients.map((c) => ({
-                  label: c.displayName || c.name || 'No Name',
-                  value: c.id,
+                  label: `${c.displayName || c.name || 'No Name'} ${c.phone ? `• ${c.phone}` : ''}`,
+                  value: c.displayName || c.name || c.id,
                   email: c.email || '',
                   phone: c.phone || ''
                 }))
@@ -399,14 +481,53 @@ export default function BillingPage() {
             />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Filter size={14} color="var(--accent)" />
-            <Input type="date" label="From Date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setCurrentPage(1); }} style={{ width: '130px' }} />
-            <Input type="date" label="To Date" value={toDate} onChange={(e) => { setToDate(e.target.value); setCurrentPage(1); }} style={{ width: '130px' }} />
-            <Button variant="outline" size="sm" onClick={() => { setFromDate(defaultFromDate); setToDate(defaultToDate); setCurrentPage(1); }} style={{ alignSelf: 'flex-end' }}>
+          {/* DATE RANGE PRESETS */}
+          <div style={{ flex: '0 0 140px' }}>
+            <Select 
+              label="Date Range" 
+              value={quickFilter} 
+              onChange={(e) => handleQuickFilterChange(e.target.value)}
+              options={[
+                { label: 'This Month', value: 'current_month' },
+                { label: 'Last Month', value: 'last_month' },
+                { label: 'Overall', value: 'overall' },
+                { label: 'Custom Range', value: 'custom' }
+              ]}
+            />
+          </div>
+
+          {/* FROM DATE */}
+          <div style={{ flex: '0 0 140px' }}>
+            <Input 
+              type="date" 
+              label="From Date" 
+              value={fromDate} 
+              onChange={(e) => { setFromDate(e.target.value); setQuickFilter('custom'); setCurrentPage(1); }} 
+            />
+          </div>
+
+          {/* TO DATE */}
+          <div style={{ flex: '0 0 140px' }}>
+            <Input 
+              type="date" 
+              label="To Date" 
+              value={toDate} 
+              onChange={(e) => { setToDate(e.target.value); setQuickFilter('custom'); setCurrentPage(1); }} 
+            />
+          </div>
+
+          {/* RESET BUTTON */}
+          <div style={{ flex: '0 0 100px', marginTop: 'auto' }}>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => { setSearchQuery(''); handleQuickFilterChange('current_month'); }} 
+              style={{ width: '100%', height: '36px', justifyContent: 'center' }}
+            >
               Reset
             </Button>
           </div>
+
         </div>
       </Card>
 
@@ -505,7 +626,7 @@ export default function BillingPage() {
 
                       {/* Amount Paid */}
                       <td style={{ padding: '12px 10px', fontWeight: 800, color: '#00c853' }}>
-                        ₹{(inv.amountPaid || 0).toLocaleString('en-IN')}
+                        ₹{getInvoicePaid(inv).toLocaleString('en-IN')}
                       </td>
 
                       {/* Balance Due */}
@@ -789,6 +910,16 @@ export default function BillingPage() {
           </form>
         </Modal>
       )}
+      <ConfirmModal 
+        isOpen={!!confirmDeleteId}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Billing Record"
+        message="Are you sure you want to delete this billing record? This action cannot be undone."
+        confirmText="Delete Record"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 }

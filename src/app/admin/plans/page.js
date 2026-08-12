@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/Toast';
 import Button from '@/components/ui/Button';
 import { CardSkeleton } from '@/components/ui/Loading';
 import Modal from '@/components/ui/Modal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import { Input, Textarea, Select } from '@/components/ui/Input';
 import PlanCard from '@/components/ui/PlanCard';
 import { CreditCard, Plus, RefreshCw, Trash2, Check, Send } from 'lucide-react';
@@ -17,6 +18,7 @@ export default function PlansPage() {
   const [saving, setSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPlanId, setEditingPlanId] = useState(null);
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', onConfirm: null, variant: 'danger', confirmText: 'Confirm' });
 
   // Helper to parse existing string durations into value/unit format
   const parseDuration = (durationStr) => {
@@ -184,40 +186,57 @@ export default function PlansPage() {
     }
   };
 
-  const handleDeletePlan = async (planId) => {
-    if (!confirm('Are you sure you want to permanently delete/remove this membership plan?')) return;
-    try {
-      setLoading(true);
-      await deleteDocument('Plans', planId);
-      toast.success('Plan deleted successfully');
-      await fetchPlans();
-    } catch (err) {
-      toast.error('Failed to delete plan');
-    } finally {
-      setLoading(false);
-    }
+  const handleDeletePlan = (planId) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Delete Membership Plan',
+      message: 'Are you sure you want to permanently delete this membership plan? This action cannot be undone.',
+      confirmText: 'Delete Plan',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          await deleteDocument('Plans', planId);
+          toast.success('Plan deleted successfully');
+          await fetchPlans();
+        } catch (err) {
+          toast.error('Failed to delete plan');
+        } finally {
+          setLoading(false);
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
-  const handleToggleDeactivatePlan = async (plan) => {
+  const handleToggleDeactivatePlan = (plan) => {
     const isCurrentlyActive = plan.status !== 'inactive';
     const newStatus = isCurrentlyActive ? 'inactive' : 'active';
     const actionText = isCurrentlyActive ? 'deactivate' : 'activate';
     
-    if (!confirm(`Are you sure you want to ${actionText} "${plan.plan_name || plan.name}"?`)) return;
-    
-    try {
-      setLoading(true);
-      await updatePlan(plan.id, {
-        ...plan,
-        status: newStatus
-      });
-      toast.success(`Plan "${plan.plan_name || plan.name}" ${isCurrentlyActive ? 'deactivated' : 'activated'} successfully!`);
-      await fetchPlans();
-    } catch (err) {
-      toast.error(`Failed to ${actionText} plan`);
-    } finally {
-      setLoading(false);
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: `${isCurrentlyActive ? 'Deactivate' : 'Activate'} Plan`,
+      message: `Are you sure you want to ${actionText} "${plan.plan_name || plan.name}"?`,
+      confirmText: `${isCurrentlyActive ? 'Deactivate' : 'Activate'} Plan`,
+      variant: isCurrentlyActive ? 'warning' : 'primary',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          await updatePlan(plan.id, {
+            ...plan,
+            status: newStatus
+          });
+          toast.success(`Plan "${plan.plan_name || plan.name}" ${isCurrentlyActive ? 'deactivated' : 'activated'} successfully!`);
+          await fetchPlans();
+        } catch (err) {
+          toast.error(`Failed to ${actionText} plan`);
+        } finally {
+          setLoading(false);
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
 
@@ -511,6 +530,16 @@ export default function PlansPage() {
           </Button>
         </form>
       </Modal>
+      <ConfirmModal 
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        cancelText="Cancel"
+        variant={confirmConfig.variant}
+      />
     </div>
   );
 }

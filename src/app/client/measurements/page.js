@@ -11,12 +11,12 @@ import { Ruler, Activity, TrendingDown, TrendingUp, HelpCircle, CheckCircle2 } f
 
 const MEASUREMENT_COLUMNS = [
   { key: 'weight', label: 'Weight (kg)' },
-  { key: 'neck', label: '1. Neck' },
-  { key: 'shoulder', label: '2. Shoulder' },
-  { key: 'chest', label: '3. Chest' },
+  { key: 'chest', label: '1. Chest' },
+  { key: 'neck', label: '2. Neck' },
+  { key: 'shoulder', label: '3. Shoulder' },
   { key: 'waist', label: '4. Waist' },
   { key: 'stomach', label: '5. Stomach' },
-  { key: 'highHip', label: '6. High Hip' },
+  { key: 'highHip', label: '6. Butt / Hip' },
   { key: 'rBicep', label: '7. Right Bicep' },
   { key: 'lBicep', label: '8. Left Bicep' },
   { key: 'rForearm', label: '9. Right Forearm' },

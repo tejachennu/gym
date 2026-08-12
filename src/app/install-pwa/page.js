@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import { useToast } from '@/components/ui/Toast';
 import Badge from '@/components/ui/Badge';
 import { 
   Download, 
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 
 export default function InstallPwaPage() {
+  const toast = useToast();
   const router = useRouter();
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isInstalled, setIsInstalled] = useState(false);
@@ -53,7 +55,7 @@ export default function InstallPwaPage() {
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) {
-      alert("Installation prompt is not ready automatically. Follow the step-by-step instructions below for your device!");
+      toast.info("Installation prompt is not ready automatically. Follow the step-by-step instructions below for your device!");
       return;
     }
 

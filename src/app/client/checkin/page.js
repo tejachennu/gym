@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/Input';
 import ImageUpload from '@/components/ui/ImageUpload';
 import { useToast } from '@/components/ui/Toast';
 import { validateField } from '@/lib/validation';
-import { Camera, Ruler, Send, History, Calendar, Eye, Sparkles } from 'lucide-react';
+import { Camera, Ruler, Send, History, Calendar, Eye, Sparkles, CheckCircle2, Lock } from 'lucide-react';
 
 function formatDateNice(dateStr) {
   if (!dateStr) return '';
@@ -32,6 +32,7 @@ export default function CheckinPage() {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState(null);
+  const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
   
   const [photos, setPhotos] = useState({ front: '', back: '', left: '', right: '' });
   const [measurements, setMeasurements] = useState({
@@ -105,6 +106,19 @@ export default function CheckinPage() {
   const latestDateObj = latestCheckin?.date ? new Date(latestCheckin.date) : null;
   const nextCheckinDateObj = latestDateObj ? new Date(latestDateObj.getTime() + 10 * 24 * 60 * 60 * 1000) : null;
 
+  const todayZero = new Date();
+  todayZero.setHours(0, 0, 0, 0);
+
+  let daysRemaining = null;
+  let isDueTodayOrOverdue = false;
+  if (nextCheckinDateObj) {
+    const targetDate = new Date(nextCheckinDateObj);
+    targetDate.setHours(0, 0, 0, 0);
+    const diffTime = targetDate - todayZero;
+    daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    isDueTodayOrOverdue = daysRemaining <= 0;
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '60px' }} className="animate-fade-up">
       {/* Page Header */}
@@ -167,16 +181,191 @@ export default function CheckinPage() {
       {/* TAB 1: NEW CHECK-IN FORM */}
       {activeTab === 'new' && (
         <>
-          {/* Submitted Date Banner */}
+          {/* Submitted & Next Check-in Date Banner */}
           {latestCheckin && (
-            <Card style={{ padding: '10px 14px', backgroundColor: 'rgba(0, 200, 83, 0.12)', border: '1px solid rgba(0, 200, 83, 0.3)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Calendar size={18} color="#00c853" />
-              <div style={{ fontSize: '0.78rem' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Last Check-in Submitted Date: </span>
-                <strong style={{ color: '#00c853' }}>{formatDateNice(latestCheckin.date)}</strong>
+            <Card style={{ padding: '12px 16px', backgroundColor: 'var(--card-hover)', border: '1px solid var(--border)', borderRadius: '12px' }} className="glass-card">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                
+                {/* Last Check-in Submitted Box */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(0, 200, 83, 0.15)', color: '#00c853' }}>
+                    <Calendar size={18} />
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', display: 'block', textTransform: 'uppercase', fontWeight: 700 }}>
+                      Last Check-in Submitted
+                    </span>
+                    <strong style={{ fontSize: '0.9rem', color: '#00c853', fontWeight: 800 }}>
+                      {formatDateNice(latestCheckin.date)}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Next Check-in Due Box */}
+                {nextCheckinDateObj && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      padding: '8px',
+                      borderRadius: '8px',
+                      backgroundColor: isDueTodayOrOverdue ? 'rgba(255, 23, 68, 0.15)' : 'rgba(0, 176, 255, 0.15)',
+                      color: isDueTodayOrOverdue ? '#ff1744' : '#00b0ff'
+                    }}>
+                      <Sparkles size={18} />
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', display: 'block', textTransform: 'uppercase', fontWeight: 700 }}>
+                        Next Check-in Due Date
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <strong style={{ fontSize: '0.9rem', color: isDueTodayOrOverdue ? '#ff1744' : '#00b0ff', fontWeight: 800 }}>
+                          {formatDateNice(nextCheckinDateObj.toISOString())}
+                        </strong>
+                        <span style={{
+                          fontSize: '0.7rem',
+                          fontWeight: 800,
+                          padding: '2px 6px',
+                          borderRadius: '6px',
+                          backgroundColor: isDueTodayOrOverdue ? 'rgba(255, 23, 68, 0.2)' : 'rgba(0, 176, 255, 0.2)',
+                          color: isDueTodayOrOverdue ? '#ff1744' : '#00b0ff'
+                        }}>
+                          {daysRemaining === 0 ? 'Due Today 🔥' : daysRemaining < 0 ? `Overdue by ${Math.abs(daysRemaining)} days` : `in ${daysRemaining} days`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
               </div>
             </Card>
           )}
+
+          {/* IF CHECK-IN ALREADY SUBMITTED AND NEXT IS NOT DUE YET (daysRemaining > 0) */}
+          {latestCheckin && daysRemaining > 0 ? (
+            <Card style={{ padding: '24px', textAlign: 'center', borderRadius: '16px' }} className="glass-card">
+              <div style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(255, 23, 68, 0.15)',
+                color: '#ff1744',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 14px auto',
+                border: '1px solid rgba(255, 23, 68, 0.3)'
+              }}>
+                <Lock size={32} />
+              </div>
+
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text)' }}>
+                🔒 Check-In Submission Locked
+              </h3>
+
+              <p style={{ margin: '0 0 16px 0', fontSize: '0.84rem', color: 'var(--text-secondary)', maxWidth: '460px', marginLeft: 'auto', marginRight: 'auto' }}>
+                You completed your 10-day posture photos & 14-point measurements on <strong style={{ color: '#00c853' }}>{formatDateNice(latestCheckin.date)}</strong>. New check-in submissions are locked until your next cycle date.
+              </p>
+
+              {/* Countdown Banner */}
+              <div style={{
+                padding: '14px 20px',
+                borderRadius: '12px',
+                backgroundColor: 'rgba(0, 176, 255, 0.12)',
+                border: '1px solid rgba(0, 176, 255, 0.3)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '20px'
+              }}>
+                <Sparkles size={22} color="#00b0ff" />
+                <div style={{ textAlign: 'left' }}>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>
+                    Next Check-In Unlocks On
+                  </span>
+                  <strong style={{ fontSize: '1.05rem', color: '#00b0ff', fontWeight: 800 }}>
+                    {formatDateNice(nextCheckinDateObj.toISOString())}
+                  </strong>
+                  <span style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    marginLeft: '8px',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(0, 176, 255, 0.2)',
+                    color: '#00b0ff'
+                  }}>
+                    in {daysRemaining} days
+                  </span>
+                </div>
+              </div>
+
+              {/* Measurement Guide Quick Button */}
+              <div style={{ marginBottom: '20px' }}>
+                <Button variant="outline" size="sm" onClick={() => setIsGuideModalOpen(true)}>
+                  <Ruler size={14} /> 📐 View Measurement & Posture Guide
+                </Button>
+              </div>
+
+              {/* Latest Submitted Photos Preview */}
+              {latestCheckin.photos && Object.values(latestCheckin.photos).some(Boolean) && (
+                <div style={{ marginBottom: '20px' }}>
+                  <h4 style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '10px' }}>
+                    Submitted Photos ({formatDateNice(latestCheckin.date)})
+                  </h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: '8px', maxWidth: '440px', margin: '0 auto' }}>
+                    {['front', 'back', 'left', 'right'].map((key) => (
+                      <div key={key} style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border)', backgroundColor: 'var(--card-hover)', aspectRatio: '3/4', position: 'relative' }}>
+                        {latestCheckin.photos[key] ? (
+                          <img 
+                            src={latestCheckin.photos[key]} 
+                            alt={key} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
+                            onClick={() => { setPreviewPhotoUrl(latestCheckin.photos[key]); }}
+                          />
+                        ) : (
+                          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+                            No Photo
+                          </div>
+                        )}
+                        <span style={{ position: 'absolute', bottom: 2, left: 2, right: 2, backgroundColor: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '0.6rem', textAlign: 'center', borderRadius: '4px', textTransform: 'capitalize' }}>
+                          {key}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                <Button variant="outline" size="sm" onClick={() => setActiveTab('history')}>
+                  <History size={14} /> View History ({checkinsHistory.length})
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            <>
+              {/* Measurement & Body Posture Reference Guide Banner */}
+              <Card style={{ padding: '12px 16px', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border)', borderRadius: '12px', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(224, 0, 8, 0.15)', color: 'var(--accent, #E00008)' }}>
+                      <Ruler size={18} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: 'var(--text)' }}>
+                        📐 Measurement & Body Posture Reference Guide
+                      </h4>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.73rem', color: 'var(--text-secondary)' }}>
+                        Check tape placement & posture photo rules for accurate tracking
+                      </p>
+                    </div>
+                  </div>
+
+                  <Button size="sm" variant="outline" onClick={() => setIsGuideModalOpen(true)} style={{ fontSize: '0.75rem', fontWeight: 700 }}>
+                    <Eye size={14} /> View Guide Image
+                  </Button>
+                </div>
+              </Card>
 
           {/* Progress Photos Card */}
           <Card style={{ padding: '12px' }} className="glass-card">
@@ -226,13 +415,17 @@ export default function CheckinPage() {
               <Input type="number" numeric={true} allowDecimal={true} label="13. Right Calf" value={measurements.rCalf} onChange={(e) => setMeasurements({...measurements, rCalf: e.target.value})} />
               <Input type="number" numeric={true} allowDecimal={true} label="14. Left Calf" value={measurements.lCalf} onChange={(e) => setMeasurements({...measurements, lCalf: e.target.value})} />
             </div>
+            {/* Submit Button */}
+            <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+              <Button onClick={handleSubmit} loading={submitting} style={{ flex: 1 }}>
+                <Send size={16} /> Submit 10-Day Check-in
+              </Button>
+            </div>
           </Card>
-
-          <Button onClick={handleSubmit} loading={submitting} style={{ padding: '10px', fontSize: '0.85rem', fontWeight: 800 }}>
-            <Send size={15} /> Submit 10-Day Check-in
-          </Button>
         </>
       )}
+    </>
+  )}
 
       {/* TAB 2: PAST CHECK-INS HISTORY LIST */}
       {activeTab === 'history' && (
@@ -343,21 +536,39 @@ export default function CheckinPage() {
         </div>
       )}
 
-      {/* Image Full Screen Preview Modal */}
+      {/* MEASUREMENT & POSTURE GUIDE MODAL */}
+      <Modal
+        isOpen={isGuideModalOpen}
+        onClose={() => setIsGuideModalOpen(false)}
+        title="📐 14-Point Body Measurement & Posture Guide"
+        size="lg"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
+          <img 
+            src="/images/bodyposturesmeasurment.jpeg" 
+            alt="Body Postures & Measurements Reference Guide" 
+            style={{ maxWidth: '100%', maxHeight: '75vh', objectFit: 'contain', borderRadius: '12px', border: '1px solid var(--border)' }}
+          />
+          <Button variant="ghost" size="sm" onClick={() => setIsGuideModalOpen(false)}>Close Guide</Button>
+        </div>
+      </Modal>
+
+      {/* FULL PHOTO PREVIEW MODAL */}
       <Modal
         isOpen={!!previewPhotoUrl}
         onClose={() => setPreviewPhotoUrl(null)}
-        title="Check-in Photo Preview"
+        title="Posture Photo Preview"
       >
-        {previewPhotoUrl && (
-          <div style={{ textAlign: 'center' }}>
-            <img
-              src={previewPhotoUrl}
-              alt="Full Check-in Preview"
-              style={{ maxWidth: '100%', maxHeight: '75vh', borderRadius: '10px', objectFit: 'contain' }}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+          {previewPhotoUrl && (
+            <img 
+              src={previewPhotoUrl} 
+              alt="Posture Preview" 
+              style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: '8px' }}
             />
-          </div>
-        )}
+          )}
+          <Button variant="ghost" size="sm" onClick={() => setPreviewPhotoUrl(null)}>Close</Button>
+        </div>
       </Modal>
     </div>
   );

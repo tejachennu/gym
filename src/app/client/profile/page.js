@@ -6,9 +6,12 @@ import { logoutUser } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { getClientById, updateClientProfile } from '@/lib/firestore';
 import Card from '@/components/ui/Card';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import Button from '@/components/ui/Button';
 import Avatar from '@/components/ui/Avatar';
 import { Input, Textarea, Select } from '@/components/ui/Input';
+import SearchableSelect from '@/components/ui/SearchableSelect';
+import { ALL_COUNTRIES } from '@/lib/countries';
 import { Spinner } from '@/components/ui/Loading';
 import { useToast } from '@/components/ui/Toast';
 import { validateField } from '@/lib/validation';
@@ -41,6 +44,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
 
@@ -52,6 +57,9 @@ export default function ProfilePage() {
     age: '',
     gender: 'Male',
     dob: '',
+    country: 'India',
+    sleepTiming: '',
+    workingHours: '',
     profession: '',
     location: '',
     height: '',
@@ -95,6 +103,9 @@ export default function ProfilePage() {
               age: clientData.age || '',
               gender: clientData.gender || 'Male',
               dob: clientData.dob || '',
+              country: clientData.country || 'India',
+              sleepTiming: clientData.sleepTiming || '',
+              workingHours: clientData.workingHours || '',
               profession: clientData.profession || '',
               location: clientData.location || clientData.address || '',
               height: clientData.height || '',
@@ -156,7 +167,7 @@ export default function ProfilePage() {
             profileImage: data.fileUrl 
           });
         }
-        toast.success("Instagram profile photo updated!");
+        toast.success("Profile photo updated successfully!");
       } else {
         throw new Error(data.error || 'Photo upload failed');
       }
@@ -211,6 +222,9 @@ export default function ProfilePage() {
         age: form.age,
         gender: form.gender,
         dob: form.dob,
+        country: form.country,
+        sleepTiming: form.sleepTiming,
+        workingHours: form.workingHours,
         profession: form.profession,
         location: form.location,
         height: form.height,
@@ -236,7 +250,7 @@ export default function ProfilePage() {
         updatedAt: new Date().toISOString()
       });
 
-      toast.success('Profile details submitted successfully!');
+      toast.success('Profile updated successfully!');
       setIsEditing(false);
     } catch (err) {
       console.error(err);
@@ -392,6 +406,18 @@ export default function ProfilePage() {
               <div style={styles.summaryItem}>
                 <span style={styles.summaryLabel}>🎂 Date of Birth</span>
                 <span style={styles.summaryVal}>{form.dob || 'Not Set'}</span>
+              </div>
+              <div style={styles.summaryItem}>
+                <span style={styles.summaryLabel}>🌍 Country</span>
+                <span style={styles.summaryVal}>{form.country || 'India'}</span>
+              </div>
+              <div style={styles.summaryItem}>
+                <span style={styles.summaryLabel}>⏰ Sleep Timing</span>
+                <span style={styles.summaryVal}>{form.sleepTiming || 'Not Set'}</span>
+              </div>
+              <div style={styles.summaryItem}>
+                <span style={styles.summaryLabel}>💼 Working Hours</span>
+                <span style={styles.summaryVal}>{form.workingHours || 'Not Set'}</span>
               </div>
               <div style={styles.summaryItem}>
                 <span style={styles.summaryLabel}>💼 Profession</span>
@@ -632,6 +658,28 @@ export default function ProfilePage() {
                 type="date"
                 value={form.dob} 
                 onChange={(e) => setForm({ ...form, dob: e.target.value })}
+              />
+
+              <SearchableSelect 
+                label="Country"
+                placeholder="-- Select Country --"
+                value={form.country}
+                onChange={(e) => setForm({ ...form, country: e.target.value })}
+                options={ALL_COUNTRIES.map(c => ({ label: c, value: c }))}
+              />
+
+              <Input 
+                label="Sleep Timing" 
+                placeholder="e.g. 10:00 PM - 06:00 AM"
+                value={form.sleepTiming} 
+                onChange={(e) => setForm({ ...form, sleepTiming: e.target.value })}
+              />
+
+              <Input 
+                label="Working Hours" 
+                placeholder="e.g. 09:00 AM - 05:00 PM"
+                value={form.workingHours} 
+                onChange={(e) => setForm({ ...form, workingHours: e.target.value })}
               />
 
               <Input 
@@ -954,21 +1002,35 @@ export default function ProfilePage() {
       <Card style={{ padding: '14px', marginTop: '10px' }} className="glass-card">
         <Button 
           variant="danger" 
-          onClick={async () => {
-            if (confirm('Are you sure you want to log out?')) {
-              try {
-                await logoutUser();
-                router.push('/login');
-              } catch (err) {
-                console.error(err);
-              }
-            }
-          }}
+          onClick={() => setIsLogoutModalOpen(true)}
           style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', fontSize: '0.9rem', fontWeight: 800 }}
         >
           <LogOut size={18} /> Log Out of Account
         </Button>
       </Card>
+
+      <ConfirmModal 
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+        onConfirm={async () => {
+          setLoggingOut(true);
+          try {
+            await logoutUser();
+            router.push('/login');
+          } catch (err) {
+            console.error(err);
+          } finally {
+            setLoggingOut(false);
+            setIsLogoutModalOpen(false);
+          }
+        }}
+        title="Log Out"
+        message="Are you sure you want to log out of your account?"
+        confirmText="Log Out"
+        cancelText="Cancel"
+        variant="danger"
+        loading={loggingOut}
+      />
     </div>
   );
 }

@@ -249,4 +249,10 @@ select:-webkit-autofill {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05) !important;
 }
 
+@media (max-width: 768px) {
+  html, body {
+    overflow-x: hidden;
+  }
+}
+
 

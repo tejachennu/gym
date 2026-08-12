@@ -9,6 +9,8 @@ import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import PlanCard from '@/components/ui/PlanCard';
 import { Spinner } from '@/components/ui/Loading';
+import { useToast } from '@/components/ui/Toast';
+import Modal from '@/components/ui/Modal';
 import {
   Dumbbell,
   Utensils,
@@ -24,6 +26,7 @@ import {
   Mail,
   MapPin,
   ChevronRight,
+  ChevronLeft,
   Flame,
   Star,
   Zap,
@@ -121,9 +124,28 @@ const FAQS = [
   }
 ];
 
+const transformationSlides = [
+  { src: '/images/t1.png', title: '100% Natural Body Transformation', tag: 'Fat Loss & Muscle Building' },
+  { src: '/images/t2.png', title: 'Body Recomposition & Core Sculpting', tag: 'Custom Diet & Workout Protocol' },
+  { src: '/images/t3.png', title: 'Physique Transformation Results', tag: '1-on-1 Fitness Coaching' },
+  { src: '/images/t4.png', title: 'Weight Loss & Endurance Transformation', tag: 'Dedicated Client Progress' },
+  { src: '/images/t5.png', title: 'Lean Muscle Mass & Posture Transformation', tag: 'MRK Fitness Protocol' },
+];
+
 export default function HomePage() {
+  const toast = useToast();
   const router = useRouter();
   const { user, userData } = useAuth();
+
+  const [currentTransSlide, setCurrentTransSlide] = useState(0);
+  const [selectedFullTransImage, setSelectedFullTransImage] = useState(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTransSlide(prev => (prev + 1) % transformationSlides.length);
+    }, 3500);
+    return () => clearInterval(timer);
+  }, []);
 
   const [plans, setPlans] = useState([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
@@ -158,7 +180,8 @@ export default function HomePage() {
   const handleHomeContactSubmit = async (e) => {
     e.preventDefault();
     if (!homeContactForm.name || !homeContactForm.email || !homeContactForm.message) {
-      return alert('Please fill in Name, Email, and Message');
+      toast.warning('Please fill in Name, Email, and Message');
+      return;
     }
 
     setHomeContactSubmitting(true);
@@ -179,7 +202,7 @@ export default function HomePage() {
       setHomeContactSubmitted(true);
     } catch (err) {
       console.error(err);
-      alert('Failed to submit enquiry. Please try again.');
+      toast.error('Failed to submit enquiry. Please try again.');
     } finally {
       setHomeContactSubmitting(false);
     }
@@ -429,6 +452,67 @@ export default function HomePage() {
             </div>
           </div>
         </Card>
+      </section>
+
+      {/* 3.4 REAL BODY TRANSFORMATIONS AUTO SLIDESHOW SECTION */}
+      <section id="transformations" style={{ ...styles.section, padding: isMobile ? '35px 16px' : '65px 16px' }}>
+        <div style={styles.sectionHeader}>
+          <span style={styles.sectionBadge}>REAL MEMBER RESULTS</span>
+          <h2 style={{ ...styles.sectionTitle, fontSize: isMobile ? '1.4rem' : '1.8rem' }}>
+            BODY TRANSFORMATION GALLERY
+          </h2>
+          <p style={styles.sectionSub}>
+            Explore real before & after physique transformations achieved through MRK FITNESS COACH programs.
+          </p>
+        </div>
+
+        <div style={{ maxWidth: '980px', margin: '0 auto' }}>
+          {/* Main Slideshow Card */}
+          <Card style={{ padding: '0', overflow: 'hidden', borderRadius: '22px', border: '1px solid var(--border)', position: 'relative', boxShadow: '0 12px 40px rgba(0,0,0,0.6)' }} className="glass-card">
+            <div 
+              style={{ position: 'relative', width: '100%', height: isMobile ? '380px' : '560px', backgroundColor: '#000', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              onClick={() => setSelectedFullTransImage(transformationSlides[currentTransSlide].src)}
+              title="Click to view full transformation image"
+            >
+              <img 
+                src={transformationSlides[currentTransSlide].src}
+                alt={transformationSlides[currentTransSlide].title}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  transition: 'all 0.5s ease-in-out',
+                }}
+              />
+            </div>
+
+            {/* Clean Title & Details Bar Below Image (Unobscured) */}
+            <div style={{ padding: '16px 22px', backgroundColor: 'var(--card)', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                  <Badge variant="danger" style={{ fontSize: '0.72rem', fontWeight: 800, padding: '4px 8px' }}>
+                    🔥 {transformationSlides[currentTransSlide].tag}
+                  </Badge>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                    Transformation {currentTransSlide + 1} of {transformationSlides.length}
+                  </span>
+                </div>
+                <h3 style={{ margin: 0, fontSize: isMobile ? '1.05rem' : '1.25rem', fontWeight: 800, color: '#FFFFFF' }}>
+                  {transformationSlides[currentTransSlide].title}
+                </h3>
+              </div>
+
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => setSelectedFullTransImage(transformationSlides[currentTransSlide].src)}
+                style={{ fontSize: '0.82rem', fontWeight: 700, padding: '8px 16px' }}
+              >
+                🔍 View Fullscreen
+              </Button>
+            </div>
+          </Card>
+        </div>
       </section>
 
       {/* 3.5 CLIENT VIDEO REVIEWS & TRANSFORMATIONS SECTION */}
@@ -1064,6 +1148,24 @@ export default function HomePage() {
           © {new Date().getFullYear()} MRK FITNESS — Radha Krishna Maram. All rights reserved.
         </div>
       </footer>
+      {/* FULL TRANSFORMATION IMAGE VIEWER MODAL */}
+      <Modal
+        isOpen={!!selectedFullTransImage}
+        onClose={() => setSelectedFullTransImage(null)}
+        title="Real Body Transformation"
+        size="lg"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
+          {selectedFullTransImage && (
+            <img 
+              src={selectedFullTransImage} 
+              alt="Full Transformation Poster" 
+              style={{ maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain', borderRadius: '12px', border: '1px solid var(--border)' }}
+            />
+          )}
+          <Button variant="ghost" size="sm" onClick={() => setSelectedFullTransImage(null)}>Close Full View</Button>
+        </div>
+      </Modal>
     </div>
   );
 }

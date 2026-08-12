@@ -275,6 +275,19 @@ export default function ClientDashboard() {
   const nextCheckinDateObj = latestCheckinDate ? new Date(latestCheckinDate.getTime() + 10 * 24 * 60 * 60 * 1000) : new Date();
   const nextCheckinFormatted = latestCheckinDate ? formatDateNice(nextCheckinDateObj) : 'Today (Due Now)';
 
+  const todayZero = new Date();
+  todayZero.setHours(0, 0, 0, 0);
+
+  let daysRemainingCheckin = null;
+  let isCheckinDueOrOverdue = false;
+  if (latestCheckinDate) {
+    const targetDate = new Date(nextCheckinDateObj);
+    targetDate.setHours(0, 0, 0, 0);
+    const diffTime = targetDate - todayZero;
+    daysRemainingCheckin = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    isCheckinDueOrOverdue = daysRemainingCheckin <= 0;
+  }
+
   const clientFirstName = (profile?.displayName || profile?.name || 'Member').split(' ')[0];
 
   // Latest Trainer Review Candidate
@@ -710,24 +723,36 @@ export default function ClientDashboard() {
                 <Camera size={22} color="var(--accent, #E00008)" />
               </div>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <h3 style={{ margin: '0 0 2px 0', fontSize: '0.95rem', fontWeight: 800, color: '#FFFFFF' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#FFFFFF' }}>
                     10-Day Body Check-in & Measurements
                   </h3>
                   <Badge variant={latestCheckinDate ? 'success' : 'warning'} style={{ fontSize: '0.68rem' }}>
-                    {latestCheckinDate ? `Submitted: ${formatDateNice(latestCheckinDate)}` : 'DUE TODAY'}
+                    {latestCheckinDate ? `Last Submitted: ${formatDateNice(latestCheckinDate)}` : 'DUE TODAY 🔥'}
                   </Badge>
                 </div>
-                {latestCheckinDate && (
-                  <div style={{ fontSize: '0.8rem', color: '#FFFFFF', fontWeight: 700, marginTop: '2px' }}>
-                    📅 Last Check-in Submitted: <span style={{ color: '#00c853' }}>{formatDateNice(latestCheckinDate)}</span>
+                
+                {latestCheckinDate ? (
+                  <div style={{ fontSize: '0.78rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>
+                      📅 Next Check-in Due: <strong style={{ color: isCheckinDueOrOverdue ? '#ff1744' : '#00b0ff' }}>{formatDateNice(nextCheckinDateObj.toISOString())}</strong>
+                    </span>
+                    <span style={{
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
+                      padding: '2px 6px',
+                      borderRadius: '6px',
+                      backgroundColor: isCheckinDueOrOverdue ? 'rgba(255, 23, 68, 0.2)' : 'rgba(0, 176, 255, 0.2)',
+                      color: isCheckinDueOrOverdue ? '#ff1744' : '#00b0ff'
+                    }}>
+                      {daysRemainingCheckin === 0 ? 'Due Today 🔥' : daysRemainingCheckin < 0 ? `Overdue by ${Math.abs(daysRemainingCheckin)} days` : `in ${daysRemainingCheckin} days`}
+                    </span>
                   </div>
+                ) : (
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    Submit your 10-day body posture photos & 14-point measurements now!
+                  </p>
                 )}
-                <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                  {latestCheckinDate 
-                    ? `Check-in recorded on ${formatDateNice(latestCheckinDate)}` 
-                    : 'Submit your 10-day body photos & 14-point measurements now!'}
-                </p>
               </div>
             </div>
 
