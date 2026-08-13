@@ -398,13 +398,13 @@ export default function BillingPage() {
 
       {/* Summary Stats Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
-        <Card style={{ padding: '12px', background: 'linear-gradient(135deg, rgba(59,130,246,0.1) 0%, var(--card) 100%)', border: '1px solid rgba(59,130,246,0.3)' }} className="glass-card">
+        {/* <Card style={{ padding: '12px', background: 'linear-gradient(135deg, rgba(59,130,246,0.1) 0%, var(--card) 100%)', border: '1px solid rgba(59,130,246,0.3)' }} className="glass-card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
             <Wallet size={14} color="#3b82f6" />
             <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>Overall Amount</span>
           </div>
           <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#3b82f6' }}>₹{totalOriginalAmount.toLocaleString('en-IN')}</span>
-        </Card>
+        </Card> */}
 
         <Card style={{ padding: '12px', background: 'linear-gradient(135deg, rgba(0,200,83,0.1) 0%, var(--card) 100%)', border: '1px solid rgba(0,200,83,0.3)' }} className="glass-card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>

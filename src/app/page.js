@@ -125,11 +125,9 @@ const FAQS = [
 ];
 
 const transformationSlides = [
-  { src: '/images/t1.png', title: '100% Natural Body Transformation', tag: 'Fat Loss & Muscle Building' },
   { src: '/images/t2.png', title: 'Body Recomposition & Core Sculpting', tag: 'Custom Diet & Workout Protocol' },
   { src: '/images/t3.png', title: 'Physique Transformation Results', tag: '1-on-1 Fitness Coaching' },
   { src: '/images/t4.png', title: 'Weight Loss & Endurance Transformation', tag: 'Dedicated Client Progress' },
-  { src: '/images/t5.png', title: 'Lean Muscle Mass & Posture Transformation', tag: 'MRK Fitness Protocol' },
 ];
 
 export default function HomePage() {

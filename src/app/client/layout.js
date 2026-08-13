@@ -196,6 +196,17 @@ export default function ClientLayout({ children }) {
             </a>
           </Card>
         </main>
+        <ConfirmModal 
+          isOpen={isLogoutModalOpen}
+          onClose={() => setIsLogoutModalOpen(false)}
+          onConfirm={handleLogoutConfirm}
+          title="Log Out"
+          message="Are you sure you want to log out of your account?"
+          confirmText="Log Out"
+          cancelText="Cancel"
+          variant="danger"
+          loading={loggingOut}
+        />
       </div>
     );
   }
