@@ -375,17 +375,19 @@ export default function ClientDashboard() {
               width: '40px', 
               height: '40px', 
               borderRadius: '50%', 
-              backgroundColor: 'rgba(0, 200, 83, 0.2)', 
-              border: '1px solid rgba(0, 200, 83, 0.4)', 
+              backgroundColor: 'rgba(0, 200, 83, 0.1)', 
+              border: '1px solid rgba(0, 200, 83, 0.35)', 
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'center', 
-              fontSize: '1.1rem', 
-              fontWeight: 900, 
-              color: '#00c853',
-              boxShadow: '0 0 12px rgba(0, 200, 83, 0.25)'
+              overflow: 'hidden',
+              boxShadow: '0 0 12px rgba(0, 200, 83, 0.2)'
             }}>
-              💬
+              <img 
+                src="/mrk-logo.png" 
+                alt="Head Coach" 
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+              />
             </div>
             <div>
               <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px' }}>

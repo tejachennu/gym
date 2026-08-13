@@ -7,6 +7,10 @@ export const metadata = {
   title: 'MRK FITNESS COACH - Radha Krishna Maram | Personal Weight-Loss & Fitness Specialist',
   description: 'Transform your body with MRK FITNESS COACH. Personalized workout plans, custom diet plans, weekly check-ins, and 24/7 support by Radha Krishna Maram.',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/mrk-logo.png',
+    apple: '/mrk-logo.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',

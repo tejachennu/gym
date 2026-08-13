@@ -76,7 +76,7 @@ export default function AdminLayout({ children }) {
         display: isMobile ? 'flex' : 'none'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <ShieldCheck size={18} color="var(--accent, #E00008)" />
+          <img src="/mrk-logo.png" alt="MRK FITNESS" style={{ height: '22px', width: 'auto', objectFit: 'contain' }} />
           <h1 style={styles.logo}>MRK FITNESS COACH</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
