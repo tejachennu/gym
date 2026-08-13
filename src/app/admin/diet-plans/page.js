@@ -59,6 +59,7 @@ export default function DietPlansPage() {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState('client-diets'); // 'client-diets' | 'templates'
   const [viewMode, setViewMode] = useState('templates'); // 'templates' or 'history'
+  const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState('');
   const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: '', message: '', onConfirm: null, variant: 'danger', confirmText: 'Confirm' });
   const [clientPlans, setClientPlans] = useState([]);
