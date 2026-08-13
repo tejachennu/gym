@@ -1,17 +1,20 @@
 "use client";
 
 import React, { useState, useRef } from 'react';
+import { Spinner } from '@/components/ui/Loading';
 
 const ImageUpload = ({ 
+  value,
   onUpload, 
+  onUploading,
   accept = "image/*", 
   maxSize = 5 * 1024 * 1024, 
   preview = true,
   label = "Drag & drop an image here, or click to select",
-  multiple = false
+  multiple = false,
+  compact = false
 }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const fileInputRef = useRef(null);
@@ -44,78 +47,47 @@ const ImageUpload = ({
 
   const handleFiles = (newFiles) => {
     const validFiles = Array.from(newFiles).filter(f => f.size <= maxSize);
-    const newFilesArray = validFiles.map(file => Object.assign(file, {
-      preview: URL.createObjectURL(file)
-    }));
-
-    if (multiple) {
-      setFiles(prev => [...prev, ...newFilesArray]);
-    } else {
-      setFiles(newFilesArray.slice(0, 1));
-    }
-    
-    // Perform real Google Drive upload
-    performUpload(newFilesArray);
+    if (validFiles.length === 0) return;
+    performUpload(validFiles.slice(0, 1));
   };
 
   const performUpload = async (filesToUpload) => {
     setUploading(true);
+    if (onUploading) onUploading(true);
     setProgress(0);
     try {
-      const uploadedFiles = [];
-      const increment = 100 / filesToUpload.length;
+      const file = filesToUpload[0];
+      const formData = new FormData();
+      formData.append('file', file);
       
-      for (let i = 0; i < filesToUpload.length; i++) {
-        const file = filesToUpload[i];
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData
-        });
-        const data = await res.json();
-        
-        if (data.success && data.fileUrl) {
-          uploadedFiles.push({
-            fileId: data.fileId,
-            fileUrl: data.fileUrl
-          });
-          setProgress(Math.round((i + 1) * increment));
-        } else {
-          throw new Error(data.error || 'Upload returned failure status');
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      
+      if (data.success && data.fileUrl) {
+        setProgress(100);
+        if (onUpload) {
+          onUpload(data.fileUrl);
         }
-      }
-      
-      setFiles(filesToUpload.map((f, idx) => Object.assign(f, {
-        preview: uploadedFiles[idx]?.fileUrl || f.preview
-      })));
-      
-      if (onUpload) {
-        if (multiple) {
-          onUpload(uploadedFiles);
-        } else {
-          onUpload(uploadedFiles[0]?.fileUrl || '');
-        }
+      } else {
+        throw new Error(data.error || 'Upload returned failure status');
       }
     } catch (err) {
       console.error('Google Drive Upload failed:', err);
     } finally {
       setUploading(false);
+      if (onUploading) onUploading(false);
     }
   };
 
-  const removeFile = (index) => {
-    const newFiles = [...files];
-    newFiles.splice(index, 1);
-    setFiles(newFiles);
-  };
-
   const containerStyle = {
-    border: `2px dashed ${isDragging ? 'var(--accent)' : 'var(--border)'}`,
-    borderRadius: '16px',
-    backgroundColor: isDragging ? 'var(--accent-surface)' : 'var(--card)',
-    padding: '40px 20px',
+    border: `2px dashed ${isDragging ? 'var(--accent, #E00008)' : 'var(--border, #2a2a30)'}`,
+    borderRadius: '12px',
+    backgroundColor: isDragging ? 'var(--accent-surface, rgba(224, 0, 8, 0.05))' : 'var(--card, #121214)',
+    padding: compact ? '12px 8px' : '30px 16px',
+    height: compact ? '110px' : '180px',
     textAlign: 'center',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
@@ -123,114 +95,97 @@ const ImageUpload = ({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '12px'
+    gap: compact ? '4px' : '8px',
+    position: 'relative'
   };
 
-  const uploadIconStyle = {
-    fontSize: '40px',
-    color: isDragging ? '#E00008' : '#AAAAAA',
-    marginBottom: '8px'
-  };
-
-  const previewGridStyle = {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '16px',
-    marginTop: '24px'
-  };
-
-  const previewItemStyle = {
-    position: 'relative',
-    width: '100px',
-    height: '100px',
-    borderRadius: '12px',
-    overflow: 'hidden',
-    border: '1px solid #2a2a30'
-  };
-
-  const removeBtnStyle = {
-    position: 'absolute',
-    top: '4px',
-    right: '4px',
-    background: 'rgba(0,0,0,0.7)',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '50%',
-    width: '24px',
-    height: '24px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '14px'
-  };
-
-  const progressBarContainer = {
-    width: '100%',
-    height: '6px',
-    backgroundColor: '#2a2a30',
-    borderRadius: '3px',
-    marginTop: '16px',
-    overflow: 'hidden'
-  };
-
-  const progressBar = {
-    height: '100%',
-    backgroundColor: '#E00008',
-    width: `${progress}%`,
-    transition: 'width 0.2s ease'
-  };
+  // Render inline preview directly inside the container slot
+  if (value) {
+    return (
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        height: compact ? '110px' : '180px',
+        borderRadius: '12px',
+        overflow: 'hidden',
+        border: '1px solid var(--border, #2a2a30)'
+      }}>
+        <img 
+          src={value} 
+          alt="Uploaded preview" 
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onUpload) onUpload('');
+          }}
+          style={{
+            position: 'absolute',
+            top: '6px',
+            right: '6px',
+            backgroundColor: 'rgba(255, 23, 68, 0.9)',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '50%',
+            width: '24px',
+            height: '24px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '12px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+            fontWeight: 'bold',
+            zIndex: 10
+          }}
+        >
+          ✕
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <div 
-        style={containerStyle}
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
-      >
-        <div style={uploadIconStyle}>⬆️</div>
-        <p style={{ color: '#FFFFFF', fontWeight: '500' }}>{label}</p>
-        <p style={{ color: '#AAAAAA', fontSize: '12px' }}>
-          Supports: JPG, PNG, GIF (Max {maxSize / 1024 / 1024}MB)
-        </p>
-        <input 
-          ref={fileInputRef}
-          type="file" 
-          accept={accept}
-          multiple={multiple}
-          onChange={handleChange}
-          style={{ display: 'none' }}
-        />
+    <div 
+      style={containerStyle}
+      onDragEnter={handleDrag}
+      onDragLeave={handleDrag}
+      onDragOver={handleDrag}
+      onDrop={handleDrop}
+      onClick={() => !uploading && fileInputRef.current?.click()}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: compact ? '24px' : '36px', marginBottom: compact ? '0' : '4px' }}>
+        {uploading ? (
+          <Spinner size={compact ? 16 : 24} thickness={2} color="var(--accent, #E00008)" />
+        ) : (
+          <span style={{ fontSize: compact ? '20px' : '32px', opacity: 0.8 }}>📤</span>
+        )}
       </div>
-
-      {uploading && (
-        <div style={progressBarContainer}>
-          <div style={progressBar} />
-        </div>
+      <p style={{ 
+        color: '#FFFFFF', 
+        fontWeight: '600', 
+        fontSize: compact ? '0.72rem' : '0.82rem', 
+        margin: 0,
+        opacity: uploading ? 0.6 : 1
+      }}>
+        {uploading ? `Uploading (${progress}%)` : (compact ? 'Tap to upload' : label)}
+      </p>
+      
+      {!uploading && !compact && (
+        <p style={{ color: 'var(--text-secondary, #AAAAAA)', fontSize: '10px', margin: 0 }}>
+          Max {maxSize / 1024 / 1024}MB
+        </p>
       )}
-
-      {preview && files.length > 0 && (
-        <div style={previewGridStyle}>
-          {files.map((file, index) => (
-            <div key={index} style={previewItemStyle}>
-              <img 
-                src={file.preview} 
-                alt="preview" 
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-              <button 
-                style={removeBtnStyle}
-                onClick={(e) => { e.stopPropagation(); removeFile(index); }}
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      
+      <input 
+        ref={fileInputRef}
+        type="file" 
+        accept={accept}
+        onChange={handleChange}
+        style={{ display: 'none' }}
+      />
     </div>
   );
 };

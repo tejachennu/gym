@@ -2,16 +2,26 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { submitCheckin, getClientCheckins } from '@/lib/firestore';
+import { submitCheckin, getClientCheckins, deleteCheckin } from '@/lib/firestore';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
-import { Input } from '@/components/ui/Input';
+import ConfirmModal from '@/components/ui/ConfirmModal';
+import { Input, Select } from '@/components/ui/Input';
 import ImageUpload from '@/components/ui/ImageUpload';
 import { useToast } from '@/components/ui/Toast';
 import { validateField } from '@/lib/validation';
-import { Camera, Ruler, Send, History, Calendar, Eye, Sparkles, CheckCircle2, Lock } from 'lucide-react';
+import { Camera, Ruler, Send, History, Calendar, Eye, Sparkles, CheckCircle2, Lock, TrendingUp, Filter, Trash2 } from 'lucide-react';
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  ResponsiveContainer, 
+  CartesianGrid 
+} from 'recharts';
 
 function formatDateNice(dateStr) {
   if (!dateStr) return '';
@@ -27,12 +37,33 @@ function formatDateNice(dateStr) {
 export default function CheckinPage() {
   const { user } = useAuth();
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState('new'); // 'new' | 'history'
+  const [activeTab, setActiveTab] = useState('new'); // 'new' | 'history' | 'graphs'
   const [checkinsHistory, setCheckinsHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState(null);
   const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
+  
+  // Deletion state
+  const [deleteCheckinId, setDeleteCheckinId] = useState(null);
+  const [deletingCheckin, setDeletingCheckin] = useState(false);
+
+  // Uploading state tracking for the 4 posture photos
+  const [uploadingPhotosState, setUploadingPhotosState] = useState({
+    front: false,
+    back: false,
+    left: false,
+    right: false
+  });
+  const isAnyPhotoUploading = Object.values(uploadingPhotosState).some(Boolean);
+
+  // Date Range Filters & Metric selection for Sizing Charts
+  const [selectedMeasurementKey, setSelectedMeasurementKey] = useState('weight');
+  const [fromDate, setFromDate] = useState(() => {
+    const d = new Date();
+    return new Date(d.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  });
+  const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0]);
   
   const [photos, setPhotos] = useState({ front: '', back: '', left: '', right: '' });
   const [measurements, setMeasurements] = useState({
@@ -63,6 +94,22 @@ export default function CheckinPage() {
       console.error('Failed to load check-in history:', err);
     } finally {
       setLoadingHistory(false);
+    }
+  };
+
+  const handleDeleteCheckin = async () => {
+    if (!deleteCheckinId) return;
+    setDeletingCheckin(true);
+    try {
+      await deleteCheckin(deleteCheckinId);
+      toast.success('Check-in record deleted successfully');
+      setDeleteCheckinId(null);
+      await loadHistory();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to delete check-in record');
+    } finally {
+      setDeletingCheckin(false);
     }
   };
 
@@ -119,6 +166,20 @@ export default function CheckinPage() {
     isDueTodayOrOverdue = daysRemaining <= 0;
   }
 
+  // Filter Sizing Chart Data for the progress graphs
+  const sizingChartData = checkinsHistory
+    .map(chk => {
+      const dStr = chk.date || (chk.createdAt?.seconds ? new Date(chk.createdAt.seconds * 1000).toISOString().split('T')[0] : '');
+      const m = chk.measurements || {};
+      return {
+        date: dStr ? dStr.split('-').slice(1).join('/') : 'Log',
+        fullDate: dStr,
+        val: m[selectedMeasurementKey] !== undefined && m[selectedMeasurementKey] !== '' ? Number(m[selectedMeasurementKey]) : 0
+      };
+    })
+    .filter(item => item.fullDate >= fromDate && item.fullDate <= toDate && item.val > 0)
+    .sort((a, b) => a.fullDate.localeCompare(b.fullDate));
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '60px' }} className="animate-fade-up">
       {/* Page Header */}
@@ -131,19 +192,32 @@ export default function CheckinPage() {
         </p>
       </div>
 
-      {/* Tab Switcher: Submit Check-in vs View History */}
-      <div style={{ display: 'flex', gap: '8px', backgroundColor: 'rgba(255,255,255,0.03)', padding: '4px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+      {/* Tab Switcher: Submit Check-in vs View History vs Progress Graphs */}
+      <div style={{ 
+        display: 'flex', 
+        gap: '6px', 
+        backgroundColor: 'rgba(255,255,255,0.03)', 
+        padding: '4px', 
+        borderRadius: '12px', 
+        border: '1px solid var(--border)',
+        overflowX: 'auto',
+        whiteSpace: 'nowrap',
+        msOverflowStyle: 'none',
+        scrollbarWidth: 'none',
+      }}>
         <button
           type="button"
           onClick={() => setActiveTab('new')}
           style={{
             flex: 1,
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
             padding: '8px 12px',
             borderRadius: '10px',
             border: 'none',
             backgroundColor: activeTab === 'new' ? 'var(--accent, #E00008)' : 'transparent',
             color: activeTab === 'new' ? '#FFFFFF' : 'var(--text-secondary)',
-            fontSize: '0.8rem',
+            fontSize: '0.78rem',
             fontWeight: activeTab === 'new' ? 800 : 500,
             cursor: 'pointer',
             display: 'flex',
@@ -152,7 +226,7 @@ export default function CheckinPage() {
             gap: '6px'
           }}
         >
-          <Camera size={15} /> + New Check-in
+          <Camera size={14} /> New Check-in
         </button>
 
         <button
@@ -160,12 +234,14 @@ export default function CheckinPage() {
           onClick={() => setActiveTab('history')}
           style={{
             flex: 1,
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
             padding: '8px 12px',
             borderRadius: '10px',
             border: 'none',
             backgroundColor: activeTab === 'history' ? 'var(--accent, #E00008)' : 'transparent',
             color: activeTab === 'history' ? '#FFFFFF' : 'var(--text-secondary)',
-            fontSize: '0.8rem',
+            fontSize: '0.78rem',
             fontWeight: activeTab === 'history' ? 800 : 500,
             cursor: 'pointer',
             display: 'flex',
@@ -174,7 +250,31 @@ export default function CheckinPage() {
             gap: '6px'
           }}
         >
-          <History size={15} /> Previous Check-ins ({checkinsHistory.length})
+          <History size={14} /> History ({checkinsHistory.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('graphs')}
+          style={{
+            flex: 1,
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
+            padding: '8px 12px',
+            borderRadius: '10px',
+            border: 'none',
+            backgroundColor: activeTab === 'graphs' ? 'var(--accent, #E00008)' : 'transparent',
+            color: activeTab === 'graphs' ? '#FFFFFF' : 'var(--text-secondary)',
+            fontSize: '0.78rem',
+            fontWeight: activeTab === 'graphs' ? 800 : 500,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px'
+          }}
+        >
+          <TrendingUp size={14} /> Progress Graphs
         </button>
       </div>
 
@@ -374,11 +474,43 @@ export default function CheckinPage() {
               <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: 'var(--text)' }}>Progress Photos</h3>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
-              <div><p style={{ margin: '0 0 3px 0', fontSize: '0.72rem', fontWeight: 700 }}>1. Front View</p><ImageUpload value={photos.front} onUpload={(url) => setPhotos({...photos, front: url})} /></div>
-              <div><p style={{ margin: '0 0 3px 0', fontSize: '0.72rem', fontWeight: 700 }}>2. Back View</p><ImageUpload value={photos.back} onUpload={(url) => setPhotos({...photos, back: url})} /></div>
-              <div><p style={{ margin: '0 0 3px 0', fontSize: '0.72rem', fontWeight: 700 }}>3. Left Side</p><ImageUpload value={photos.left} onUpload={(url) => setPhotos({...photos, left: url})} /></div>
-              <div><p style={{ margin: '0 0 3px 0', fontSize: '0.72rem', fontWeight: 700 }}>4. Right Side</p><ImageUpload value={photos.right} onUpload={(url) => setPhotos({...photos, right: url})} /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)' }}>1. Front View</p>
+                <ImageUpload 
+                  value={photos.front} 
+                  onUpload={(url) => setPhotos({...photos, front: url})} 
+                  onUploading={(isUploading) => setUploadingPhotosState(prev => ({ ...prev, front: isUploading }))}
+                  compact={true} 
+                />
+              </div>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)' }}>2. Back View</p>
+                <ImageUpload 
+                  value={photos.back} 
+                  onUpload={(url) => setPhotos({...photos, back: url})} 
+                  onUploading={(isUploading) => setUploadingPhotosState(prev => ({ ...prev, back: isUploading }))}
+                  compact={true} 
+                />
+              </div>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)' }}>3. Left Side</p>
+                <ImageUpload 
+                  value={photos.left} 
+                  onUpload={(url) => setPhotos({...photos, left: url})} 
+                  onUploading={(isUploading) => setUploadingPhotosState(prev => ({ ...prev, left: isUploading }))}
+                  compact={true} 
+                />
+              </div>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)' }}>4. Right Side</p>
+                <ImageUpload 
+                  value={photos.right} 
+                  onUpload={(url) => setPhotos({...photos, right: url})} 
+                  onUploading={(isUploading) => setUploadingPhotosState(prev => ({ ...prev, right: isUploading }))}
+                  compact={true} 
+                />
+              </div>
             </div>
           </Card>
 
@@ -417,8 +549,22 @@ export default function CheckinPage() {
             </div>
             {/* Submit Button */}
             <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-              <Button onClick={handleSubmit} loading={submitting} style={{ flex: 1 }}>
-                <Send size={16} /> Submit 10-Day Check-in
+              <Button 
+                onClick={handleSubmit} 
+                loading={submitting} 
+                disabled={isAnyPhotoUploading}
+                style={{ 
+                  flex: 1,
+                  backgroundColor: isAnyPhotoUploading ? 'var(--card-hover)' : 'var(--accent)',
+                  color: isAnyPhotoUploading ? 'var(--text-secondary)' : '#fff',
+                  cursor: isAnyPhotoUploading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isAnyPhotoUploading ? (
+                  'Waiting for uploads to finish...'
+                ) : (
+                  <><Send size={16} /> Submit 10-Day Check-in</>
+                )}
               </Button>
             </div>
           </Card>
@@ -466,11 +612,41 @@ export default function CheckinPage() {
                         )}
                       </div>
                     </div>
-                    {meas.weight && (
-                      <div style={{ background: 'rgba(0, 200, 83, 0.15)', border: '1px solid rgba(0, 200, 83, 0.3)', padding: '4px 10px', borderRadius: '10px', color: '#00c853', fontWeight: 800, fontSize: '0.85rem' }}>
-                        Weight: {meas.weight} kg
-                      </div>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {meas.weight && (
+                        <div style={{ background: 'rgba(0, 200, 83, 0.15)', border: '1px solid rgba(0, 200, 83, 0.3)', padding: '4px 10px', borderRadius: '10px', color: '#00c853', fontWeight: 800, fontSize: '0.85rem' }}>
+                          Weight: {meas.weight} kg
+                        </div>
+                      )}
+                      
+                      <button
+                        type="button"
+                        onClick={() => setDeleteCheckinId(item.id)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-secondary, #AAAAAA)',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: '6px',
+                          transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = 'var(--danger, #ff1744)';
+                          e.currentTarget.style.backgroundColor = 'rgba(255, 23, 68, 0.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = 'var(--text-secondary, #AAAAAA)';
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                        title="Delete Check-in Record"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Body Photos Thumbnails */}
@@ -536,6 +712,101 @@ export default function CheckinPage() {
         </div>
       )}
 
+      {/* TAB 3: PROGRESS GRAPHS */}
+      {activeTab === 'graphs' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {/* Date Filter Bar */}
+          <Card style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }} className="glass-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Filter size={15} color="var(--accent, #E00008)" style={{ opacity: 0.8 }} />
+              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Filter by Date Range
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <Input 
+                  type="date" 
+                  label="From Date" 
+                  value={fromDate} 
+                  onChange={(e) => setFromDate(e.target.value)} 
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: '130px' }}>
+                <Input 
+                  type="date" 
+                  label="To Date" 
+                  value={toDate} 
+                  onChange={(e) => setToDate(e.target.value)} 
+                />
+              </div>
+            </div>
+          </Card>
+
+          {/* SIZING METRIC SELECTION GRAPH */}
+          <Card style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }} className="glass-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <TrendingUp size={16} color="var(--accent, #E00008)" />
+                <h4 style={{ fontSize: '0.88rem', fontWeight: 800, margin: 0, color: 'var(--text)' }}>
+                  Sizing Metrics Progress
+                </h4>
+              </div>
+              <Select 
+                value={selectedMeasurementKey} 
+                onChange={(e) => setSelectedMeasurementKey(e.target.value)} 
+                options={[
+                  { label: 'Weight (kg)', value: 'weight' },
+                  { label: 'Waist (cm)', value: 'waist' },
+                  { label: 'Chest (cm)', value: 'chest' },
+                  { label: 'Stomach (cm)', value: 'stomach' },
+                  { label: 'Neck (cm)', value: 'neck' },
+                  { label: 'Shoulder (cm)', value: 'shoulder' },
+                  { label: 'Right Bicep (cm)', value: 'rBicep' },
+                  { label: 'Left Bicep (cm)', value: 'lBicep' },
+                  { label: 'Right Thigh (cm)', value: 'rThigh' },
+                  { label: 'Left Thigh (cm)', value: 'lThigh' },
+                  { label: 'Right Forearm (cm)', value: 'rForearm' },
+                  { label: 'Left Forearm (cm)', value: 'lForearm' },
+                  { label: 'Right Calf (cm)', value: 'rCalf' },
+                  { label: 'Left Calf (cm)', value: 'lCalf' },
+                  { label: 'High Hip (cm)', value: 'highHip' },
+                ]}
+                containerStyle={{ margin: 0, width: '150px' }}
+              />
+            </div>
+
+            {sizingChartData.length > 0 ? (
+              <div style={{ width: '100%', height: 260 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={sizingChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={10} />
+                    <YAxis stroke="var(--text-secondary)" fontSize={10} domain={['dataMin - 1', 'dataMax + 1']} />
+                    <Tooltip contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '11px' }} />
+                    <Line 
+                      type="monotone" 
+                      dataKey="val" 
+                      stroke="var(--accent, #E00008)" 
+                      strokeWidth={3} 
+                      dot={{ r: 4, stroke: 'var(--accent, #E00008)', strokeWidth: 2, fill: 'var(--bg, #0A0A0C)' }} 
+                      activeDot={{ r: 6, stroke: 'var(--accent, #E00008)', strokeWidth: 2, fill: 'var(--text, #ffffff)' }} 
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+                <TrendingUp size={24} color="var(--text-secondary)" style={{ marginBottom: '8px', opacity: 0.5 }} />
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, fontStyle: 'italic' }}>
+                  No measurement data found for selected metric in this date range.
+                </p>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
       {/* MEASUREMENT & POSTURE GUIDE MODAL */}
       <Modal
         isOpen={isGuideModalOpen}
@@ -570,6 +841,19 @@ export default function CheckinPage() {
           <Button variant="ghost" size="sm" onClick={() => setPreviewPhotoUrl(null)}>Close</Button>
         </div>
       </Modal>
+
+      {/* DELETE CONFIRMATION MODAL */}
+      <ConfirmModal
+        isOpen={!!deleteCheckinId}
+        onClose={() => setDeleteCheckinId(null)}
+        onConfirm={handleDeleteCheckin}
+        title="Delete Check-in Record"
+        message="Are you sure you want to delete this check-in record? This action will permanently remove the posture photos and sizing measurements, and cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        loading={deletingCheckin}
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { 
   submitDailyLog, 
@@ -387,25 +388,27 @@ export default function TrackingPage() {
 
         {/* UNIFIED CARD 2: 10-DAY BODY POSTURE & SIZING (GATED) */}
         {hasPostureCheckin && (
-          <Card onClick={() => { setActiveModal('posture_sizing'); setShowInputPopup(false); }} style={{ ...styles.hubCard, borderLeft: '3px solid var(--accent, #E00008)' }} className="glass-card">
-            <div style={{ ...styles.hubIconWrapper, backgroundColor: 'rgba(224, 0, 8, 0.15)' }}>
-              <Camera size={20} color="var(--accent, #E00008)" />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                <h3 style={styles.hubTitle}>10-Day Body Posture & Measurements Check-in</h3>
-                {isCheckinLocked ? (
-                  <Badge variant="warning">🔒 {daysToGo} Days Left</Badge>
-                ) : (
-                  <Badge variant="danger">Submit Check-in</Badge>
-                )}
+          <Link href="/client/checkin" style={{ textDecoration: 'none', display: 'block' }}>
+            <Card style={{ ...styles.hubCard, borderLeft: '3px solid var(--accent, #E00008)' }} className="glass-card">
+              <div style={{ ...styles.hubIconWrapper, backgroundColor: 'rgba(224, 0, 8, 0.15)' }}>
+                <Camera size={20} color="var(--accent, #E00008)" />
               </div>
-              <p style={styles.hubSub}>
-                {latestCheckinDate ? `Last check-in ${daysPassedSinceCheckin} day(s) ago` : 'No posture & sizing check-in submitted yet'}
-              </p>
-            </div>
-            <ChevronRight size={18} color="var(--text-secondary)" />
-          </Card>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                  <h3 style={styles.hubTitle}>10-Day Body Posture & Measurements Check-in</h3>
+                  {isCheckinLocked ? (
+                    <Badge variant="warning">🔒 {daysToGo} Days Left</Badge>
+                  ) : (
+                    <Badge variant="danger">Submit Check-in</Badge>
+                  )}
+                </div>
+                <p style={styles.hubSub}>
+                  {latestCheckinDate ? `Last check-in ${daysPassedSinceCheckin} day(s) ago` : 'No posture & sizing check-in submitted yet'}
+                </p>
+              </div>
+              <ChevronRight size={18} color="var(--text-secondary)" />
+            </Card>
+          </Link>
         )}
 
       </div>
@@ -586,155 +589,6 @@ export default function TrackingPage() {
 
                     <Button type="submit" loading={submitting} style={{ width: '100%', marginTop: '4px' }}>
                       Save Daily Activity & Wellness Log
-                    </Button>
-                  </form>
-                </Modal>
-              )}
-            </div>
-        ), document.body)}
-
-      {/* SHEET 2: UNIFIED 10-DAY BODY POSTURE & SIZING */}
-      {mounted && hasPostureCheckin && activeModal === 'posture_sizing' && createPortal((
-        <div style={styles.fullScreenOverlay} className="animate-fade-up">
-              <header style={styles.sheetHeader}>
-                <button onClick={() => setActiveModal(null)} style={styles.sheetBackBtn}>
-                  <ArrowLeft size={18} color="var(--text)" />
-                  <h3 style={styles.sheetTitle}>10-Day Body Posture & Sizing Check-in</h3>
-                </button>
-              </header>
-
-              <div style={styles.sheetContent}>
-                {/* Date Filter Bar */}
-                <Card style={{ padding: '8px 12px' }} className="glass-card">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Filter size={14} color="var(--accent)" /> Date Range:
-                    </span>
-                    <Input type="date" label="From" value={fromDate} onChange={(e) => setFromDate(e.target.value)} containerStyle={{ flex: 1, minWidth: '120px' }} />
-                    <Input type="date" label="To" value={toDate} onChange={(e) => setToDate(e.target.value)} containerStyle={{ flex: 1, minWidth: '120px' }} />
-                  </div>
-                </Card>
-
-                <Button 
-                  onClick={() => !isCheckinLocked && setShowInputPopup(true)} 
-                  disabled={isCheckinLocked}
-                  style={{ 
-                    padding: '10px', 
-                    fontSize: '0.85rem',
-                    backgroundColor: isCheckinLocked ? 'var(--card-hover)' : 'var(--accent)',
-                    color: isCheckinLocked ? 'var(--text-secondary)' : '#fff',
-                    cursor: isCheckinLocked ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {isCheckinLocked ? (
-                    <>🔒 Check-in Locked (Unlocks in {daysToGo} Days)</>
-                  ) : (
-                    <><Camera size={16} /> Submit 10-Day Body Posture & Sizing Check-in</>
-                  )}
-                </Button>
-
-                {/* SIZING METRIC SELECTION GRAPH */}
-                <Card style={styles.chartCard} className="glass-card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
-                    <h4 style={styles.chartTitle}>📐 14-Point Body Sizing Metric Progress</h4>
-                    <Select 
-                      value={selectedMeasurementKey} 
-                      onChange={(e) => setSelectedMeasurementKey(e.target.value)} 
-                      options={[
-                        { label: 'Weight (kg)', value: 'weight' },
-                        { label: 'Waist (in)', value: 'waist' },
-                        { label: 'Chest (in)', value: 'chest' },
-                        { label: 'Stomach (in)', value: 'stomach' },
-                        { label: 'Neck (in)', value: 'neck' },
-                        { label: 'Shoulder (in)', value: 'shoulder' },
-                        { label: 'Right Bicep (in)', value: 'rBicep' },
-                        { label: 'Left Bicep (in)', value: 'lBicep' },
-                        { label: 'Right Thigh (in)', value: 'rThigh' },
-                        { label: 'Left Thigh (in)', value: 'lThigh' }
-                      ]}
-                      containerStyle={{ margin: 0, width: '150px' }}
-                    />
-                  </div>
-
-                  {sizingChartData.length > 0 ? (
-                    <div style={{ width: '100%', height: 165 }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={sizingChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                          <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={10} />
-                          <YAxis stroke="var(--text-secondary)" fontSize={10} domain={['dataMin - 1', 'dataMax + 1']} />
-                          <Tooltip contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '11px' }} />
-                          <Line type="monotone" dataKey="val" stroke="var(--accent)" strokeWidth={2.5} dot={{ r: 4 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ) : <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No measurement data found for selected metric.</p>}
-                </Card>
-              </div>
-
-              {/* INPUT POPUP FOR POSTURE & SIZING */}
-              {showInputPopup && (
-                <Modal isOpen={showInputPopup} onClose={() => setShowInputPopup(false)} title="10-Day Body Posture & Sizing Check-in" size="lg">
-                  <form onSubmit={handleSavePostureSizing} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    
-                    {/* 4-SIDE POSTURE PHOTOS */}
-                    <Card style={{ padding: '10px', backgroundColor: 'var(--card-hover)', border: '1px solid var(--border)' }}>
-                      <h4 style={{ margin: '0 0 8px 0', fontSize: '0.82rem', fontWeight: 800, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Camera size={14} /> 1. Upload 4-Side Body Posture Photos (Mandatory)
-                      </h4>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                        {['front', 'back', 'left', 'right'].map((side) => (
-                          <div key={side} style={{ padding: '6px', backgroundColor: 'var(--card)', borderRadius: '6px', textAlign: 'center', border: '1px solid var(--border)' }}>
-                            <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'capitalize', color: 'var(--text)', marginBottom: '4px' }}>
-                              {side} Photo
-                            </div>
-                            <input type="file" accept="image/*" id={`posture-upload-${side}`} onChange={(e) => handlePhotoUpload(e, side)} style={{ display: 'none' }} />
-                            <label htmlFor={`posture-upload-${side}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', backgroundColor: 'var(--card-hover)', borderRadius: '4px', cursor: 'pointer', fontSize: '0.72rem' }}>
-                              {uploadingPhotos[side] ? <Spinner size={12} /> : <Upload size={12} color="var(--accent)" />}
-                              {posturePhotos[side] ? '✓ Uploaded' : 'Upload'}
-                            </label>
-                            {posturePhotos[side] && (
-                              <img 
-                                src={getDirectImageUrl(posturePhotos[side])} 
-                                alt={`${side} preview`} 
-                                style={{ width: '100%', height: '50px', objectFit: 'cover', borderRadius: '4px', marginTop: '4px', cursor: 'pointer' }} 
-                                onClick={() => setViewingPhotoUrl(posturePhotos[side])}
-                                title="Click to view full photo"
-                              />
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </Card>
-
-                    {/* 14-POINT SIZING MEASUREMENTS */}
-                    <Card style={{ padding: '10px', backgroundColor: 'var(--card-hover)', border: '1px solid var(--border)' }}>
-                      <h4 style={{ margin: '0 0 8px 0', fontSize: '0.82rem', fontWeight: 800, color: '#00c853', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <TrendingUp size={14} /> 2. Enter Body Sizing Measurements (Optional)
-                      </h4>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '6px' }}>
-                        <Input label="Weight (kg)" type="number" step="0.1" value={sizingForm.weight} onChange={(e) => setSizingForm({ ...sizingForm, weight: e.target.value })} />
-                        <Input label="Chest (in)" type="number" step="0.1" value={sizingForm.chest} onChange={(e) => setSizingForm({ ...sizingForm, chest: e.target.value })} />
-                        <Input label="Neck (in)" type="number" step="0.1" value={sizingForm.neck} onChange={(e) => setSizingForm({ ...sizingForm, neck: e.target.value })} />
-                        <Input label="Shoulder (in)" type="number" step="0.1" value={sizingForm.shoulder} onChange={(e) => setSizingForm({ ...sizingForm, shoulder: e.target.value })} />
-                        <Input label="Waist (in)" type="number" step="0.1" value={sizingForm.waist} onChange={(e) => setSizingForm({ ...sizingForm, waist: e.target.value })} />
-                        <Input label="Stomach (in)" type="number" step="0.1" value={sizingForm.stomach} onChange={(e) => setSizingForm({ ...sizingForm, stomach: e.target.value })} />
-                        <Input label="Butt / Hip (in)" type="number" step="0.1" value={sizingForm.highHip} onChange={(e) => setSizingForm({ ...sizingForm, highHip: e.target.value })} />
-                        <Input label="Right Bicep (in)" type="number" step="0.1" value={sizingForm.rBicep} onChange={(e) => setSizingForm({ ...sizingForm, rBicep: e.target.value })} />
-                        <Input label="Left Bicep (in)" type="number" step="0.1" value={sizingForm.lBicep} onChange={(e) => setSizingForm({ ...sizingForm, lBicep: e.target.value })} />
-                        <Input label="Right Forearm" type="number" step="0.1" value={sizingForm.rForearm} onChange={(e) => setSizingForm({ ...sizingForm, rForearm: e.target.value })} />
-                        <Input label="Left Forearm" type="number" step="0.1" value={sizingForm.lForearm} onChange={(e) => setSizingForm({ ...sizingForm, lForearm: e.target.value })} />
-                        <Input label="Right Thigh (in)" type="number" step="0.1" value={sizingForm.rThigh} onChange={(e) => setSizingForm({ ...sizingForm, rThigh: e.target.value })} />
-                        <Input label="Left Thigh (in)" type="number" step="0.1" value={sizingForm.lThigh} onChange={(e) => setSizingForm({ ...sizingForm, lThigh: e.target.value })} />
-                        <Input label="Right Calf (in)" type="number" step="0.1" value={sizingForm.rCalf} onChange={(e) => setSizingForm({ ...sizingForm, rCalf: e.target.value })} />
-                        <Input label="Left Calf (in)" type="number" step="0.1" value={sizingForm.lCalf} onChange={(e) => setSizingForm({ ...sizingForm, lCalf: e.target.value })} />
-                      </div>
-                    </Card>
-
-                    <Button type="submit" loading={submitting} style={{ width: '100%', marginTop: '4px' }}>
-                      Submit 10-Day Body Posture & Sizing Check-in
                     </Button>
                   </form>
                 </Modal>
