@@ -1297,6 +1297,27 @@ function LogsTab({ dailyLogs }) {
               {log.weight && <span>⚖️ {log.weight}kg</span>}
             </div>
           </div>
+          {log.takenSupplements && Object.keys(log.takenSupplements).length > 0 && (
+            <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '6px' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginRight: '4px', display: 'flex', alignItems: 'center' }}>💊 Supps:</span>
+              {Object.entries(log.takenSupplements).map(([name, taken]) => (
+                <span
+                  key={name}
+                  style={{
+                    fontSize: '0.65rem',
+                    fontWeight: 600,
+                    padding: '1px 6px',
+                    borderRadius: '8px',
+                    backgroundColor: taken ? 'rgba(171, 71, 188, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                    color: taken ? '#ce93d8' : 'var(--text-secondary)',
+                    border: `1px solid ${taken ? 'rgba(171, 71, 188, 0.3)' : 'var(--border)'}`,
+                  }}
+                >
+                  {taken ? '✓' : '✗'} {name}
+                </span>
+              ))}
+            </div>
+          )}
         </Card>
       ))}
     </div>

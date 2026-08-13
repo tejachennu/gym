@@ -11,7 +11,8 @@ import {
   submitCheckin, 
   getClientCheckins,
   getClientById,
-  getPlans
+  getPlans,
+  getClientDietPlans
 } from '@/lib/firestore';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -122,17 +123,21 @@ export default function TrackingPage() {
     rBicep: '', lBicep: '', rForearm: '', lForearm: '', rThigh: '', lThigh: '', rCalf: '', lCalf: ''
   });
 
+  const [dietPlans, setDietPlans] = useState([]);
+  const [takenSupplements, setTakenSupplements] = useState({});
+
   const todayDateString = new Date().toISOString().split('T')[0];
 
   const loadAllData = async () => {
     try {
       setLoading(true);
-      const [profileData, tLog, logsHist, chkHist, plansData] = await Promise.all([
+      const [profileData, tLog, logsHist, chkHist, plansData, dPlans] = await Promise.all([
         getClientById(user.uid),
         getDailyLog(user.uid, todayDateString),
         getClientDailyLogs(user.uid),
         getClientCheckins(user.uid),
-        getPlans()
+        getPlans(),
+        getClientDietPlans(user.uid)
       ]);
 
       setProfile(profileData);
@@ -140,6 +145,7 @@ export default function TrackingPage() {
       setTodayLog(tLog);
       setDailyLogsHistory(logsHist || []);
       setCheckinsHistory(chkHist || []);
+      setDietPlans(dPlans || []);
 
       if (tLog) {
         setActivityWellnessForm({
@@ -152,6 +158,7 @@ export default function TrackingPage() {
           mood: tLog.mood || 'Good',
           dailyNotes: tLog.dailyNotes || ''
         });
+        setTakenSupplements(tLog.takenSupplements || {});
       }
     } catch (err) {
       console.error(err);
@@ -227,7 +234,8 @@ export default function TrackingPage() {
         sleepQuality: activityWellnessForm.sleepQuality,
         energyLevel: activityWellnessForm.energyLevel,
         mood: activityWellnessForm.mood,
-        dailyNotes: activityWellnessForm.dailyNotes || ''
+        dailyNotes: activityWellnessForm.dailyNotes || '',
+        takenSupplements: takenSupplements
       });
 
       toast.success('Daily Activity & Wellness Log saved successfully!');
@@ -380,7 +388,7 @@ export default function TrackingPage() {
               {isTodayActivityWellnessDone ? <Badge variant="success">✓ Submitted Today</Badge> : <Badge variant="warning">Pending Today</Badge>}
             </div>
             <p style={styles.hubSub}>
-              {todayLog?.steps || 0} steps • {todayLog?.water || 0}L water • {todayLog?.sleepHours || 0}h sleep • Mood: {todayLog?.mood || 'Good'}
+              {todayLog?.steps || 0} steps • {todayLog?.water || 0}L water • {todayLog?.sleepHours || 0}h sleep{todayLog?.takenSupplements && Object.keys(todayLog.takenSupplements).length > 0 ? ` • 💊 ${Object.values(todayLog.takenSupplements).filter(Boolean).length}/${Object.keys(todayLog.takenSupplements).length} taken` : ''}
             </p>
           </div>
           <ChevronRight size={18} color="var(--text-secondary)" />
@@ -586,6 +594,43 @@ export default function TrackingPage() {
                     </div>
 
                     <Textarea label="Daily Wellness Notes / Remarks" placeholder="How did you feel today? Any soreness or achievement?" value={activityWellnessForm.dailyNotes} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, dailyNotes: e.target.value })} rows={2} />
+
+                    {/* Supplements Checklist (if active plan has any) */}
+                    {dietPlans && dietPlans[0]?.supplements && dietPlans[0].supplements.length > 0 && (
+                      <div style={{ padding: '10px', backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '4px' }}>
+                        <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#FFFFFF', display: 'block', marginBottom: '8px' }}>
+                          💊 Supplements Taken Today
+                        </label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {dietPlans[0].supplements.map((supp, sIdx) => {
+                            const isTaken = !!takenSupplements[supp.name];
+                            return (
+                              <label 
+                                key={sIdx} 
+                                style={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: '8px', 
+                                  fontSize: '0.78rem', 
+                                  cursor: 'pointer',
+                                  color: isTaken ? '#FFFFFF' : 'var(--text-secondary)'
+                                }}
+                              >
+                                <input 
+                                  type="checkbox" 
+                                  checked={isTaken}
+                                  onChange={() => setTakenSupplements(prev => ({ ...prev, [supp.name]: !prev[supp.name] }))}
+                                  style={{ accentColor: '#ab47bc', cursor: 'pointer' }}
+                                />
+                                <div>
+                                  <strong>{supp.name}</strong> {supp.dosage ? `(${supp.dosage})` : ''} - <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{supp.timing}</span>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     <Button type="submit" loading={submitting} style={{ width: '100%', marginTop: '4px' }}>
                       Save Daily Activity & Wellness Log

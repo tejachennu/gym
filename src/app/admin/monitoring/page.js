@@ -730,6 +730,33 @@ export default function MonitoringPage() {
                   )}
                 </div>
 
+                {dailyLog?.takenSupplements && Object.keys(dailyLog.takenSupplements).length > 0 && (
+                  <div style={styles.innerBlock}>
+                    <div style={styles.blockTitleRow}>
+                      <span style={{ fontSize: '13px' }}>💊</span>
+                      <span style={styles.blockTitle}>Supplements Compliance</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+                      {Object.entries(dailyLog.takenSupplements).map(([name, taken]) => (
+                        <span
+                          key={name}
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            padding: '3px 8px',
+                            borderRadius: '12px',
+                            backgroundColor: taken ? 'rgba(171, 71, 188, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                            color: taken ? '#ce93d8' : 'var(--text-secondary)',
+                            border: `1px solid ${taken ? 'rgba(171, 71, 188, 0.3)' : 'var(--border)'}`,
+                          }}
+                        >
+                          {taken ? '✓' : '✗'} {name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Trainer Action Footer */}
                 <div style={{
                   padding: '10px 12px',

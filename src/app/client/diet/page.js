@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { getClientDietPlans, getDailyLog, submitDailyLog } from '@/lib/firestore';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Loading';
 import EmptyState from '@/components/ui/EmptyState';
@@ -34,6 +35,10 @@ export default function DietPlanPage() {
   const [uploadedPhotos, setUploadedPhotos] = useState({});
   const [viewingPhotoUrl, setViewingPhotoUrl] = useState(null);
 
+  // State for supplements status
+  const [takenSupplements, setTakenSupplements] = useState({});
+  const [savingSupplements, setSavingSupplements] = useState(false);
+
   const todayDateString = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
@@ -54,6 +59,9 @@ export default function DietPlanPage() {
               }
             });
             setUploadedPhotos(photosMap);
+          }
+          if (dailyLog && dailyLog.takenSupplements) {
+            setTakenSupplements(dailyLog.takenSupplements || {});
           }
         })
         .catch(error => {
@@ -130,6 +138,33 @@ export default function DietPlanPage() {
       if (toast?.error) {
         toast.error('Failed to delete photo');
       }
+    }
+  };
+
+  const handleToggleSupplement = (name) => {
+    setTakenSupplements(prev => ({
+      ...prev,
+      [name]: !prev[name]
+    }));
+  };
+
+  const handleSubmitSupplements = async () => {
+    setSavingSupplements(true);
+    try {
+      await submitDailyLog(user.uid, todayDateString, {
+        takenSupplements: takenSupplements,
+        date: todayDateString
+      });
+      if (toast?.success) {
+        toast.success('Supplement status updated successfully! 💊');
+      }
+    } catch (error) {
+      console.error(error);
+      if (toast?.error) {
+        toast.error('Failed to save supplement status');
+      }
+    } finally {
+      setSavingSupplements(false);
     }
   };
 
@@ -486,39 +521,96 @@ export default function DietPlanPage() {
       {/* Prescribed Supplements Section */}
       {activePlan?.supplements && activePlan.supplements.length > 0 && (
         <Card style={{ padding: '16px', borderRadius: '16px', borderLeft: '4px solid #ab47bc' }} className="glass-card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-            <span style={{ fontSize: '1.2rem' }}>💊</span>
-            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#FFFFFF' }}>Prescribed Supplements</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1.2rem' }}>💊</span>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#FFFFFF' }}>Prescribed Supplements</h3>
+            </div>
+            <Badge variant="secondary">Daily Compliance</Badge>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {activePlan.supplements.map((supp, sIdx) => (
-              <div key={sIdx} style={{ padding: '10px 12px', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderRadius: '10px', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#FFFFFF' }}>
-                    {supp.name}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {activePlan.supplements.map((supp, sIdx) => {
+              const isTaken = !!takenSupplements[supp.name];
+              return (
+                <div 
+                  key={sIdx} 
+                  onClick={() => handleToggleSupplement(supp.name)}
+                  style={{ 
+                    padding: '12px', 
+                    backgroundColor: isTaken ? 'rgba(171, 71, 188, 0.08)' : 'rgba(255, 255, 255, 0.02)', 
+                    borderRadius: '12px', 
+                    border: isTaken ? '1px solid rgba(171, 71, 188, 0.4)' : '1px solid var(--border)', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  {/* Custom Checkbox/Tick */}
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '6px',
+                    border: isTaken ? '2px solid #ab47bc' : '2px solid var(--text-secondary)',
+                    backgroundColor: isTaken ? '#ab47bc' : 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#FFFFFF',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold',
+                    flexShrink: 0,
+                    transition: 'all 0.15s ease'
+                  }}>
+                    {isTaken && '✓'}
                   </div>
-                  {supp.instructions && (
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                      Instructions: {supp.instructions}
-                    </div>
-                  )}
-                </div>
 
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  {supp.dosage && (
-                    <Badge variant="info" style={{ fontSize: '0.7rem' }}>
-                      Dosage: {supp.dosage}
-                    </Badge>
-                  )}
-                  {supp.timing && (
-                    <Badge variant="success" style={{ fontSize: '0.7rem' }}>
-                      Timing: {supp.timing}
-                    </Badge>
-                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: isTaken ? '#FFFFFF' : 'var(--text)', transition: 'color 0.2s' }}>
+                      {supp.name}
+                    </div>
+                    {supp.instructions && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        Instructions: {supp.instructions}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {supp.dosage && (
+                      <Badge variant="info" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>
+                        {supp.dosage}
+                      </Badge>
+                    )}
+                    {supp.timing && (
+                      <Badge variant="success" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>
+                        {supp.timing}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
+
+            <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'flex-end' }}>
+              <Button 
+                onClick={handleSubmitSupplements}
+                loading={savingSupplements}
+                style={{ 
+                  backgroundColor: '#ab47bc',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  padding: '8px 16px',
+                  borderRadius: '10px',
+                  boxShadow: '0 4px 12px rgba(171, 71, 188, 0.3)'
+                }}
+              >
+                Submit Supplement Status 💊
+              </Button>
+            </div>
           </div>
         </Card>
       )}
