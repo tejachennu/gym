@@ -99,6 +99,7 @@ export const Input = ({
           onChange={onChange}
           placeholder={placeholder}
           disabled={disabled}
+          required={required}
           style={inputStyle}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
@@ -166,6 +167,7 @@ export const Textarea = ({ label, error, helperText, required, disabled, style =
       )}
       <textarea
         disabled={disabled}
+        required={required}
         style={inputStyle}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
@@ -212,6 +214,7 @@ export const Select = ({ label, error, helperText, required, disabled, options =
       <div style={{ position: 'relative' }}>
         <select
           disabled={disabled}
+          required={required}
           style={inputStyle}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
