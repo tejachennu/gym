@@ -5,7 +5,8 @@ import { useTheme } from '@/context/ThemeContext';
 import { useEffect, useState } from 'react';
 import { PageLoader } from '@/components/ui/Loading';
 import { logoutUser } from '@/lib/auth';
-import { Menu, X, LogOut, ShieldCheck, Sun, Moon } from 'lucide-react';
+import { getAdminNotifications, markAsRead, deleteNotification } from '@/lib/firestore';
+import { Menu, X, LogOut, ShieldCheck, Sun, Moon, Bell, Trash2, MessageSquare, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 const NAV_ITEMS = [
   { name: 'Dashboard', path: '/admin', icon: '📊' },
@@ -28,6 +29,8 @@ export default function AdminLayout({ children }) {
   const { theme, toggleTheme } = useTheme();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifs, setShowNotifs] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -38,19 +41,31 @@ export default function AdminLayout({ children }) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const loadNotifications = async () => {
+    try {
+      const list = await getAdminNotifications();
+      setNotifications(list || []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     if (!loading) {
       if (!user) {
         router.push('/login');
       } else if (userData?.role === 'client') {
         router.push('/client');
+      } else {
+        loadNotifications();
       }
     }
   }, [user, userData, loading, router]);
 
-  // Close mobile drawer on route change
+  // Close mobile drawer and notif dropdown on route change
   useEffect(() => {
     setIsMobileMenuOpen(false);
+    setShowNotifs(false);
   }, [pathname]);
 
   if (loading || !user || userData?.role === 'client') {
@@ -68,6 +83,43 @@ export default function AdminLayout({ children }) {
     }
   };
 
+  const handleMarkAsRead = async (notifId, e) => {
+    if (e) e.stopPropagation();
+    try {
+      await markAsRead(notifId);
+      setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, read: true } : n));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteNotif = async (notifId, e) => {
+    if (e) e.stopPropagation();
+    try {
+      await deleteNotification(notifId);
+      setNotifications(prev => prev.filter(n => n.id !== notifId));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleNotifClick = async (notif) => {
+    if (!notif.read && notif.id) {
+      await handleMarkAsRead(notif.id);
+    }
+    setShowNotifs(false);
+    if (notif.type === 'client_reply' || notif.link === '/admin/monitoring') {
+      const searchParam = notif.clientName ? `?search=${encodeURIComponent(notif.clientName)}` : '';
+      router.push(`/admin/monitoring${searchParam}`);
+    } else if (notif.link) {
+      router.push(notif.link);
+    } else {
+      router.push('/admin/notifications');
+    }
+  };
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
   return (
     <div style={styles.container}>
       {/* Mobile Top Header */}
@@ -80,6 +132,22 @@ export default function AdminLayout({ children }) {
           <h1 style={styles.logo}>MRK FITNESS COACH</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Notifications Bell */}
+          <div style={{ position: 'relative' }}>
+            <button 
+              onClick={() => setShowNotifs(!showNotifs)}
+              style={styles.bellButton}
+              title="Notifications"
+            >
+              <Bell size={18} />
+              {unreadCount > 0 && (
+                <span style={styles.unreadBadge}>
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+          </div>
+
           <button onClick={toggleMenu} style={styles.menuButton} aria-label="Toggle navigation menu">
             {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -96,6 +164,24 @@ export default function AdminLayout({ children }) {
         <div style={styles.sidebarHeader}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <img src="/mrk-logo.png" alt="MRK FITNESS COACH" style={{ height: '30px', width: 'auto', objectFit: 'contain' }} />
+            
+            {/* Desktop Notifications Bell Button */}
+            {!isMobile && (
+              <div style={{ position: 'relative' }}>
+                <button 
+                  onClick={() => setShowNotifs(!showNotifs)}
+                  style={styles.bellButton}
+                  title="Notifications & Client Replies"
+                >
+                  <Bell size={16} />
+                  {unreadCount > 0 && (
+                    <span style={styles.unreadBadge}>
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
           <p style={styles.adminName}>Management Portal</p>
         </div>
@@ -103,6 +189,7 @@ export default function AdminLayout({ children }) {
         <nav style={styles.nav}>
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.path || (item.path !== '/admin' && pathname.startsWith(item.path));
+            const isNotificationsTab = item.path === '/admin/notifications';
             return (
               <a
                 key={item.path}
@@ -110,7 +197,19 @@ export default function AdminLayout({ children }) {
                 style={{ ...styles.navItem, ...(isActive ? styles.navItemActive : {}) }}
               >
                 <span style={styles.navIcon}>{item.icon}</span>
-                {item.name}
+                <span style={{ flex: 1 }}>{item.name}</span>
+                {isNotificationsTab && unreadCount > 0 && (
+                  <span style={{
+                    backgroundColor: 'var(--accent, #E00008)',
+                    color: '#FFF',
+                    fontSize: '0.65rem',
+                    fontWeight: 800,
+                    padding: '1px 6px',
+                    borderRadius: '10px'
+                  }}>
+                    {unreadCount}
+                  </span>
+                )}
               </a>
             );
           })}
@@ -123,6 +222,101 @@ export default function AdminLayout({ children }) {
         </div>
       </div>
 
+      {/* Notifications Dropdown Modal / Popup */}
+      {showNotifs && (
+        <div style={{
+          position: 'fixed',
+          top: isMobile ? '56px' : '65px',
+          right: isMobile ? '12px' : 'auto',
+          left: isMobile ? 'auto' : '240px',
+          width: '320px',
+          maxHeight: '420px',
+          backgroundColor: 'var(--card, #121214)',
+          border: '1px solid var(--border, #2a2a30)',
+          borderRadius: '14px',
+          padding: '12px',
+          boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
+          zIndex: 110,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border, #2a2a30)', paddingBottom: '8px' }}>
+            <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: 'var(--text, #FFF)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Bell size={14} color="var(--accent)" /> Notifications & Replies ({notifications.length})
+            </h3>
+            {unreadCount > 0 && (
+              <span style={{ fontSize: '0.68rem', color: 'var(--accent)', fontWeight: 700 }}>
+                {unreadCount} Unread
+              </span>
+            )}
+          </div>
+
+          <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {notifications.length === 0 ? (
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', textAlign: 'center', margin: '14px 0' }}>
+                No notifications or client replies yet.
+              </p>
+            ) : (
+              notifications.slice(0, 10).map((n) => {
+                const isReply = n.type === 'client_reply';
+                return (
+                  <div
+                    key={n.id}
+                    onClick={() => handleNotifClick(n)}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      backgroundColor: n.read ? 'rgba(255,255,255,0.03)' : 'rgba(224, 0, 8, 0.08)',
+                      border: `1px solid ${n.read ? 'var(--border, #2a2a30)' : 'rgba(224, 0, 8, 0.3)'}`,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      gap: '8px',
+                      alignItems: 'start'
+                    }}
+                  >
+                    <div style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '6px',
+                      backgroundColor: isReply ? 'rgba(0, 200, 83, 0.15)' : 'rgba(224, 0, 8, 0.15)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      {isReply ? <MessageSquare size={13} color="#00c853" /> : <Bell size={13} color="var(--accent)" />}
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#FFF' }}>
+                          {n.title}
+                        </span>
+                        {!n.read && (
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--accent)' }} />
+                        )}
+                      </div>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {n.message}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <a 
+            href="/admin/notifications" 
+            onClick={() => setShowNotifs(false)}
+            style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--accent)', fontWeight: 700, textDecoration: 'none', paddingTop: '4px', borderTop: '1px solid var(--border)' }}
+          >
+            View All in Notification Hub →
+          </a>
+        </div>
+      )}
+
       {/* Main Content Area */}
       <main style={{
         ...styles.mainContent,
@@ -133,9 +327,9 @@ export default function AdminLayout({ children }) {
         {children}
       </main>
 
-      {/* Overlay Backdrop for Mobile Drawer */}
-      {isMobile && isMobileMenuOpen && (
-        <div style={styles.overlay} onClick={toggleMenu} />
+      {/* Overlay Backdrop for Mobile Drawer & Notifs */}
+      {((isMobile && isMobileMenuOpen) || showNotifs) && (
+        <div style={styles.overlay} onClick={() => { setIsMobileMenuOpen(false); setShowNotifs(false); }} />
       )}
     </div>
   );
@@ -182,6 +376,30 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bellButton: {
+    background: 'var(--card-hover, rgba(255, 255, 255, 0.05))',
+    border: '1px solid var(--border, rgba(255, 255, 255, 0.1))',
+    borderRadius: '8px',
+    color: 'var(--text, #FFFFFF)',
+    width: '32px',
+    height: '32px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: '-3px',
+    right: '-3px',
+    backgroundColor: 'var(--accent, #E00008)',
+    color: '#FFFFFF',
+    borderRadius: '10px',
+    padding: '1px 5px',
+    fontSize: '0.6rem',
+    fontWeight: 800,
   },
   themeButton: {
     background: 'var(--card-hover, rgba(255, 255, 255, 0.05))',

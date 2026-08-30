@@ -234,12 +234,20 @@ export default function ClientHistoryPage() {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {/* Key Metrics Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
             <Card style={{ padding: '10px', backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: '10px' }}>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>👟 Daily Steps</div>
               <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#4dabf7', marginTop: '2px' }}>
                 {d.steps ? Number(d.steps).toLocaleString() : 0} steps
               </div>
+              {d.stepsScreenshot && (
+                <div 
+                  onClick={() => setViewingPhotoUrl(d.stepsScreenshot)} 
+                  style={{ fontSize: '0.68rem', color: '#00c853', fontWeight: 700, cursor: 'pointer', marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                >
+                  📸 Steps Proof Attached 👁️
+                </div>
+              )}
             </Card>
 
             <Card style={{ padding: '10px', backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: '10px' }}>
@@ -250,16 +258,9 @@ export default function ClientHistoryPage() {
             </Card>
 
             <Card style={{ padding: '10px', backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: '10px' }}>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>😴 Sleep Duration & Quality</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>😴 Sleep Duration</div>
               <div style={{ fontSize: '1rem', fontWeight: 800, color: '#7c4dff', marginTop: '2px' }}>
                 {d.sleepHours || 0} hrs <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>({d.sleepQuality || 'Good'})</span>
-              </div>
-            </Card>
-
-            <Card style={{ padding: '10px', backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: '10px' }}>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>🏋️ Workout Weight Lifted</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#00c853', marginTop: '2px' }}>
-                {d.workoutWeight ? `${d.workoutWeight} kg` : 'None'}
               </div>
             </Card>
           </div>

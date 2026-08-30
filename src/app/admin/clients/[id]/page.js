@@ -13,6 +13,7 @@ import {
   addDocument,
   assignPlan
 } from '@/lib/firestore';
+import { getNextCheckinInfo } from '@/lib/checkinUtils';
 import Tabs from '@/components/ui/Tabs';
 import Card from '@/components/ui/Card';
 import Avatar from '@/components/ui/Avatar';
@@ -24,7 +25,7 @@ import Modal from '@/components/ui/Modal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { Input, Textarea, Select } from '@/components/ui/Input';
 import SearchableSelect from '@/components/ui/SearchableSelect';
-import { ALL_COUNTRIES } from '@/lib/countries';
+import { ALL_COUNTRIES, getCountryFlag, getCountryWithFlag } from '@/lib/countries';
 import ImageUpload from '@/components/ui/ImageUpload';
 import { validateField } from '@/lib/validation';
 import { 
@@ -431,12 +432,14 @@ export default function ClientDetailPage({ params }) {
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: '50px' }}><Spinner /></div>;
   if (!client) return <div style={{ padding: '50px', textAlign: 'center' }}>Client not found.</div>;
 
+  const nextCheckinInfo = getNextCheckinInfo(client, checkins);
+
   const tabs = [
     { key: 'overview', label: 'Overview', icon: <User size={16} />, content: <OverviewTab client={client} /> },
     { key: 'diet', label: 'Diet Plan', icon: <Utensils size={16} />, content: <DietTab dietPlans={dietPlans} /> },
     { key: 'workout', label: 'Workout Plan', icon: <Dumbbell size={16} />, content: <WorkoutTab workoutPlans={workoutPlans} /> },
-    { key: 'logs', label: 'Daily Logs', icon: <FileText size={16} />, content: <LogsTab dailyLogs={dailyLogs} /> },
-    { key: 'checkins', label: 'Check-ins', icon: <TrendingUp size={16} />, content: <CheckinsTab checkins={checkins} /> },
+    { key: 'logs', label: 'Daily Logs', icon: <FileText size={16} />, content: <LogsTab dailyLogs={dailyLogs} onViewAttachment={(url) => { setViewerUrl(url); setIsViewerOpen(true); }} /> },
+    { key: 'checkins', label: 'Check-ins', icon: <TrendingUp size={16} />, content: <CheckinsTab checkins={checkins} client={client} /> },
     { key: 'blood', label: 'Blood Reports', icon: <Heart size={16} />, content: <BloodTab bloodReports={bloodReports} onViewAttachment={(url) => { setViewerUrl(url); setIsViewerOpen(true); }} /> },
   ];
 
@@ -523,8 +526,12 @@ export default function ClientDetailPage({ params }) {
               <span>Code: <strong>{client.clientCode || '100'}</strong></span>
               <span>Age: <strong>{client.age ? `${client.age} yrs` : '--'}</strong></span>
               <span>Gender: <strong>{client.gender || 'Male'}</strong></span>
+              <span>Country: <strong>{getCountryWithFlag(client.country || 'India')}</strong></span>
               <span>Plan: <strong style={{ color: 'var(--accent, #E00008)' }}>{client.currentPlan || 'Not Assigned'}</strong></span>
               {client.planExpiry && <span>Expiry: <strong>{client.planExpiry}</strong></span>}
+              <span style={{ backgroundColor: nextCheckinInfo.isOverdue ? 'rgba(255, 23, 68, 0.12)' : 'rgba(0, 176, 255, 0.12)', padding: '2px 8px', borderRadius: '6px', border: `1px solid ${nextCheckinInfo.isOverdue ? 'rgba(255, 23, 68, 0.35)' : 'rgba(0, 176, 255, 0.35)'}`, color: nextCheckinInfo.isOverdue ? '#ff1744' : '#00b0ff', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                📅 Next Check-in: <strong>{nextCheckinInfo.nextCheckinDateFormatted}</strong> ({nextCheckinInfo.statusText})
+              </span>
             </div>
           </div>
         </div>
@@ -639,7 +646,7 @@ export default function ClientDetailPage({ params }) {
               placeholder="-- Select Country --"
               value={profileForm.country}
               onChange={(e) => setProfileForm({ ...profileForm, country: e.target.value })}
-              options={ALL_COUNTRIES.map(c => ({ label: c, value: c }))}
+              options={ALL_COUNTRIES}
             />
             <Input 
               label="Sleep Timing" 
@@ -1282,12 +1289,12 @@ function WorkoutTab({ workoutPlans }) {
   );
 }
 
-function LogsTab({ dailyLogs }) {
+function LogsTab({ dailyLogs, onViewAttachment }) {
   if (dailyLogs.length === 0) return <Card style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)' }}>No daily activity logs recorded yet.</Card>;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       {dailyLogs.map(log => (
-        <Card key={log.id} style={{ padding: '10px 14px' }}>
+        <Card key={log.id} style={{ padding: '12px 14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontWeight: 700, fontSize: '0.82rem' }}>📅 {log.date}</span>
             <div style={{ display: 'flex', gap: '12px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
@@ -1297,6 +1304,32 @@ function LogsTab({ dailyLogs }) {
               {log.weight && <span>⚖️ {log.weight}kg</span>}
             </div>
           </div>
+
+          {/* Steps Screenshot Proof */}
+          {log.stepsScreenshot && (
+            <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 10px', backgroundColor: 'rgba(77, 171, 247, 0.08)', borderRadius: '8px', border: '1px solid rgba(77, 171, 247, 0.25)' }}>
+              <img 
+                src={log.stepsScreenshot} 
+                alt="Steps proof" 
+                style={{ width: '42px', height: '42px', borderRadius: '6px', objectFit: 'cover', cursor: 'pointer', border: '1px solid rgba(77, 171, 247, 0.4)' }}
+                onClick={() => onViewAttachment && onViewAttachment(log.stepsScreenshot)} 
+              />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#4dabf7' }}>📸 Steps Screenshot Uploaded</div>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>Verified proof for {log.steps ? Number(log.steps).toLocaleString() : 0} steps</div>
+              </div>
+              <Button 
+                type="button"
+                size="sm" 
+                variant="outline" 
+                style={{ padding: '3px 8px', fontSize: '0.68rem', height: 'auto' }} 
+                onClick={() => onViewAttachment && onViewAttachment(log.stepsScreenshot)}
+              >
+                View 👁️
+              </Button>
+            </div>
+          )}
+
           {log.takenSupplements && Object.keys(log.takenSupplements).length > 0 && (
             <div style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '6px' }}>
               <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginRight: '4px', display: 'flex', alignItems: 'center' }}>💊 Supps:</span>
@@ -1324,27 +1357,61 @@ function LogsTab({ dailyLogs }) {
   );
 }
 
-function CheckinsTab({ checkins }) {
-  if (checkins.length === 0) return <Card style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)' }}>No 10-day check-in records submitted yet.</Card>;
+function CheckinsTab({ checkins = [], client }) {
+  const nextInfo = getNextCheckinInfo(client, checkins);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      {checkins.map(chk => (
-        <Card key={chk.id} style={{ padding: '14px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>
-              📸 Check-in ({chk.date || chk.createdAt?.toDate?.()?.toLocaleDateString() || 'Record'})
-            </span>
-            <Badge variant="success">Completed</Badge>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      {/* 10-Day Checkin Schedule Overview Card */}
+      <Card style={{ padding: '16px', background: 'linear-gradient(135deg, rgba(0, 176, 255, 0.08) 0%, rgba(18, 18, 20, 0.95) 100%)', border: '1px solid rgba(0, 176, 255, 0.3)', borderRadius: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#00b0ff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            📅 Recurring 10-Day Body & Posture Check-in Schedule
           </div>
-          {chk.photos && (
-            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingTop: '6px' }}>
-              {Object.entries(chk.photos).map(([side, url]) => (
-                url ? <img key={side} src={url} alt={side} style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '6px' }} /> : null
-              ))}
-            </div>
-          )}
+          <Badge variant={nextInfo.badgeVariant} style={{ fontWeight: 800, padding: '4px 10px', fontSize: '0.72rem' }}>
+            {nextInfo.statusText}
+          </Badge>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', fontSize: '0.8rem' }}>
+          <div style={{ padding: '10px', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.72rem' }}>Next Check-in Due Date</span>
+            <strong style={{ color: nextInfo.isOverdue ? '#ff1744' : '#00b0ff', fontSize: '1.02rem' }}>{nextInfo.nextCheckinDateFormatted}</strong>
+          </div>
+          <div style={{ padding: '10px', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.72rem' }}>Last Completed Check-in</span>
+            <strong style={{ color: '#FFFFFF', fontSize: '0.95rem' }}>{nextInfo.lastCheckinDate || 'None logged yet'}</strong>
+          </div>
+          <div style={{ padding: '10px', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.72rem' }}>Total Check-ins Logged</span>
+            <strong style={{ color: '#00c853', fontSize: '0.95rem' }}>{nextInfo.totalCheckins} check-ins</strong>
+          </div>
+        </div>
+      </Card>
+
+      {checkins.length === 0 ? (
+        <Card style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+          No 10-day check-in records submitted yet.
         </Card>
-      ))}
+      ) : (
+        checkins.map(chk => (
+          <Card key={chk.id} style={{ padding: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>
+                📸 Check-in ({chk.date || chk.createdAt?.toDate?.()?.toLocaleDateString() || 'Record'})
+              </span>
+              <Badge variant="success">Completed</Badge>
+            </div>
+            {chk.photos && (
+              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingTop: '6px' }}>
+                {Object.entries(chk.photos).map(([side, url]) => (
+                  url ? <img key={side} src={url} alt={side} style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '6px' }} /> : null
+                ))}
+              </div>
+            )}
+          </Card>
+        ))
+      )}
     </div>
   );
 }

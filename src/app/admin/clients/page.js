@@ -7,9 +7,11 @@ import {
   deleteClient, 
   getPlans,
   addDocument,
+  getDocuments,
   updateClientProfile,
   assignPlan
 } from '@/lib/firestore';
+import { getNextCheckinInfo } from '@/lib/checkinUtils';
 import { registerUserByAdmin } from '@/lib/auth';
 import { useToast } from '@/components/ui/Toast';
 import { validateField } from '@/lib/validation';
@@ -23,7 +25,7 @@ import Modal from '@/components/ui/Modal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import Pagination from '@/components/ui/Pagination';
 import SearchableSelect from '@/components/ui/SearchableSelect';
-import { ALL_COUNTRIES } from '@/lib/countries';
+import { ALL_COUNTRIES, getCountryFlag, getCountryWithFlag } from '@/lib/countries';
 import ImageUpload from '@/components/ui/ImageUpload';
 import { 
   Users, 
@@ -46,6 +48,7 @@ export default function ClientsPage() {
   const router = useRouter();
   const toast = useToast();
   const [clients, setClients] = useState([]);
+  const [checkins, setCheckins] = useState([]);
   const [allPlansList, setAllPlansList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -113,8 +116,12 @@ export default function ClientsPage() {
   const fetchClients = async () => {
     try {
       setLoading(true);
-      const data = await getAllClients();
-      setClients(data || []);
+      const [clientsData, checkinsData] = await Promise.all([
+        getAllClients(),
+        getDocuments('BodyCheckins')
+      ]);
+      setClients(clientsData || []);
+      setCheckins(checkinsData || []);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load clients');
@@ -608,7 +615,16 @@ export default function ClientsPage() {
       (c.phone || '')?.toLowerCase().includes(s) ||
       (c.clientCode || '')?.toLowerCase().includes(s);
     
-    const matchesStatus = statusFilter === 'all' || (c.status || 'active') === statusFilter;
+    const checkinInfo = getNextCheckinInfo(c, checkins);
+    const matchesStatus = 
+      statusFilter === 'all' 
+        ? true 
+        : statusFilter === 'due_checkin' 
+          ? checkinInfo.isDue 
+          : statusFilter === 'overdue_checkin'
+            ? checkinInfo.isOverdue
+            : (c.status || 'active') === statusFilter;
+
     const matchesCountry = countryFilter === 'all' || (c.country || 'India') === countryFilter;
     const matchesGender = genderFilter === 'all' || (c.gender || 'Male').toLowerCase() === genderFilter.toLowerCase();
 
@@ -633,7 +649,7 @@ export default function ClientsPage() {
             <h1 style={styles.title}>Clients Directory</h1>
           </div>
           <p style={styles.subtitle}>
-            Manage member profiles, health metrics & fitness plan assignments in tabular format
+            Manage member profiles, recurring check-in schedules & fitness plan assignments in tabular format
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -659,7 +675,7 @@ export default function ClientsPage() {
 
         <div style={styles.filterWrapper}>
           <div style={styles.filterLabel}>
-            <Filter size={14} color="var(--text-secondary)" /> Status:
+            <Filter size={14} color="var(--text-secondary)" /> Filter:
           </div>
           <select
             value={statusFilter}
@@ -669,8 +685,10 @@ export default function ClientsPage() {
             }}
             style={styles.filterSelect}
           >
-            <option value="all">All Status ({clients.length})</option>
+            <option value="all">All Clients ({clients.length})</option>
             <option value="active">Active Members</option>
+            <option value="due_checkin">🔥 Check-in Due / Overdue ({clients.filter(c => getNextCheckinInfo(c, checkins).isDue).length})</option>
+            <option value="overdue_checkin">⚠️ Overdue Check-ins ({clients.filter(c => getNextCheckinInfo(c, checkins).isOverdue).length})</option>
             <option value="inactive">Inactive</option>
           </select>
 
@@ -698,7 +716,7 @@ export default function ClientsPage() {
               }}
               options={[
                 { label: '🌏 All Countries', value: '' },
-                ...ALL_COUNTRIES.map(c => ({ label: c, value: c }))
+                ...ALL_COUNTRIES
               ]}
             />
           </div>
@@ -717,6 +735,7 @@ export default function ClientsPage() {
                   <th style={{ padding: '12px 10px', textAlign: 'left', color: 'var(--text-secondary)' }}>Client Name</th>
                   <th style={{ padding: '12px 10px', textAlign: 'left', color: 'var(--text-secondary)' }}>Contact Info</th>
                   <th style={{ padding: '12px 10px', textAlign: 'left', color: 'var(--text-secondary)' }}>Plan & Expiry</th>
+                  <th style={{ padding: '12px 10px', textAlign: 'left', color: 'var(--text-secondary)' }}>Next Check-in</th>
                   <th style={{ padding: '12px 10px', textAlign: 'left', color: 'var(--text-secondary)' }}>Status</th>
                   <th style={{ padding: '12px 10px', textAlign: 'right', color: 'var(--text-secondary)' }}>Actions</th>
                 </tr>
@@ -725,6 +744,7 @@ export default function ClientsPage() {
                 {paginatedClients.map((client) => {
                   const memStatus = getMembershipStatus(client);
                   const clientName = client.displayName || client.name || 'No Name';
+                  const checkinInfo = getNextCheckinInfo(client, checkins);
 
                   return (
                     <tr 
@@ -740,7 +760,7 @@ export default function ClientsPage() {
                           <div>
                             <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: '0.88rem' }}>{clientName}</div>
                             <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                              Code: {client.clientCode || 'Member'} {client.age ? `• ${client.age} yrs` : ''} {client.gender ? `(${client.gender})` : ''}
+                              Code: {client.clientCode || 'Member'} {client.age ? `• ${client.age} yrs` : ''} {client.gender ? `(${client.gender})` : ''} • {getCountryFlag(client.country || 'India')} {client.country || 'India'}
                             </div>
                           </div>
                         </div>
@@ -767,6 +787,18 @@ export default function ClientsPage() {
                             📅 Expiry: {client.planExpiry}
                           </div>
                         )}
+                      </td>
+
+                      {/* Next Check-in Date & Status */}
+                      <td style={{ padding: '12px 10px' }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: checkinInfo.isOverdue ? '#ff1744' : 'var(--text)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          📅 {checkinInfo.nextCheckinDateFormatted}
+                        </div>
+                        <div style={{ marginTop: '3px' }}>
+                          <Badge variant={checkinInfo.badgeVariant} size="sm">
+                            {checkinInfo.statusText}
+                          </Badge>
+                        </div>
                       </td>
 
                       {/* Status */}
@@ -885,7 +917,7 @@ export default function ClientsPage() {
               placeholder="-- Select Country --"
               value={newClient.country}
               onChange={(e) => setNewClient({ ...newClient, country: e.target.value })}
-              options={ALL_COUNTRIES.map(c => ({ label: c, value: c }))}
+              options={ALL_COUNTRIES}
             />
           </div>
 
@@ -1140,11 +1172,45 @@ export default function ClientsPage() {
                   <strong style={{ color: 'var(--text)' }}>{selectedProfileClient.planExpiry || '--'}</strong>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Location / City</span>
-                  <strong style={{ color: 'var(--text)' }}>{selectedProfileClient.location || '--'}</strong>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Location / Country</span>
+                  <strong style={{ color: 'var(--text)' }}>
+                    {selectedProfileClient.location ? `${selectedProfileClient.location}, ` : ''}{getCountryWithFlag(selectedProfileClient.country || 'India')}
+                  </strong>
                 </div>
               </div>
             </div>
+
+            {/* Recurring 10-Day Check-in Schedule Card */}
+            {(() => {
+              const pCheckin = getNextCheckinInfo(selectedProfileClient, checkins);
+              return (
+                <div style={{ padding: '12px 14px', backgroundColor: 'rgba(0, 176, 255, 0.08)', borderRadius: '12px', border: '1px solid rgba(0, 176, 255, 0.25)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#00b0ff', display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'uppercase' }}>
+                      📅 10-Day Body & Posture Check-in Schedule
+                    </div>
+                    <Badge variant={pCheckin.badgeVariant} size="sm">
+                      {pCheckin.statusText}
+                    </Badge>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', fontSize: '0.76rem' }}>
+                    <div>
+                      <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Next Check-in Due</span>
+                      <strong style={{ color: pCheckin.isOverdue ? '#ff1744' : '#FFFFFF', fontSize: '0.9rem' }}>{pCheckin.nextCheckinDateFormatted}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Last Check-in Date</span>
+                      <strong style={{ color: 'var(--text)' }}>{pCheckin.lastCheckinDate || 'None logged yet'}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-secondary)', display: 'block' }}>Total Check-ins Logged</span>
+                      <strong style={{ color: '#00c853' }}>{pCheckin.totalCheckins} completed</strong>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Physical Stats & Goal Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', padding: '10px', backgroundColor: 'var(--card-hover)', borderRadius: '10px', border: '1px solid var(--border)', textAlign: 'center' }}>

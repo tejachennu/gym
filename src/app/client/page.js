@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { getClientById, getDailyLog, getClientCheckins, getPlans, getClientPlans, getDocuments } from '@/lib/firestore';
+import { getClientById, getDailyLog, getClientCheckins, getPlans, getClientPlans, getDocuments, addReviewComment } from '@/lib/firestore';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Loading';
+import { useToast } from '@/components/ui/Toast';
 import Link from 'next/link';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { 
@@ -37,7 +38,9 @@ import {
   History,
   ActivitySquare,
   ExternalLink,
-  Bell
+  Bell,
+  Send,
+  MessageSquare
 } from 'lucide-react';
 
 function formatDateNice(dateStr) {
@@ -53,6 +56,7 @@ function formatDateNice(dateStr) {
 
 export default function ClientDashboard() {
   const { user } = useAuth();
+  const toast = useToast();
   const [profile, setProfile] = useState(null);
   const [todayLog, setTodayLog] = useState(null);
   const [checkins, setCheckins] = useState([]);
@@ -63,6 +67,11 @@ export default function ClientDashboard() {
   const [allUserLogs, setAllUserLogs] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Client Reply to Trainer Review State
+  const [replyText, setReplyText] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
+  const [showReplyInput, setShowReplyInput] = useState(false);
 
   useEffect(() => {
     if (user?.uid) {
@@ -212,7 +221,6 @@ export default function ClientDashboard() {
   const waterPercent = Math.min(100, (water / waterTarget) * 100);
 
   const sleepHours = todayLog?.sleepHours || 0;
-  const workoutWeight = todayLog?.workoutWeight || 0;
 
   // Validated Weight Chart Data for current selected plan only
   const validWeightList = [...selectedPlanCheckins, ...(todayLog ? [todayLog] : [])]
@@ -293,11 +301,11 @@ export default function ClientDashboard() {
   // Latest Trainer Review Candidate
   const latestTrainerReview = (() => {
     const candidateList = [
-      ...(todayLog ? [todayLog] : []),
-      ...(checkins || []),
-      ...(allUserLogs || [])
+      ...(todayLog ? [{ ...todayLog, _collection: 'DailyLogs' }] : []),
+      ...(checkins || []).map(c => ({ ...c, _collection: 'BodyCheckins' })),
+      ...(allUserLogs || []).map(l => ({ ...l, _collection: 'DailyLogs' }))
     ]
-    .filter(item => item && (item.reviewed || (item.remarks && item.remarks.trim() !== '')))
+    .filter(item => item && (item.reviewed || (item.remarks && item.remarks.trim() !== '') || (item.comments && item.comments.length > 0)))
     .sort((a, b) => {
       const dateA = a.reviewedAt || a.date || (a.createdAt?.seconds ? new Date(a.createdAt.seconds * 1000).toISOString() : '');
       const dateB = b.reviewedAt || b.date || (b.createdAt?.seconds ? new Date(b.createdAt.seconds * 1000).toISOString() : '');
@@ -307,11 +315,56 @@ export default function ClientDashboard() {
     return candidateList[0] || null;
   })();
 
+  const handleSendReply = async (e) => {
+    if (e) e.preventDefault();
+    if (!replyText.trim()) {
+      toast.warning('Please enter a reply message.');
+      return;
+    }
+
+    if (!latestTrainerReview) {
+      toast.error('No active review found to reply to.');
+      return;
+    }
+
+    setSendingReply(true);
+    try {
+      const collectionName = latestTrainerReview._collection || (latestTrainerReview.photos ? 'BodyCheckins' : 'DailyLogs');
+      const docId = latestTrainerReview.id || `${user.uid}_${latestTrainerReview.date || new Date().toISOString().split('T')[0]}`;
+      const clientName = profile?.displayName || profile?.name || user.displayName || 'Client';
+
+      const updatedComments = await addReviewComment(collectionName, docId, {
+        sender: 'client',
+        senderName: clientName,
+        senderRole: 'client',
+        clientId: user.uid,
+        text: replyText.trim()
+      });
+
+      // Update local state immediately
+      if (collectionName === 'DailyLogs') {
+        if (todayLog && (todayLog.id === docId || todayLog.date === latestTrainerReview.date)) {
+          setTodayLog(prev => ({ ...prev, comments: updatedComments, remarks: prev?.remarks || latestTrainerReview.remarks }));
+        }
+        setAllUserLogs(prev => prev.map(l => l.id === docId ? { ...l, comments: updatedComments } : l));
+      } else {
+        setCheckins(prev => prev.map(c => c.id === docId ? { ...c, comments: updatedComments } : c));
+      }
+
+      setReplyText('');
+      setShowReplyInput(false);
+      toast.success('Reply sent to Coach Radha Krishna! Coach has been notified.');
+    } catch (err) {
+      console.error(err);
+      toast.error(err?.message || 'Failed to send reply');
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '80px' }} className="animate-fade-up">
       
-
-
       {/* PAST PLAN NOTICE BANNER */}
       {isViewingPastPlan && (
         <Card style={{ padding: '12px 16px', backgroundColor: 'rgba(255, 145, 0, 0.15)', border: '1px solid rgba(255, 145, 0, 0.4)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -361,7 +414,7 @@ export default function ClientDashboard() {
         </div>
       </Card>
 
-      {/* 2. TRAINER REVIEW & FEEDBACK CARD */}
+      {/* 2. TRAINER REVIEW & FEEDBACK CARD WITH CLIENT REPLY THREAD */}
       <Card style={{ 
         padding: '18px', 
         background: 'linear-gradient(135deg, rgba(0, 200, 83, 0.12) 0%, rgba(18, 18, 20, 0.95) 100%)',
@@ -401,8 +454,8 @@ export default function ClientDashboard() {
             </div>
           </div>
 
-          <Badge variant={latestTrainerReview?.remarks ? 'success' : 'secondary'} style={{ padding: '4px 10px', fontSize: '0.7rem', fontWeight: 800 }}>
-            {latestTrainerReview?.remarks ? '✓ Trainer Reviewed' : '⏳ Log Pending'}
+          <Badge variant={latestTrainerReview?.remarks || (latestTrainerReview?.comments && latestTrainerReview.comments.length > 0) ? 'success' : 'secondary'} style={{ padding: '4px 10px', fontSize: '0.7rem', fontWeight: 800 }}>
+            {latestTrainerReview?.remarks || (latestTrainerReview?.comments && latestTrainerReview.comments.length > 0) ? '✓ Trainer Reviewed' : '⏳ Log Pending'}
           </Badge>
         </div>
 
@@ -411,34 +464,153 @@ export default function ClientDashboard() {
           border: '1px solid rgba(0, 200, 83, 0.25)', 
           borderRadius: '12px', 
           padding: '14px',
-          position: 'relative'
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px'
         }}>
-          {latestTrainerReview?.remarks ? (
-            <>
-              <div style={{ fontSize: '0.88rem', color: '#E0E0E0', lineHeight: '1.5', fontStyle: 'italic' }}>
-                &ldquo;{latestTrainerReview.remarks}&rdquo;
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                  Reviewed by Head Coach
-                </span>
-                <span style={{ fontSize: '0.75rem', color: '#00c853', fontWeight: 800 }}>
-                  — Radha Krishna Maram
-                </span>
-              </div>
-            </>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '6px 0' }}>
-              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                No trainer remarks logged yet for today. Submit your daily log to receive direct trainer feedback!
-              </div>
-              <Link href="/client/daily-log" style={{ textDecoration: 'none' }}>
-                <Button size="sm" style={{ backgroundColor: 'var(--accent)', color: '#FFF', fontWeight: 700 }}>
-                  Submit Today&apos;s Log 📱
-                </Button>
-              </Link>
-            </div>
-          )}
+          {(() => {
+            const rawComments = latestTrainerReview?.comments || [];
+            const uniqueComments = [];
+            const seen = new Set();
+            for (const c of rawComments) {
+              if (!c || !c.text) continue;
+              const timeMinute = c.createdAt ? c.createdAt.slice(0, 16) : '';
+              const key = `${c.sender || c.senderRole}_${c.text.trim()}_${timeMinute}`;
+              if (seen.has(key)) continue;
+              seen.add(key);
+              uniqueComments.push(c);
+            }
+
+            const hasComments = uniqueComments.length > 0;
+            const hasRemarks = !!(latestTrainerReview?.remarks && latestTrainerReview.remarks.trim());
+
+            if (!hasComments && !hasRemarks) {
+              return (
+                <div style={{ textAlign: 'center', padding: '6px 0' }}>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                    No trainer remarks logged yet for today. Submit your daily log to receive direct trainer feedback!
+                  </div>
+                  <Link href="/client/daily-log" style={{ textDecoration: 'none' }}>
+                    <Button size="sm" style={{ backgroundColor: 'var(--accent)', color: '#FFF', fontWeight: 700 }}>
+                      Submit Today&apos;s Log 📱
+                    </Button>
+                  </Link>
+                </div>
+              );
+            }
+
+            return (
+              <>
+                {/* If remarks exists and no comments array yet, show initial trainer remark */}
+                {!hasComments && hasRemarks && (
+                  <div style={{ padding: '8px 12px', backgroundColor: 'rgba(0, 200, 83, 0.08)', borderRadius: '8px', borderLeft: '3px solid #00c853' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#00c853', fontWeight: 800, marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      👑 Coach Radha Krishna Maram
+                    </div>
+                    <div style={{ fontSize: '0.88rem', color: '#E0E0E0', lineHeight: '1.5', fontStyle: 'italic' }}>
+                      &ldquo;{latestTrainerReview.remarks}&rdquo;
+                    </div>
+                  </div>
+                )}
+
+                {/* Comments & Reply Thread */}
+                {hasComments && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {uniqueComments.map((comment, cIdx) => {
+                      const isTrainer = comment.sender === 'trainer' || comment.senderRole === 'trainer';
+                      return (
+                        <div
+                          key={comment.id || cIdx}
+                          style={{
+                            padding: '8px 12px',
+                            borderRadius: '10px',
+                            backgroundColor: isTrainer ? 'rgba(0, 200, 83, 0.08)' : 'rgba(224, 0, 8, 0.08)',
+                            borderLeft: `3px solid ${isTrainer ? '#00c853' : 'var(--accent, #E00008)'}`,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '2px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: isTrainer ? '#00c853' : 'var(--accent, #E00008)' }}>
+                              {isTrainer ? '👑 Coach Radha Krishna' : `🏋️ ${comment.senderName || 'You (Client)'}`}
+                            </span>
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+                              {comment.createdAt ? new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </span>
+                          </div>
+                          <p style={{ margin: 0, fontSize: '0.84rem', color: '#FFFFFF', lineHeight: 1.4 }}>
+                            {comment.text}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Interactive Reply Flow */}
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '10px' }}>
+                  {!showReplyInput ? (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                        Have a question or response for your coach?
+                      </span>
+                      <Button 
+                        size="sm" 
+                        onClick={() => setShowReplyInput(true)}
+                        style={{ backgroundColor: 'var(--accent)', color: '#FFF', fontSize: '0.75rem', fontWeight: 700, padding: '4px 10px' }}
+                      >
+                        <MessageSquare size={13} /> Reply to Coach
+                      </Button>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSendReply} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <MessageSquare size={13} color="var(--accent)" /> Reply to Coach Radha Krishna:
+                        </span>
+                        <button 
+                          type="button" 
+                          onClick={() => setShowReplyInput(false)}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.72rem' }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input 
+                          type="text"
+                          placeholder="Type your reply to coach (e.g. Thanks coach, feeling great today!)..."
+                          value={replyText}
+                          onChange={(e) => setReplyText(e.target.value)}
+                          autoFocus
+                          style={{
+                            flex: 1,
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid var(--border)',
+                            color: '#FFFFFF',
+                            fontSize: '0.82rem',
+                            outline: 'none'
+                          }}
+                        />
+                        <Button 
+                          type="submit" 
+                          loading={sendingReply}
+                          size="sm"
+                          style={{ backgroundColor: 'var(--accent)', color: '#FFF', fontWeight: 700, padding: '8px 14px', whiteSpace: 'nowrap' }}
+                        >
+                          <Send size={13} /> Send Reply
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              </>
+            );
+          })()}
         </div>
       </Card>
 
@@ -640,17 +812,6 @@ export default function ClientDashboard() {
                 )}
               </div>
 
-              {/* Workout Weight */}
-              <div style={{ padding: '12px', backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Dumbbell size={14} color="#00c853" /> Workout Weight Lifted
-                  </span>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#00c853' }}>
-                    {workoutWeight ? `${workoutWeight} kg` : '--'}
-                  </span>
-                </div>
-              </div>
 
               {/* Sleep Duration */}
               <div style={{ padding: '12px', backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', border: '1px solid var(--border)' }}>

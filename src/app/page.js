@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import PlanCard from '@/components/ui/PlanCard';
-import { Spinner } from '@/components/ui/Loading';
+import { Spinner, PageLoader } from '@/components/ui/Loading';
 import { useToast } from '@/components/ui/Toast';
 import Modal from '@/components/ui/Modal';
 import {
@@ -133,7 +133,18 @@ const transformationSlides = [
 export default function HomePage() {
   const toast = useToast();
   const router = useRouter();
-  const { user, userData } = useAuth();
+  const { user, userData, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      const isAdmin = userData?.role === 'admin' || user.email?.toLowerCase().includes('admin');
+      if (isAdmin) {
+        router.replace('/admin');
+      } else {
+        router.replace('/client');
+      }
+    }
+  }, [user, userData, authLoading, router]);
 
   const [currentTransSlide, setCurrentTransSlide] = useState(0);
   const [selectedFullTransImage, setSelectedFullTransImage] = useState(null);
@@ -257,6 +268,10 @@ export default function HomePage() {
   const proteinGrams = Math.round(calcWeight * 2.2);
   const carbsGrams = Math.round((estimatedCalories * 0.40) / 4);
   const fatGrams = Math.round((estimatedCalories * 0.25) / 9);
+
+  if (authLoading || user) {
+    return <PageLoader message="Redirecting to your dashboard..." />;
+  }
 
   return (
     <div style={styles.pageWrapper}>

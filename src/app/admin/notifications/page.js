@@ -7,7 +7,7 @@ import Button from '@/components/ui/Button';
 import Avatar from '@/components/ui/Avatar';
 import { Select, Input, Textarea } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
-import { Bell, Send, CheckCircle2, Info, AlertTriangle, Clock, Search, X, Users, Filter, Check, Zap, Sparkles, Layers } from 'lucide-react';
+import { Bell, Send, CheckCircle2, Info, AlertTriangle, Clock, Search, X, Users, Filter, Check, Zap, Sparkles, Layers, MessageSquare, ArrowRight } from 'lucide-react';
 
 export default function NotificationsPage() {
   const toast = useToast();
@@ -25,6 +25,7 @@ export default function NotificationsPage() {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [recentSent, setRecentSent] = useState([]);
+  const [historyFilter, setHistoryFilter] = useState('all'); // 'all' | 'replies' | 'broadcasts'
   const [loading, setLoading] = useState(true);
 
   // Search & plan filter state
@@ -521,33 +522,102 @@ export default function NotificationsPage() {
             </div>
           </Card>
 
-          {/* ENHANCED CARD 3: RECENT SENT LOG */}
+          {/* ENHANCED CARD 3: RECENT SENT & CLIENT REPLIES LOG */}
           <Card style={styles.historyCard} className="glass-card">
-            <div style={styles.sideCardHeader}>
-              <Clock size={16} color="var(--accent)" />
-              <h2 style={styles.sideCardTitle}>Recent Sent History Log</h2>
+            <div style={{ ...styles.sideCardHeader, justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Clock size={16} color="var(--accent)" />
+                <h2 style={styles.sideCardTitle}>Activity & Replies Log</h2>
+              </div>
+
+              {/* Filter Pills */}
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button
+                  onClick={() => setHistoryFilter('all')}
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    borderRadius: '10px',
+                    border: 'none',
+                    backgroundColor: historyFilter === 'all' ? 'var(--accent, #E00008)' : 'rgba(255,255,255,0.06)',
+                    color: '#FFF',
+                    cursor: 'pointer'
+                  }}
+                >
+                  All ({recentSent.length})
+                </button>
+                <button
+                  onClick={() => setHistoryFilter('replies')}
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    borderRadius: '10px',
+                    border: 'none',
+                    backgroundColor: historyFilter === 'replies' ? '#00c853' : 'rgba(255,255,255,0.06)',
+                    color: '#FFF',
+                    cursor: 'pointer'
+                  }}
+                >
+                  💬 Replies ({recentSent.filter(n => n.type === 'client_reply').length})
+                </button>
+                <button
+                  onClick={() => setHistoryFilter('broadcasts')}
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    borderRadius: '10px',
+                    border: 'none',
+                    backgroundColor: historyFilter === 'broadcasts' ? '#ff9100' : 'rgba(255,255,255,0.06)',
+                    color: '#FFF',
+                    cursor: 'pointer'
+                  }}
+                >
+                  📢 Sent
+                </button>
+              </div>
             </div>
 
             <div style={styles.historyList}>
-              {recentSent.length === 0 ? (
-                <div style={styles.emptyHistoryState}>
-                  <Bell size={24} color="var(--text-secondary)" style={{ marginBottom: '6px', opacity: 0.5 }} />
-                  <div>No notifications sent yet.</div>
-                </div>
-              ) : (
-                recentSent.slice(0, 6).map((item, idx) => {
-                  const dateStr = item.sentAt 
-                    ? new Date(item.sentAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+              {(() => {
+                const filtered = recentSent.filter(item => {
+                  if (historyFilter === 'replies') return item.type === 'client_reply';
+                  if (historyFilter === 'broadcasts') return item.type !== 'client_reply';
+                  return true;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div style={styles.emptyHistoryState}>
+                      <Bell size={24} color="var(--text-secondary)" style={{ marginBottom: '6px', opacity: 0.5 }} />
+                      <div>No items in this category.</div>
+                    </div>
+                  );
+                }
+
+                return filtered.slice(0, 10).map((item, idx) => {
+                  const isClientReply = item.type === 'client_reply';
+                  const dateStr = item.sentAt || (item.createdAt?.seconds ? new Date(item.createdAt.seconds * 1000).toISOString() : null)
+                    ? new Date(item.sentAt || item.createdAt?.seconds * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
                     : 'Just now';
 
                   return (
-                    <div key={idx} style={styles.historyItem}>
+                    <div key={idx} style={{
+                      ...styles.historyItem,
+                      backgroundColor: isClientReply ? 'rgba(0, 200, 83, 0.05)' : 'var(--card, #1a1a1f)',
+                      border: isClientReply ? '1px solid rgba(0, 200, 83, 0.25)' : '1px solid var(--border, #2a2a30)'
+                    }}>
                       <div style={{
                         ...styles.historyIconWrapper,
+                        ...(isClientReply ? { backgroundColor: 'rgba(0, 200, 83, 0.15)', borderColor: '#00c853' } : {}),
                         ...(item.type === 'alert' ? { backgroundColor: 'rgba(255, 23, 68, 0.15)', borderColor: '#ff1744' } : {}),
                         ...(item.type === 'info' ? { backgroundColor: 'rgba(41, 182, 246, 0.15)', borderColor: '#29b6f6' } : {})
                       }}>
-                        {item.type === 'alert' ? (
+                        {isClientReply ? (
+                          <MessageSquare size={15} color="#00c853" />
+                        ) : item.type === 'alert' ? (
                           <AlertTriangle size={15} color="#ff1744" />
                         ) : item.type === 'info' ? (
                           <Info size={15} color="#29b6f6" />
@@ -558,20 +628,45 @@ export default function NotificationsPage() {
 
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
-                          <h4 style={styles.historyTitle}>{item.title}</h4>
+                          <h4 style={{ ...styles.historyTitle, color: isClientReply ? '#00c853' : 'var(--text)' }}>
+                            {item.title}
+                          </h4>
                           <span style={styles.historyTime}>{dateStr}</span>
                         </div>
                         <p style={styles.historyMeta}>
-                          Target: <strong style={{ color: 'var(--text)' }}>{item.recipientName || 'Clients'}</strong>
+                          {isClientReply ? (
+                            <span>From: <strong style={{ color: '#00c853' }}>{item.clientName || 'Client'}</strong></span>
+                          ) : (
+                            <span>Target: <strong style={{ color: 'var(--text)' }}>{item.recipientName || 'Clients'}</strong></span>
+                          )}
                         </p>
                         <p style={styles.historyMessageSnippet}>
                           {item.message}
                         </p>
+
+                        {isClientReply && (
+                          <div style={{ marginTop: '6px' }}>
+                            <a
+                              href={`/admin/monitoring${item.clientName ? `?search=${encodeURIComponent(item.clientName)}` : ''}`}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.72rem',
+                                color: '#00c853',
+                                fontWeight: 700,
+                                textDecoration: 'none'
+                              }}
+                            >
+                              View & Reply in Daily Monitoring <ArrowRight size={11} />
+                            </a>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
-                })
-              )}
+                });
+              })()}
             </div>
           </Card>
 

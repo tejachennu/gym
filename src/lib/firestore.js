@@ -203,8 +203,115 @@ export const getClientNotifications = async (clientId) => {
     return tB - tA;
   });
 };
+
+export const getAdminNotifications = async () => {
+  const allNotifs = await getDocuments("Notifications");
+  const filtered = (allNotifs || []).filter(n => 
+    n.recipient === 'admin' || 
+    n.type === 'client_reply' ||
+    n.target === 'admin'
+  );
+  return filtered.sort((a, b) => {
+    const tA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+    const tB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+    return tB - tA;
+  });
+};
+
 export const markAsRead = (notificationId) => updateDocument("Notifications", notificationId, { read: true });
 export const deleteNotification = (notificationId) => deleteDocument("Notifications", notificationId);
+
+// Review Comments & Reply Thread Flow
+export const addReviewComment = async (collectionName, docId, commentData) => {
+  const docRef = doc(db, collectionName, docId);
+  const docSnap = await getDoc(docRef);
+  const existingData = docSnap.exists() ? docSnap.data() : {};
+  const currentComments = Array.isArray(existingData.comments) ? existingData.comments : [];
+  
+  const commentsList = [...currentComments];
+  const newText = (commentData.text || '').trim();
+
+  // If there are no existing comments, but there was an old legacy remark DIFFERENT from this new message text
+  if (commentsList.length === 0 && existingData.remarks && existingData.remarks.trim() && existingData.remarks.trim() !== newText) {
+    commentsList.push({
+      id: 'initial_remark',
+      sender: 'trainer',
+      senderName: 'Radha Krishna Maram',
+      senderRole: 'trainer',
+      text: existingData.remarks.trim(),
+      createdAt: existingData.reviewedAt || (existingData.createdAt?.seconds ? new Date(existingData.createdAt.seconds * 1000).toISOString() : new Date().toISOString())
+    });
+  }
+
+  const nowIso = new Date().toISOString();
+  if (newText) {
+    const newComment = {
+      id: `${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      ...commentData,
+      text: newText,
+      createdAt: nowIso
+    };
+    commentsList.push(newComment);
+  }
+
+  // Deduplicate comments to prevent any duplicated messages from appearing
+  const uniqueComments = [];
+  const seenKeys = new Set();
+  for (const c of commentsList) {
+    if (!c || !c.text) continue;
+    const timeMinute = c.createdAt ? c.createdAt.slice(0, 16) : '';
+    const key = `${c.sender || c.senderRole}_${c.text.trim()}_${timeMinute}`;
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    uniqueComments.push(c);
+  }
+
+  await setDoc(docRef, {
+    comments: uniqueComments,
+    remarks: newText || existingData.remarks || '',
+    lastCommentAt: nowIso,
+    lastCommentBy: commentData.sender || 'trainer',
+    lastCommentText: newText,
+    hasUnreadClientReply: commentData.sender === 'client',
+    reviewed: true,
+    reviewedAt: nowIso,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+
+  // If client commented, send notification to trainer / admin
+  if (commentData.sender === 'client') {
+    await createNotification({
+      recipient: 'admin',
+      type: 'client_reply',
+      title: `💬 Reply from ${commentData.senderName || 'Client'}`,
+      message: `${commentData.senderName || 'Client'} replied to trainer review (${existingData.date || 'Daily Log'}): "${commentData.text}"`,
+      clientId: existingData.clientId || commentData.clientId,
+      clientName: commentData.senderName || 'Client',
+      docId: docId,
+      collectionName: collectionName,
+      date: existingData.date || new Date().toISOString().split('T')[0],
+      link: '/admin/monitoring',
+      read: false
+    });
+  } else if (commentData.sender === 'trainer' && (existingData.clientId || commentData.clientId)) {
+    // If trainer added a reply, send notification to client!
+    const targetClientId = existingData.clientId || commentData.clientId;
+    await createNotification({
+      recipient: targetClientId,
+      type: 'trainer_feedback',
+      title: `💬 Coach Radha Krishna Replied`,
+      message: `Coach: "${commentData.text}"`,
+      clientId: targetClientId,
+      docId: docId,
+      collectionName: collectionName,
+      date: existingData.date || new Date().toISOString().split('T')[0],
+      link: '/client',
+      read: false
+    });
+  }
+
+  return initialComments;
+};
 
 // Users
 export const getAllClients = () => queryDocuments("Users", [{ field: "role", operator: "==", value: "client" }]);

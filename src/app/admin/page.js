@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { getAllClients, getClientDailyLogs, getClientCheckins, getPlans, getDocuments } from '@/lib/firestore';
+import { getNextCheckinInfo } from '@/lib/checkinUtils';
 import Card from '@/components/ui/Card';
 import StatsCard from '@/components/ui/StatsCard';
 import Button from '@/components/ui/Button';
@@ -324,38 +325,16 @@ export default function AdminDashboard() {
           .map(c => {
             const cLogs = logsMap[c.id] ? Object.values(logsMap[c.id]) : [];
             const checkinLogs = cLogs.filter(l => l.type === 'checkin' || l.photos || l.measurements);
-            checkinLogs.sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
-            
-            let lastDate = checkinLogs.length > 0 ? new Date(checkinLogs[0].date || checkinLogs[0].createdAt) : null;
-            if (!lastDate || isNaN(lastDate.getTime())) {
-              lastDate = c.createdAt?.seconds ? new Date(c.createdAt.seconds * 1000) : new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-            }
-            
-            const nextCheckinDate = new Date(lastDate);
-            nextCheckinDate.setDate(nextCheckinDate.getDate() + 10);
-            
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const diffDays = Math.ceil((nextCheckinDate - today) / (1000 * 60 * 60 * 24));
-            
-            let dueStatus = '';
-            let dueVariant = 'success';
-            if (diffDays < 0) {
-              dueStatus = `Overdue by ${Math.abs(diffDays)} day(s)`;
-              dueVariant = 'danger';
-            } else if (diffDays === 0) {
-              dueStatus = 'Due Today 🔥';
-              dueVariant = 'warning';
-            } else {
-              dueStatus = `Due in ${diffDays} day(s)`;
-              dueVariant = 'success';
-            }
+            const checkinInfo = getNextCheckinInfo(c, checkinLogs);
 
             return {
               ...c,
-              checkinDueStatus: dueStatus,
-              checkinDueVariant: dueVariant,
-              nextCheckinDate: nextCheckinDate.toISOString().split('T')[0]
+              checkinDueStatus: checkinInfo.statusText,
+              dueStatus: checkinInfo.statusText,
+              checkinDueVariant: checkinInfo.badgeVariant,
+              dueVariant: checkinInfo.badgeVariant,
+              nextCheckinDate: checkinInfo.nextCheckinDate,
+              nextCheckinDateStr: checkinInfo.nextCheckinDateFormatted
             };
           });
 

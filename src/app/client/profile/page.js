@@ -11,7 +11,7 @@ import Button from '@/components/ui/Button';
 import Avatar from '@/components/ui/Avatar';
 import { Input, Textarea, Select } from '@/components/ui/Input';
 import SearchableSelect from '@/components/ui/SearchableSelect';
-import { ALL_COUNTRIES } from '@/lib/countries';
+import { ALL_COUNTRIES, getCountryFlag, getCountryWithFlag } from '@/lib/countries';
 import { Spinner } from '@/components/ui/Loading';
 import { useToast } from '@/components/ui/Toast';
 import { validateField } from '@/lib/validation';
@@ -311,7 +311,7 @@ export default function ProfilePage() {
             </div>
             <p style={styles.emailText}>{form.email}</p>
             <div style={styles.metaRow}>
-              <span>📍 {form.location || 'Location Not Set'}</span>
+              <span>📍 {form.location ? `${form.location}, ` : ''}{getCountryWithFlag(form.country || 'India')}</span>
               <span>•</span>
               <span>🏋️ {form.goal}</span>
             </div>
@@ -665,7 +665,7 @@ export default function ProfilePage() {
                 placeholder="-- Select Country --"
                 value={form.country}
                 onChange={(e) => setForm({ ...form, country: e.target.value })}
-                options={ALL_COUNTRIES.map(c => ({ label: c, value: c }))}
+                options={ALL_COUNTRIES}
               />
 
               <Input 

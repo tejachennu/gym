@@ -40,7 +40,10 @@ import {
   ArrowLeft,
   X,
   FileText,
-  Dumbbell
+  Dumbbell,
+  AlertTriangle,
+  Edit,
+  History
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -127,6 +130,71 @@ export default function TrackingPage() {
   const [takenSupplements, setTakenSupplements] = useState({});
 
   const todayDateString = new Date().toISOString().split('T')[0];
+  const getYesterdayDateString = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().split('T')[0];
+  };
+  const yesterdayDateString = getYesterdayDateString();
+
+  const [selectedLogDate, setSelectedLogDate] = useState(todayDateString);
+  const [showAlreadySubmittedModal, setShowAlreadySubmittedModal] = useState(false);
+  const [alreadySubmittedDate, setAlreadySubmittedDate] = useState('');
+
+  const handleSelectLogDate = async (targetDate, triggerPopupIfSubmitted = true) => {
+    setSelectedLogDate(targetDate);
+    let existing = dailyLogsHistory.find(l => l.date === targetDate);
+    if (!existing && user?.uid) {
+      try {
+        existing = await getDailyLog(user.uid, targetDate);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    const isSubmitted = !!(existing && (existing.steps || existing.water || existing.sleepHours || existing.dailyNotes || existing.stepsScreenshot || (existing.takenSupplements && Object.keys(existing.takenSupplements).length > 0)));
+
+    if (isSubmitted) {
+      setActivityWellnessForm({
+        steps: existing.steps !== undefined && existing.steps !== null ? String(existing.steps) : '',
+        stepsScreenshot: existing.stepsScreenshot || '',
+        water: existing.water !== undefined && existing.water !== null ? String(existing.water) : '',
+        sleepHours: existing.sleepHours !== undefined && existing.sleepHours !== null ? String(existing.sleepHours) : '',
+        sleepQuality: existing.sleepQuality || 'Good',
+        energyLevel: existing.energyLevel || 'Medium',
+        mood: existing.mood || 'Good',
+        dailyNotes: existing.dailyNotes || ''
+      });
+      setTakenSupplements(existing.takenSupplements || {});
+
+      if (triggerPopupIfSubmitted) {
+        setAlreadySubmittedDate(targetDate);
+        setShowAlreadySubmittedModal(true);
+      }
+    } else {
+      setActivityWellnessForm({
+        steps: '',
+        stepsScreenshot: '',
+        water: '',
+        sleepHours: '',
+        sleepQuality: 'Good',
+        energyLevel: 'Medium',
+        mood: 'Good',
+        dailyNotes: ''
+      });
+      setTakenSupplements({});
+    }
+  };
+
+  const openActivityLogModal = (targetDate = todayDateString) => {
+    handleSelectLogDate(targetDate, false);
+    setShowInputPopup(true);
+  };
+
+  const isCurrentSelectedDateSubmitted = !!(() => {
+    const existing = dailyLogsHistory.find(l => l.date === selectedLogDate);
+    return existing && (existing.steps || existing.water || existing.sleepHours || existing.dailyNotes || existing.stepsScreenshot || (existing.takenSupplements && Object.keys(existing.takenSupplements).length > 0));
+  })();
 
   const loadAllData = async () => {
     try {
@@ -224,9 +292,10 @@ export default function TrackingPage() {
   const handleSaveActivityWellness = async (e) => {
     if (e) e.preventDefault();
     setSubmitting(true);
+    const dateToSave = selectedLogDate || todayDateString;
     try {
       await submitDailyLog(user.uid, {
-        date: todayDateString,
+        date: dateToSave,
         steps: activityWellnessForm.steps ? Number(activityWellnessForm.steps) : 0,
         stepsScreenshot: activityWellnessForm.stepsScreenshot || '',
         water: activityWellnessForm.water ? Number(activityWellnessForm.water) : 0,
@@ -238,8 +307,9 @@ export default function TrackingPage() {
         takenSupplements: takenSupplements
       });
 
-      toast.success('Daily Activity & Wellness Log saved successfully!');
+      toast.success(`Daily Activity & Wellness Log for ${dateToSave === todayDateString ? 'Today' : dateToSave} saved successfully!`);
       setShowInputPopup(false);
+      setShowAlreadySubmittedModal(false);
       await loadAllData();
     } catch (err) {
       console.error(err);
@@ -454,32 +524,47 @@ export default function TrackingPage() {
                       onChange={(e) => setToDate(e.target.value)} 
                       containerStyle={{ flex: 1, minWidth: '120px' }}
                     />
-                    <Button variant="outline" size="sm" onClick={() => { setFromDate(defaultFromDate); setToDate(defaultToDate); }} style={{ alignSelf: 'flex-end' }}>
+                    <Button variant="outline" size="sm" onClick={() => { setFromDate(getDefaultFromDate()); setToDate(getDefaultToDate()); }} style={{ alignSelf: 'flex-end' }}>
                       Reset (1 Month)
                     </Button>
                   </div>
                 </Card>
 
-                <Button 
-                  onClick={() => !isTodayActivityWellnessDone && setShowInputPopup(true)} 
-                  disabled={isTodayActivityWellnessDone}
-                  style={{ 
-                    padding: '10px', 
-                    fontSize: '0.85rem',
-                    backgroundColor: isTodayActivityWellnessDone ? '#00c853' : 'var(--accent)',
-                    color: '#fff',
-                    opacity: isTodayActivityWellnessDone ? 0.8 : 1,
-                    cursor: isTodayActivityWellnessDone ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {isTodayActivityWellnessDone ? (
-                    <>✓ Daily Activity & Wellness Submitted Today</>
-                  ) : (
-                    <><PlusCircle size={16} /> Log Today&apos;s Activity & Wellness</>
-                  )}
-                </Button>
+                {/* Log Action Buttons */}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <Button 
+                    onClick={() => openActivityLogModal(todayDateString)} 
+                    style={{ 
+                      flex: 1,
+                      padding: '10px', 
+                      fontSize: '0.85rem',
+                      backgroundColor: isTodayActivityWellnessDone ? '#00c853' : 'var(--accent)',
+                      color: '#fff',
+                      fontWeight: 700
+                    }}
+                  >
+                    {isTodayActivityWellnessDone ? (
+                      <>✓ Today Logged (Tap to Update / Re-log)</>
+                    ) : (
+                      <><PlusCircle size={16} /> Log Today&apos;s Activity ({todayDateString})</>
+                    )}
+                  </Button>
 
-
+                  <Button 
+                    variant="outline"
+                    onClick={() => openActivityLogModal(yesterdayDateString)} 
+                    style={{ 
+                      padding: '10px 14px', 
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <Clock size={15} color="var(--accent)" /> Log Yesterday
+                  </Button>
+                </div>
 
                 {/* GRAPH 2: STEPS */}
                 <Card style={styles.chartCard} className="glass-card">
@@ -516,12 +601,167 @@ export default function TrackingPage() {
                     </div>
                   ) : <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No water intake data found.</p>}
                 </Card>
+
+                {/* RECENT ACTIVITY LOGS LIST */}
+                <Card style={{ padding: '12px' }} className="glass-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <h4 style={{ ...styles.chartTitle, margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <History size={15} color="var(--accent)" /> Recent Activity Logs History
+                    </h4>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                      {dailyLogsHistory.length} total entries
+                    </span>
+                  </div>
+
+                  {dailyLogsHistory.length === 0 ? (
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic', margin: '8px 0' }}>
+                      No activity logs recorded yet. Start by logging today or yesterday!
+                    </p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto' }}>
+                      {dailyLogsHistory.slice(0, 10).map((log, idx) => {
+                        const isToday = log.date === todayDateString;
+                        const isYesterday = log.date === yesterdayDateString;
+                        const dateLabel = isToday ? 'Today' : (isYesterday ? 'Yesterday' : log.date);
+
+                        return (
+                          <div 
+                            key={log.id || idx}
+                            style={{
+                              padding: '10px 12px',
+                              backgroundColor: 'var(--card-hover)',
+                              border: isToday ? '1px solid rgba(0, 200, 83, 0.4)' : '1px solid var(--border)',
+                              borderRadius: '10px',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              gap: '10px'
+                            }}
+                          >
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <strong style={{ fontSize: '0.82rem', color: 'var(--text)' }}>
+                                  {dateLabel} <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 400 }}>({log.date})</span>
+                                </strong>
+                                {isToday && <Badge variant="success" size="sm">Today</Badge>}
+                                {isYesterday && <Badge variant="neutral" size="sm">Yesterday</Badge>}
+                              </div>
+
+                              <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                <span>👟 {log.steps || 0} steps</span>
+                                <span>💧 {log.water || 0}L</span>
+                                <span>🌙 {log.sleepHours || 0}h ({log.sleepQuality || 'Good'})</span>
+                                {log.mood && <span>Mood: {log.mood}</span>}
+                              </div>
+
+                              {log.dailyNotes && (
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontStyle: 'italic', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  &ldquo;{log.dailyNotes}&rdquo;
+                                </div>
+                              )}
+                            </div>
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openActivityLogModal(log.date)}
+                              style={{ padding: '4px 10px', fontSize: '0.72rem', fontWeight: 700, flexShrink: 0 }}
+                            >
+                              <Edit size={12} /> Edit / Re-log
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </Card>
               </div>
 
               {/* INPUT POPUP FOR ACTIVITY & WELLNESS */}
               {showInputPopup && (
-                <Modal isOpen={showInputPopup} onClose={() => setShowInputPopup(false)} title="Log Today's Activity & Wellness" size="md">
+                <Modal 
+                  isOpen={showInputPopup} 
+                  onClose={() => setShowInputPopup(false)} 
+                  title={isCurrentSelectedDateSubmitted ? `Update Daily Activity — ${selectedLogDate}` : `Log Daily Activity — ${selectedLogDate}`} 
+                  size="md"
+                >
                   <form onSubmit={handleSaveActivityWellness} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    
+                    {/* Date Selector Row */}
+                    <div style={{
+                      padding: '10px 12px',
+                      backgroundColor: 'var(--card-hover)',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Calendar size={14} color="var(--accent)" /> Select Activity Date:
+                        </label>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectLogDate(todayDateString, true)}
+                            style={{
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              border: selectedLogDate === todayDateString ? '1px solid var(--accent)' : '1px solid var(--border)',
+                              backgroundColor: selectedLogDate === todayDateString ? 'var(--accent-surface)' : 'var(--card)',
+                              color: selectedLogDate === todayDateString ? 'var(--accent)' : 'var(--text-secondary)',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Today
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectLogDate(yesterdayDateString, true)}
+                            style={{
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              border: selectedLogDate === yesterdayDateString ? '1px solid var(--accent)' : '1px solid var(--border)',
+                              backgroundColor: selectedLogDate === yesterdayDateString ? 'var(--accent-surface)' : 'var(--card)',
+                              color: selectedLogDate === yesterdayDateString ? 'var(--accent)' : 'var(--text-secondary)',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            ⏮️ Yesterday
+                          </button>
+                        </div>
+                      </div>
+
+                      <Input 
+                        type="date" 
+                        value={selectedLogDate} 
+                        max={todayDateString}
+                        onChange={(e) => handleSelectLogDate(e.target.value, true)} 
+                      />
+
+                      {isCurrentSelectedDateSubmitted && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '0.72rem',
+                          color: '#ffb300',
+                          backgroundColor: 'rgba(255, 179, 0, 0.1)',
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255, 179, 0, 0.25)'
+                        }}>
+                          <AlertTriangle size={14} color="#ffb300" />
+                          <span>Log already submitted for <strong>{selectedLogDate}</strong>. Submitting again will update your entry (2nd submission).</span>
+                        </div>
+                      )}
+                    </div>
+
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', alignItems: 'end' }}>
                         <Input label="Steps (e.g. 10000)" type="number" value={activityWellnessForm.steps} onChange={(e) => setActivityWellnessForm({ ...activityWellnessForm, steps: e.target.value })} />
@@ -632,10 +872,64 @@ export default function TrackingPage() {
                       </div>
                     )}
 
-                    <Button type="submit" loading={submitting} style={{ width: '100%', marginTop: '4px' }}>
-                      Save Daily Activity & Wellness Log
+                    <Button type="submit" loading={submitting} style={{ width: '100%', marginTop: '4px', fontWeight: 800 }}>
+                      {isCurrentSelectedDateSubmitted ? '💾 Update Daily Activity Log (2nd Submission)' : 'Save Daily Activity & Wellness Log'}
                     </Button>
                   </form>
+                </Modal>
+              )}
+
+              {/* POPUP ALERT MODAL: ALREADY SUBMITTED DATE */}
+              {showAlreadySubmittedModal && (
+                <Modal
+                  isOpen={showAlreadySubmittedModal}
+                  onClose={() => setShowAlreadySubmittedModal(false)}
+                  title="⚠️ Daily Log Already Submitted"
+                  size="sm"
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'center', padding: '10px 0' }}>
+                    <div style={{
+                      width: '52px',
+                      height: '52px',
+                      borderRadius: '50%',
+                      backgroundColor: 'rgba(255, 179, 0, 0.15)',
+                      border: '1px solid rgba(255, 179, 0, 0.4)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto',
+                      color: '#ffb300'
+                    }}>
+                      <AlertTriangle size={26} />
+                    </div>
+
+                    <div>
+                      <h4 style={{ margin: '0 0 6px 0', fontSize: '1.05rem', color: '#FFFFFF', fontWeight: 800 }}>
+                        Log Already Submitted for {alreadySubmittedDate === todayDateString ? `Today (${alreadySubmittedDate})` : (alreadySubmittedDate === yesterdayDateString ? `Yesterday (${alreadySubmittedDate})` : alreadySubmittedDate)}
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                        You have already submitted a daily activity log for this date. Your previous entry has been loaded into the form. You can modify any values and re-submit (2nd submission) to update it.
+                      </p>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setShowAlreadySubmittedModal(false);
+                        }}
+                        style={{ flex: 1, fontSize: '0.8rem' }}
+                      >
+                        Pick Another Date
+                      </Button>
+                      <Button
+                        onClick={() => setShowAlreadySubmittedModal(false)}
+                        style={{ flex: 1, backgroundColor: 'var(--accent)', color: '#FFF', fontSize: '0.8rem', fontWeight: 700 }}
+                      >
+                        ✏️ Edit / Update Log
+                      </Button>
+                    </div>
+                  </div>
                 </Modal>
               )}
             </div>
