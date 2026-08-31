@@ -310,7 +310,7 @@ export const addReviewComment = async (collectionName, docId, commentData) => {
     });
   }
 
-  return initialComments;
+  return uniqueComments;
 };
 
 // Users
