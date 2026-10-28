@@ -190,13 +190,19 @@ export const deleteBloodReport = (id) => deleteDocument("BloodReports", id);
 
 // Notifications
 export const createNotification = (notificationData) => addDocument("Notifications", notificationData);
+// Merges several query results into one list, dropping documents matched by more than one query
+const mergeById = (lists) => {
+  const byId = {};
+  lists.flat().forEach(item => { byId[item.id] = item; });
+  return Object.values(byId);
+};
+
 export const getClientNotifications = async (clientId) => {
-  const allNotifs = await getDocuments("Notifications");
-  const filtered = (allNotifs || []).filter(n => 
-    n.recipient === 'all' || 
-    n.recipient === clientId || 
-    n.userId === clientId
-  );
+  const results = await Promise.all([
+    queryDocuments("Notifications", [{ field: "recipient", operator: "in", value: ['all', clientId] }]),
+    queryDocuments("Notifications", [{ field: "userId", operator: "==", value: clientId }])
+  ]);
+  const filtered = mergeById(results);
   return filtered.sort((a, b) => {
     const tA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.sentAt ? new Date(a.sentAt).getTime() : 0);
     const tB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.sentAt ? new Date(b.sentAt).getTime() : 0);
@@ -205,12 +211,12 @@ export const getClientNotifications = async (clientId) => {
 };
 
 export const getAdminNotifications = async () => {
-  const allNotifs = await getDocuments("Notifications");
-  const filtered = (allNotifs || []).filter(n => 
-    n.recipient === 'admin' || 
-    n.type === 'client_reply' ||
-    n.target === 'admin'
-  );
+  const results = await Promise.all([
+    queryDocuments("Notifications", [{ field: "recipient", operator: "==", value: 'admin' }]),
+    queryDocuments("Notifications", [{ field: "type", operator: "==", value: 'client_reply' }]),
+    queryDocuments("Notifications", [{ field: "target", operator: "==", value: 'admin' }])
+  ]);
+  const filtered = mergeById(results);
   return filtered.sort((a, b) => {
     const tA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
     const tB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt ? new Date(b.createdAt).getTime() : 0);

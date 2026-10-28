@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { getClientById, getDailyLog, getClientCheckins, getPlans, getClientPlans, getDocuments, addReviewComment } from '@/lib/firestore';
+import { getClientById, getDailyLog, getClientCheckins, getPlans, getClientPlans, getClientDailyLogs, addReviewComment } from '@/lib/firestore';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
@@ -65,7 +65,6 @@ export default function ClientDashboard() {
   const [selectedPlanIndex, setSelectedPlanIndex] = useState(0);
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [allUserLogs, setAllUserLogs] = useState([]);
-  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Client Reply to Trainer Review State
@@ -83,20 +82,13 @@ export default function ClientDashboard() {
         getClientCheckins(user.uid),
         getPlans(),
         getClientPlans(user.uid),
-        getDocuments('Notifications'),
-        getDocuments('DailyLogs')
-      ]).then(([profileData, logData, checkinsData, plansData, cPlansData, notifsData, allLogsData]) => {
+        getClientDailyLogs(user.uid)
+      ]).then(([profileData, logData, checkinsData, plansData, cPlansData, myLogs]) => {
         setProfile(profileData);
         setTodayLog(logData);
         setCheckins(checkinsData || []);
         setMasterPlans(plansData || []);
-        
-        const myLogs = (allLogsData || []).filter(l => l.clientId === user.uid);
-        setAllUserLogs(myLogs);
-
-        const clientNotifs = (notifsData || []).filter(n => n.recipient === 'all' || n.recipient === user.uid);
-        clientNotifs.sort((a, b) => new Date(b.sentAt || b.createdAt) - new Date(a.sentAt || a.createdAt));
-        setNotifications(clientNotifs);
+        setAllUserLogs(myLogs || []);
 
         // Combine profile.planHistory and cPlansData
         let combinedPlans = profileData?.planHistory || [];

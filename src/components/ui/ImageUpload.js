@@ -17,6 +17,7 @@ const ImageUpload = ({
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [uploadError, setUploadError] = useState('');
   const fileInputRef = useRef(null);
 
   const handleDrag = (e) => {
@@ -53,6 +54,7 @@ const ImageUpload = ({
 
   const performUpload = async (filesToUpload) => {
     setUploading(true);
+    setUploadError('');
     if (onUploading) onUploading(true);
     setProgress(0);
     try {
@@ -64,9 +66,9 @@ const ImageUpload = ({
         method: 'POST',
         body: formData
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       
-      if (data.success && data.fileUrl) {
+      if (res.ok && data.success && data.fileUrl) {
         setProgress(100);
         if (onUpload) {
           onUpload(data.fileUrl);
@@ -76,6 +78,7 @@ const ImageUpload = ({
       }
     } catch (err) {
       console.error('Google Drive Upload failed:', err);
+      setUploadError(err.message || 'Upload failed');
     } finally {
       setUploading(false);
       if (onUploading) onUploading(false);
@@ -174,8 +177,8 @@ const ImageUpload = ({
       </p>
       
       {!uploading && !compact && (
-        <p style={{ color: 'var(--text-secondary, #AAAAAA)', fontSize: '10px', margin: 0 }}>
-          Max {maxSize / 1024 / 1024}MB
+        <p style={{ color: uploadError ? '#ff1744' : 'var(--text-secondary, #AAAAAA)', fontSize: '10px', margin: 0 }}>
+          {uploadError ? `⚠️ ${uploadError}` : `Max ${maxSize / 1024 / 1024}MB`}
         </p>
       )}
       

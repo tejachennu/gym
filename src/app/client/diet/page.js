@@ -39,7 +39,13 @@ export default function DietPlanPage() {
   const [takenSupplements, setTakenSupplements] = useState({});
   const [savingSupplements, setSavingSupplements] = useState(false);
 
-  const todayDateString = new Date().toISOString().split('T')[0];
+  const todayDateString = (() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  })();
 
   useEffect(() => {
     if (user?.uid) {
@@ -88,30 +94,29 @@ export default function DietPlanPage() {
         body: formData
       });
       
-      if (!res.ok) throw new Error('Upload failed');
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       
-      if (data.success) {
-        const updated = { ...uploadedPhotos, [slotId]: data.fileUrl };
-        setUploadedPhotos(updated);
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || data.message || `Upload failed (Status ${res.status})`);
+      }
 
-        // Persist to Firestore DailyLogs collection
-        await submitDailyLog(user.uid, todayDateString, {
-          mealPhotos: updated,
-          dietCompleted: true,
-          date: todayDateString
-        });
+      const updated = { ...uploadedPhotos, [slotId]: data.fileUrl };
+      setUploadedPhotos(updated);
 
-        if (toast?.success) {
-          toast.success('Meal photo saved!');
-        }
-      } else {
-        throw new Error(data.message || 'Upload failed');
+      // Persist to Firestore DailyLogs collection
+      await submitDailyLog(user.uid, todayDateString, {
+        mealPhotos: updated,
+        dietCompleted: true,
+        date: todayDateString
+      });
+
+      if (toast?.success) {
+        toast.success('Meal photo saved!');
       }
     } catch (error) {
-      console.error(error);
+      console.error('Meal photo upload error:', error);
       if (toast?.error) {
-        toast.error('Failed to upload photo');
+        toast.error(error.message || 'Failed to upload photo');
       }
     } finally {
       setUploadingPhotos(prev => ({ ...prev, [slotId]: false }));

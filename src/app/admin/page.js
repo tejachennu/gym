@@ -92,10 +92,13 @@ export default function AdminDashboard() {
       let logsListCombined = [];
       const tempLogsMap = {};
 
-      for (const client of clients) {
-        const logs = await getClientDailyLogs(client.id);
-        const checkins = await getClientCheckins(client.id);
-        
+      const clientHistories = await Promise.all(
+        clients.map(client => Promise.all([getClientDailyLogs(client.id), getClientCheckins(client.id)]))
+      );
+
+      for (const [index, client] of clients.entries()) {
+        const [logs, checkins] = clientHistories[index];
+
         tempLogsMap[client.id] = {};
         
         logs.forEach(log => {

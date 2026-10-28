@@ -129,13 +129,19 @@ export default function TrackingPage() {
   const [dietPlans, setDietPlans] = useState([]);
   const [takenSupplements, setTakenSupplements] = useState({});
 
-  const todayDateString = new Date().toISOString().split('T')[0];
-  const getYesterdayDateString = () => {
+  const getLocalDateString = (offsetDays = 0) => {
     const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
+    if (offsetDays !== 0) {
+      d.setDate(d.getDate() + offsetDays);
+    }
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
-  const yesterdayDateString = getYesterdayDateString();
+
+  const todayDateString = getLocalDateString(0);
+  const yesterdayDateString = getLocalDateString(-1);
 
   const [selectedLogDate, setSelectedLogDate] = useState(todayDateString);
   const [showAlreadySubmittedModal, setShowAlreadySubmittedModal] = useState(false);
@@ -273,17 +279,19 @@ export default function TrackingPage() {
 
     setUploadingPhotos(prev => ({ ...prev, [side]: true }));
     try {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result;
-        setPosturePhotos(prev => ({ ...prev, [side]: base64 }));
-        toast.success(`Photo selected!`);
-        setUploadingPhotos(prev => ({ ...prev, [side]: false }));
-      };
-      reader.readAsDataURL(file);
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Upload failed');
+      }
+      setPosturePhotos(prev => ({ ...prev, [side]: data.fileUrl }));
+      toast.success(`Photo uploaded!`);
     } catch (err) {
       console.error(err);
-      toast.error('Failed to upload image');
+      toast.error(err.message || 'Failed to upload image');
+    } finally {
       setUploadingPhotos(prev => ({ ...prev, [side]: false }));
     }
   };
@@ -779,17 +787,26 @@ export default function TrackingPage() {
                             accept="image/*" 
                             id="steps-screenshot-input"
                             style={{ display: 'none' }}
-                            onChange={(e) => {
+                            onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (file) {
                                 setUploadingStepsScreenshot(true);
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setActivityWellnessForm(prev => ({ ...prev, stepsScreenshot: reader.result }));
+                                try {
+                                  const formData = new FormData();
+                                  formData.append('file', file);
+                                  const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                                  const data = await res.json().catch(() => ({}));
+                                  if (!res.ok || !data.success) {
+                                    throw new Error(data.error || 'Upload failed');
+                                  }
+                                  setActivityWellnessForm(prev => ({ ...prev, stepsScreenshot: data.fileUrl }));
+                                  toast.success('Steps screenshot uploaded!');
+                                } catch (err) {
+                                  console.error(err);
+                                  toast.error(err.message || 'Failed to upload screenshot');
+                                } finally {
                                   setUploadingStepsScreenshot(false);
-                                  toast.success('Steps screenshot attached!');
-                                };
-                                reader.readAsDataURL(file);
+                                }
                               }
                             }}
                           />

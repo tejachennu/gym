@@ -37,8 +37,8 @@ export const uploadFileToDrive = async (buffer, filename, mimeType, folderId) =>
     throw new Error('File upload failed: File buffer is empty');
   }
 
-  const primaryFolderId = folderId || "1J8EKHxFC0twuTJhPjXT7FEEUhsz2LA62";
-  const fallbackFolderId = "1v5O9tuTS5Rwes_Uo2aADkIhAYF9IKaoM";
+  const primaryFolderId = folderId || process.env.GOOGLE_DRIVE_FOLDER_ID || "1v5O9tuTS5Rwes_Uo2aADkIhAYF9IKaoM";
+  const fallbackFolderId = "1J8EKHxFC0twuTJhPjXT7FEEUhsz2LA62";
 
   // Helper function to perform the actual drive upload request
   const performUpload = async (targetFolderId) => {
